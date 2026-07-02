@@ -1,0 +1,9 @@
+---
+pid: 24908
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter build apk --debug 2>&1"
+started_at: 2026-07-01T20:59:19.846Z
+running_for_ms: 7470013  
+---
+Running Gradle task 'assembleDebug'...                             31.7s
+√ Built build\app\outputs\flutter-apk\app-debug.apk

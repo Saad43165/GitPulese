@@ -1,0 +1,78 @@
+name: gitexplorer
+description: A production-grade GitHub repository, code, and user explorer app.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Networking
+  dio: ^5.4.3+1
+  pretty_dio_logger: ^1.3.1
+  connectivity_plus: ^6.0.3
+
+  # Local persistence
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  shared_preferences: ^2.2.3
+
+  # UI / rendering
+  flutter_markdown: ^0.7.3
+  cached_network_image: ^3.3.1
+  fl_chart: ^0.68.0
+  shimmer: ^3.0.0
+  google_fonts: ^6.2.1
+  flutter_svg: ^2.0.10+1
+  url_launcher: ^6.3.0
+  share_plus: ^9.0.0
+  flutter_staggered_animations: ^1.1.1
+  timeago: ^3.7.0
+  intl: ^0.19.0
+  collection: ^1.18.0
+
+  # Splash / icon (build-time tools)
+  flutter_native_splash: ^2.4.1
+  flutter_local_notifications: ^17.2.2
+  workmanager: ^0.9.0
+  dio_cache_interceptor: ^4.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.11
+  riverpod_generator: ^2.4.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#0D1117"
+  adaptive_icon_foreground: "assets/icons/app_icon_fg.png"
+
+flutter_native_splash:
+  color: "#0D1117"
+  image: assets/images/splash_logo.png
+  color_dark: "#0D1117"
+  image_dark: assets/images/splash_logo.png
+  android_12:
+    image: assets/images/splash_logo.png
+    icon_background_color: "#0D1117"
+    image_dark: assets/images/splash_logo.png
+    icon_background_color_dark: "#0D1117"

@@ -1,0 +1,26 @@
+---
+pid: 42500
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter analyze 2>&1"
+started_at: 2026-07-01T20:29:10.833Z
+running_for_ms: 9280005  
+---
+Analyzing gitexplorer-2...                                      
+
+warning - Unused import: 'database_helper.dart' - lib\data\local\tracked_repos_table.dart:2:8 - unused_import
+warning - Unused import: '../../providers/core_providers.dart' - lib\features\bookmarks\bookmarks_screen.dart:7:8 - unused_import
+   info - Use interpolation to compose strings and values - lib\features\compare\compare_screen.dart:55:28 - prefer_interpolation_to_compose_strings
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\repo_detail\repo_detail_screen.dart:11:8 - unused_import
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\search\search_screen.dart:7:8 - unused_import
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:109:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:110:28 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:160:21 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:161:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:167:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\tracked_repos\tracked_repos_screen.dart:58:17 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\tracked_repos\tracked_repos_screen.dart:59:29 - prefer_const_literals_to_create_immutables
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\user_detail\user_detail_screen.dart:9:8 - unused_import
+warning - Unused import: '../data/models/repo_model.dart' - lib\providers\search_providers.dart:2:8 - unused_import
+warning - Unused import: '../data/models/user_and_search_models.dart' - lib\providers\search_providers.dart:3:8 - unused_import
+
+15 issues found. (ran in 167.7s)

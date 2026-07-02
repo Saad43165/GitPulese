@@ -1,0 +1,98 @@
+---
+pid: 3904
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter analyze 2>&1"
+started_at: 2026-07-01T19:58:04.159Z
+running_for_ms: 11145005 
+---
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 85.0.0 (104.0.0 available)
+  analyzer 7.6.0 (14.0.0 available)
+  analyzer_plugin 0.13.4 (0.14.13 available)
+  build 2.4.2 (4.0.6 available)
+  build_config 1.1.2 (1.3.0 available)
+  build_resolvers 2.4.4 (3.0.4 available)
+  build_runner 2.4.14 (2.15.0 available)
+  build_runner_core 8.0.0 (9.3.2 available)
+  cached_network_image 3.4.0 (3.4.1 available)
+  cached_network_image_web 1.3.0 (1.3.1 available)
+  cli_util 0.4.2 (0.5.1 available)
+  connectivity_plus 6.1.5 (7.2.0 available)
+  cross_file 0.3.5+3 (0.3.5+4 available)
+  custom_lint_core 0.7.5 (0.8.2 available)
+  custom_lint_visitor 1.0.0+7.7.0 (1.0.0+9.0.0 available)
+  dart_style 3.1.1 (3.1.9 available)
+  fl_chart 0.68.0 (1.2.0 available)
+  flutter_launcher_icons 0.13.1 (0.14.4 available)
+  flutter_lints 4.0.0 (6.0.0 available)
+  flutter_local_notifications 17.2.4 (22.0.1 available)
+  flutter_local_notifications_linux 4.0.1 (8.0.1 available)
+  flutter_local_notifications_platform_interface 7.2.0 (12.0.0 available)
+  flutter_markdown 0.7.7+1 (discontinued replaced by flutter_markdown_plus)
+  flutter_native_splash 2.4.7 (2.4.8 available)
+  flutter_riverpod 2.6.1 (3.3.2 available)
+  google_fonts 6.3.3 (8.1.0 available)
+  image 4.8.0 (4.9.1 available)
+  intl 0.19.0 (0.20.3 available)
+  lints 4.0.0 (6.1.0 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.17.0 (1.18.3 available)
+  mime 1.0.6 (2.0.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  riverpod 2.6.1 (3.3.2 available)
+  riverpod_annotation 2.6.1 (4.0.3 available)
+  riverpod_generator 2.6.5 (4.0.4 available)
+  share_plus 9.0.0 (13.2.0 available)
+  share_plus_platform_interface 4.0.0 (7.1.0 available)
+  shared_preferences_android 2.4.23 (2.4.26 available)
+  shelf_web_socket 2.0.1 (3.0.0 available)
+  source_gen 2.0.0 (4.2.3 available)
+  sqflite 2.4.2+1 (2.4.3 available)
+  sqflite_android 2.4.2+3 (2.4.3 available)
+  sqflite_common 2.5.8 (2.5.11 available)
+  sqflite_darwin 2.4.2 (2.4.3+1 available)
+  sqflite_platform_interface 2.4.0 (2.4.1 available)
+  synchronized 3.4.0+1 (3.4.1 available)
+  test_api 0.7.10 (0.7.13 available)
+  timezone 0.9.4 (0.11.1 available)
+  url_launcher_android 6.3.30 (6.3.32 available)
+  vector_math 2.2.0 (2.4.0 available)
+  web 0.5.1 (1.1.1 available)
+  win32 5.15.0 (6.3.0 available)
+  workmanager 0.5.2 (0.9.0+3 available)
+  xml 6.6.1 (7.0.1 available)
+Got dependencies!
+1 package is discontinued.
+54 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing gitexplorer-2...                                      
+
+warning - Unused import: 'package:gitexplorer/core/network/dio_client.dart' - lib\core\network\dio_client.dart:1:8 - unused_import
+  error - The named parameter 'hitCacheOnErrorExcept' isn't defined - lib\core\network\dio_client.dart:99:11 - undefined_named_parameter
+warning - Unused import: 'database_helper.dart' - lib\data\local\tracked_repos_table.dart:2:8 - unused_import
+warning - Unused import: '../../providers/core_providers.dart' - lib\features\bookmarks\bookmarks_screen.dart:6:8 - unused_import
+   info - Use interpolation to compose strings and values - lib\features\compare\compare_screen.dart:55:28 - prefer_interpolation_to_compose_strings
+   info - Use 'const' with the constructor to improve performance - lib\features\dashboard\dashboard_screen.dart:98:13 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\dashboard\dashboard_screen.dart:140:13 - prefer_const_constructors
+warning - Unused import: '../../data/local/database_helper.dart' - lib\features\history\history_screen.dart:7:8 - unused_import
+warning - Unused import: '../home/root_shell.dart' - lib\features\history\history_screen.dart:12:8 - unused_import
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\repo_detail\repo_detail_screen.dart:11:8 - unused_import
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\search\search_screen.dart:6:8 - unused_import
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:39:11 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:100:11 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:113:11 - prefer_const_constructors
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\settings\settings_screen.dart:120:19 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\settings\settings_screen.dart:121:19 - deprecated_member_use
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\settings\settings_screen.dart:126:19 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\settings\settings_screen.dart:127:19 - deprecated_member_use
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\settings\settings_screen.dart:132:19 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\settings\settings_screen.dart:133:19 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:139:11 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\tracked_repos\tracked_repos_screen.dart:58:17 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\features\tracked_repos\tracked_repos_screen.dart:59:29 - prefer_const_literals_to_create_immutables
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\user_detail\user_detail_screen.dart:9:8 - unused_import
+warning - Unused import: '../data/models/repo_model.dart' - lib\providers\search_providers.dart:2:8 - unused_import
+warning - Unused import: '../data/models/user_and_search_models.dart' - lib\providers\search_providers.dart:3:8 - unused_import
+
+26 issues found. (ran in 58.4s)

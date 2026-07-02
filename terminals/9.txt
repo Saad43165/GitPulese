@@ -1,0 +1,9 @@
+---
+pid: 48532
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && dart analyze lib/features/repo_detail lib/features/user_detail lib/features/compare lib/features/triage lib/features/tracked_repos lib/features/search/widgets/filter_sheet.dart lib/widgets 2>&1"
+started_at: 2026-07-01T20:37:25.793Z
+running_for_ms: 8785003  
+---
+Analyzing repo_detail, user_detail, compare, triage, tracked_repos, filter_sheet.dart, widgets...
+No issues found!

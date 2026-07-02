@@ -1,0 +1,31 @@
+---
+pid: 51492
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter analyze 2>&1"
+started_at: 2026-07-01T20:56:48.951Z
+running_for_ms: 7625015  
+---
+Analyzing gitexplorer-2...                                      
+
+warning - Unused import: 'database_helper.dart' - lib\data\local\tracked_repos_table.dart:2:8 - unused_import
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:44:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:95:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:111:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:124:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:137:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:138:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:152:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:153:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:163:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:164:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:179:23 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:180:34 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:186:34 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:193:34 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:309:22 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:309:44 - prefer_const_constructors
+warning - Unused import: '../data/models/repo_model.dart' - lib\providers\search_providers.dart:2:8 - unused_import
+warning - Unused import: '../data/models/user_and_search_models.dart' - lib\providers\search_providers.dart:3:8 - unused_import
+warning - Unused import: 'package:flutter/material.dart' - lib\providers\settings_providers.dart:1:8 - unused_import
+
+20 issues found. (ran in 15.0s)

@@ -1,0 +1,7 @@
+---
+pid: 46204
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "sleep 20"
+started_at: 2026-07-01T21:09:03.691Z
+running_for_ms: 6890006  
+---
