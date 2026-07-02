@@ -83,3 +83,4 @@ gitexplorer-backend/       separate Node/Express proxy — deploy this first (se
 - **Background notification checks**: reliable on Android via Workmanager, best-effort/OS-throttled on iOS. Manual "Check now" always works on both.
 - Everything else (search, README, languages, contributors, releases, user profiles, history, bookmarks, AI summaries, compare mode, star history, risk checker, security advisories, triage view) hits the real GitHub REST API, real Groq API, or real local SQLite through the backend proxy or directly.
 # GitPulese
+# GitPulese
