@@ -16,6 +16,7 @@ import '../../widgets/repo_card.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../repo_detail/repo_detail_screen.dart';
+import 'widgets/ai_developer_analyzer_card.dart';
 
 final _userDetailProvider =
     FutureProvider.autoDispose.family((ref, String username) async {
@@ -174,7 +175,14 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                   final sorted = langCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
                   final total = langCounts.values.fold<int>(0, (a, b) => a + b);
 
-                  return DetailSection(
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+                        child: AiDeveloperAnalyzerCard(user: user, repos: repos),
+                      ),
+                      DetailSection(
                     title: 'Top Languages',
                     subtitle: 'Based on public repositories',
                     icon: Icons.pie_chart_outline_rounded,
@@ -209,6 +217,8 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                         );
                       }).toList(),
                     ),
+                  );
+                    ],
                   );
                 },
                 orElse: () => const SizedBox.shrink(),

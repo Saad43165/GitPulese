@@ -181,3 +181,36 @@ class GhRepo {
     return 'At Risk';
   }
 }
+
+class GhCommit {
+  final String sha;
+  final String message;
+  final String authorName;
+  final String? authorAvatarUrl;
+  final DateTime date;
+  final String htmlUrl;
+
+  GhCommit({
+    required this.sha,
+    required this.message,
+    required this.authorName,
+    this.authorAvatarUrl,
+    required this.date,
+    required this.htmlUrl,
+  });
+
+  factory GhCommit.fromJson(Map<String, dynamic> json) {
+    final commit = json['commit'] as Map<String, dynamic>? ?? {};
+    final author = commit['author'] as Map<String, dynamic>? ?? {};
+    final authorInfo = json['author'] as Map<String, dynamic>?;
+
+    return GhCommit(
+      sha: json['sha'] as String? ?? '',
+      message: commit['message'] as String? ?? 'No message',
+      authorName: author['name'] as String? ?? 'Unknown',
+      authorAvatarUrl: authorInfo?['avatar_url'] as String?,
+      date: DateTime.tryParse(author['date'] as String? ?? '') ?? DateTime.now(),
+      htmlUrl: json['html_url'] as String? ?? '',
+    );
+  }
+}

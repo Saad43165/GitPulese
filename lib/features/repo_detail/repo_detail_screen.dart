@@ -21,6 +21,7 @@ import '../compare/compare_screen.dart';
 import '../triage/triage_screen.dart';
 import '../user_detail/user_detail_screen.dart';
 import 'widgets/ai_summary_card.dart';
+import 'widgets/recent_commits_section.dart';
 import 'widgets/risk_checker_card.dart';
 import 'widgets/security_advisories_card.dart';
 import 'widgets/similar_repos_section.dart';
@@ -225,6 +226,9 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                         wrapInSurface: false,
                         child: _ContributorsSection(owner: widget.owner, repoName: widget.repoName),
                       ),
+                      const SizedBox(height: AppSpacing.lg),
+                      RecentCommitsSection(owner: widget.owner, repoName: widget.repoName),
+                      const SizedBox(height: AppSpacing.lg),
                       DetailSection(
                         title: 'Latest Releases',
                         icon: Icons.new_releases_outlined,

@@ -269,6 +269,21 @@ class GitHubApiService {
     }
   }
 
+  Future<List<GhCommit>> getRepoCommits(String owner, String repo, {int perPage = 5}) async {
+    try {
+      final response = await _dio.get(
+        ApiConstants.repoCommits(owner, repo),
+        queryParameters: {'per_page': perPage},
+      );
+      return (response.data as List<dynamic>)
+          .map((e) => GhCommit.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409 || e.response?.statusCode == 404) return [];
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
   Future<List<GhRepo>> getUserRepos(String username, {int perPage = 30}) async {
     try {
       final response = await _dio.get(

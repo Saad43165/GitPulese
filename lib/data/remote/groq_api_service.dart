@@ -42,6 +42,36 @@ class GroqApiService {
       throw GroqApiException.fromDioError(e);
     }
   }
+
+  Future<String> analyzeDeveloper({
+    required String username,
+    required String? bio,
+    required List<Map<String, dynamic>> repos,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.backendBaseUrl}/ai/analyze-user',
+        data: {
+          'username': username,
+          'bio': bio,
+          'repos': repos,
+        },
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      final analysis = response.data['analysis'] as String?;
+      if (analysis == null || analysis.trim().isEmpty) {
+        throw GroqApiException('Empty analysis returned.');
+      }
+      return analysis.trim();
+    } on DioException catch (e) {
+      throw GroqApiException.fromDioError(e);
+    }
+  }
 }
 
 class GroqApiException implements Exception {

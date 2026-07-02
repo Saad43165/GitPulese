@@ -34,6 +34,14 @@ final similarReposProvider =
   return api.findSimilarRepos(repo);
 });
 
+// ---------- Recent Commits ----------
+
+final repoCommitsProvider = FutureProvider.autoDispose
+    .family<List<GhCommit>, ({String owner, String repo})>((ref, args) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getRepoCommits(args.owner, args.repo, perPage: 10);
+});
+
 // ---------- Star History ----------
 
 final starHistoryProvider = FutureProvider.autoDispose
