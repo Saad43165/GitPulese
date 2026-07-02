@@ -143,6 +143,7 @@ class SettingsScreen extends ConsumerWidget {
                     subtitle: const Text('Manage repos you receive alerts for'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                   ),
+                ),
               ],
             ),
             _SettingsGroup(

@@ -23,7 +23,7 @@ final trendingReposProvider =
     TrendingPeriod.monthly => SearchPeriod.thisMonth,
   };
 
-  return api.searchRepositories(
+  final result = await api.searchRepositories(
     query: '',
     language: language,
     minStars: 5,
@@ -31,11 +31,11 @@ final trendingReposProvider =
     period: searchPeriod,
     perPage: 20,
   );
-  
+
   if (result.items.isNotEmpty && period == TrendingPeriod.weekly) {
     WidgetManager.updateTrendingWidget(result.items.first);
   }
-  
+
   return result;
 });
 

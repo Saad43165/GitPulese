@@ -1,0 +1,32 @@
+---
+pid: 48608
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter build apk --debug 2>&1"
+started_at: 2026-07-02T21:57:50.665Z
+running_for_ms: 229983   
+---
+Running Gradle task 'assembleDebug'...                          
+/C:/Users/PC/AppData/Local/Pub/Cache/hosted/pub.dev/home_widget-0.3.1/lib/home_widget.dart:137:11: Error: No named parameter with the name 'size'.
+          size: logicalSize,
+          ^^^^
+/C:/src/flutter/packages/flutter/lib/src/rendering/view.dart:33:9: Context: Found this candidate, but the arguments don't match.
+  const ViewConfiguration({
+        ^^^^^^^^^^^^^^^^^
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildDebug'.
+> Process 'command 'C:\src\flutter\bin\flutter.bat'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 40s
+Running Gradle task 'assembleDebug'...                            101.9s
+Gradle task assembleDebug failed with exit code 1

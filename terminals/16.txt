@@ -1,0 +1,66 @@
+---
+pid: 13632
+cwd: "D:\Projects\GitExplorer\gitexplorer-2"
+command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter analyze 2>&1"
+started_at: 2026-07-02T21:55:17.664Z
+running_for_ms: 380004   
+---
+Analyzing gitexplorer-2...                                      
+
+warning - Unused import: 'database_helper.dart' - lib\data\local\tracked_repos_table.dart:2:8 - unused_import
+warning - Unused import: '../../core/theme/app_spacing.dart' - lib\features\auth\auth_dialog.dart:6:8 - unused_import
+   info - Use 'const' with the constructor to improve performance - lib\features\auth\auth_dialog.dart:139:17 - prefer_const_constructors
+warning - Unused import: 'dart:math' - lib\features\dashboard\dashboard_screen.dart:1:8 - unused_import
+warning - Unused import: '../../core/theme/app_spacing.dart' - lib\features\dashboard\dashboard_screen.dart:6:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\home\root_shell.dart:54:39 - deprecated_member_use
+warning - Duplicate import - lib\features\repo_detail\widgets\ai_summary_card.dart:4:8 - duplicate_import
+   info - Use 'const' with the constructor to improve performance - lib\features\repo_detail\widgets\recent_commits_section.dart:32:19 - prefer_const_constructors
+warning - Unused import: '../../../core/theme/app_spacing.dart' - lib\features\repo_detail\widgets\similar_repos_section.dart:7:8 - unused_import
+warning - Unused import: '../../../core/theme/app_spacing.dart' - lib\features\repo_detail\widgets\star_history_chart.dart:7:8 - unused_import
+   info - The import of 'dart:ui' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' - lib\features\search\search_screen.dart:1:8 - unnecessary_import
+warning - Unused import: '../../data/remote/github_api_service.dart' - lib\features\search\search_screen.dart:8:8 - unused_import
+warning - Unused import: '../../widgets/glowing_indicator.dart' - lib\features\search\search_screen.dart:15:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\search\widgets\filter_sheet.dart:33:65 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\search\widgets\filter_sheet.dart:42:52 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:47:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:98:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:114:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:127:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:140:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:141:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:158:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:159:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:173:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:174:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:184:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:185:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:195:26 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:196:30 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:211:23 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:212:34 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:218:34 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:225:34 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:342:22 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:342:44 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\settings\settings_screen.dart:383:11 - prefer_const_constructors
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\splash\splash_screen.dart:115:46 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\features\splash\splash_screen.dart:115:79 - deprecated_member_use
+warning - The value of the local variable 'totalForks' isn't used - lib\features\user_detail\developer_wrapped_screen.dart:96:9 - unused_local_variable
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\developer_wrapped_screen.dart:163:25 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\user_detail_screen.dart:286:32 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\user_detail_screen.dart:286:82 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\user_detail_screen.dart:286:96 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\user_detail_screen.dart:293:24 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\user_detail_screen.dart:293:38 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\features\user_detail\widgets\ai_developer_analyzer_card.dart:31:15 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\providers\ai_providers.dart:175:28 - prefer_const_constructors
+   info - Use 'const' with the constructor to improve performance - lib\providers\ai_providers.dart:281:28 - prefer_const_constructors
+warning - Unused import: '../data/models/repo_model.dart' - lib\providers\search_providers.dart:2:8 - unused_import
+warning - Unused import: '../data/models/user_and_search_models.dart' - lib\providers\search_providers.dart:3:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\widgets\glowing_indicator.dart:50:38 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\widgets\glowing_indicator.dart:58:35 - prefer_const_constructors
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\widgets\glowing_indicator.dart:74:38 - deprecated_member_use
+   info - Use 'const' with the constructor to improve performance - lib\widgets\glowing_indicator.dart:82:35 - prefer_const_constructors
+warning - The value of the local variable 'navReserve' isn't used - lib\widgets\safe_page.dart:21:11 - unused_local_variable
+
+55 issues found. (ran in 14.4s)

@@ -10,7 +10,7 @@ class WidgetManager {
     try {
       await HomeWidget.saveWidgetData<String>('repo_name', repo.fullName);
       await HomeWidget.saveWidgetData<String>('repo_desc', repo.description ?? 'No description');
-      await HomeWidget.saveWidgetData<String>('repo_stars', Formatters.compactNumber(repo.stargazersCount));
+      await HomeWidget.saveWidgetData<String>('repo_stars', formatCount(repo.stargazersCount));
       await HomeWidget.saveWidgetData<String>('repo_lang', repo.language ?? 'Mixed');
       
       // For deep linking

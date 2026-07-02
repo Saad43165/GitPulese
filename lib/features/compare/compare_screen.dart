@@ -97,7 +97,8 @@ class CompareScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
-            ),
+              ),
+        ),
       ),
     );
   }

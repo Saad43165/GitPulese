@@ -198,9 +198,9 @@ class _DeveloperWrappedScreenState extends State<DeveloperWrappedScreen> {
           // Stats Grid
           Row(
             children: [
-              _buildStatBox('Total Stars', Formatters.compactNumber(totalStars), Icons.star_rounded, const Color(0xFFE3B341)),
+              _buildStatBox('Total Stars', formatCount(totalStars), Icons.star_rounded, const Color(0xFFE3B341)),
               const SizedBox(width: 16),
-              _buildStatBox('Followers', Formatters.compactNumber(widget.user.followers), Icons.people_alt_rounded, const Color(0xFF58A6FF)),
+              _buildStatBox('Followers', formatCount(widget.user.followers), Icons.people_alt_rounded, const Color(0xFF58A6FF)),
             ],
           ),
           const SizedBox(height: 16),

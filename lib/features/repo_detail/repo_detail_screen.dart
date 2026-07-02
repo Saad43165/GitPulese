@@ -9,6 +9,7 @@ import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../providers/core_providers.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/ai_providers.dart';

@@ -258,9 +258,9 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                         );
                       }).toList(),
                     ),
-                  );
-                    ],
-                  );
+                  ),
+                ],
+              );
                 },
                 orElse: () => const SizedBox.shrink(),
               ),

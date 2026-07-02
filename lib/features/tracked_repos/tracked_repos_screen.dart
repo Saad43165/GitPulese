@@ -211,6 +211,7 @@ class _TrackedReposScreenState extends ConsumerState<TrackedReposScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }

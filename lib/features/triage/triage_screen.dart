@@ -183,6 +183,7 @@ class TriageScreen extends ConsumerWidget {
             ),
           ],
         ),
+        ),
       ),
     );
   }

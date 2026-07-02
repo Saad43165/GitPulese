@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/manifest_parser.dart';
 import '../data/models/repo_model.dart';
+import '../data/remote/github_api_service.dart';
 import '../data/remote/groq_api_service.dart';
 import 'core_providers.dart';
+
+final groqApiServiceProvider = Provider<GroqApiService>((ref) => GroqApiService());
 
 // ---------- Compare Mode ----------
 
@@ -183,6 +186,48 @@ class StarNotifier extends StateNotifier<AsyncValue<bool>> {
     }
   }
 }
+
+// ---------- AI Developer Analyzer ----------
+
+class DeveloperAnalyzerNotifier extends StateNotifier<AsyncValue<String?>> {
+  DeveloperAnalyzerNotifier(this.groq) : super(const AsyncValue.data(null));
+
+  final GroqApiService groq;
+
+  Future<void> analyzeDeveloper({
+    required String username,
+    required String? bio,
+    required List<GhRepo> topRepos,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final repos = topRepos
+          .map((r) => {
+                'name': r.name,
+                'description': r.description,
+                'language': r.language,
+                'stars': r.stargazersCount,
+                'topics': r.topics,
+              })
+          .toList();
+      final analysis = await groq.analyzeDeveloper(
+        username: username,
+        bio: bio,
+        repos: repos,
+      );
+      if (!mounted) return;
+      state = AsyncValue.data(analysis);
+    } catch (e, st) {
+      if (!mounted) return;
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final developerAnalyzerProvider =
+    StateNotifierProvider.autoDispose<DeveloperAnalyzerNotifier, AsyncValue<String?>>((ref) {
+  return DeveloperAnalyzerNotifier(ref.watch(groqApiServiceProvider));
+});
 
 // ---------- AI Code Explainer ----------
 

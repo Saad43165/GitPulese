@@ -72,7 +72,7 @@ class RecentCommitsSection extends ConsumerWidget {
                           height: 30,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: isDark ? AppColors.darkSurfaceHighlight : AppColors.lightSurfaceHighlight,
+                            color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
                             border: Border.all(
                               color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
                               width: 1,
