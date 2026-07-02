@@ -6,7 +6,7 @@ import '../../../widgets/glowing_indicator.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../data/models/repo_model.dart';
-import '../../../providers/phase2_providers.dart';
+import '../../../providers/ai_providers.dart';
 
 class StarHistoryChart extends ConsumerWidget {
   const StarHistoryChart({super.key, required this.repo});

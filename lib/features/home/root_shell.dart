@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../dashboard/dashboard_screen.dart';
@@ -63,7 +64,10 @@ class _RootShellState extends State<RootShell> {
                 backgroundColor: Colors.transparent,
                 indicatorColor: Colors.transparent,
                 selectedIndex: _index,
-                onDestinationSelected: (i) => setState(() => _index = i),
+                onDestinationSelected: (i) {
+                  HapticFeedback.lightImpact();
+                  setState(() => _index = i);
+                },
                 labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
                 destinations: [
                   NavigationDestination(

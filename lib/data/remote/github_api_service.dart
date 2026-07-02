@@ -464,4 +464,38 @@ class GitHubApiService {
       throw GitHubApiException.fromDioError(e);
     }
   }
+
+  Future<bool> checkFollow(String username) async {
+    try {
+      final response = await _dio.get('/user/following/$username');
+      return response.statusCode == 204;
+    } catch (e) {
+      return false; // 404 means not following
+    }
+  }
+
+  Future<void> followUser(String username, {required bool follow}) async {
+    try {
+      if (follow) {
+        await _dio.put(
+          '/user/following/$username',
+          options: Options(headers: {'Content-Length': '0'}),
+        );
+      } else {
+        await _dio.delete('/user/following/$username');
+      }
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<void> forkRepo(String owner, String repo) async {
+    try {
+      await _dio.post(
+        '/repos/$owner/$repo/forks',
+      );
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
 }

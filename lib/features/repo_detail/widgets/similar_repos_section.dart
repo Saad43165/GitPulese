@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../widgets/glowing_indicator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/repo_model.dart';
-import '../../../providers/phase2_providers.dart';
+import '../../../providers/ai_providers.dart';
 import '../../../widgets/repo_card.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../repo_detail_screen.dart';

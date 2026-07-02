@@ -10,6 +10,7 @@ import '../../core/utils/formatters.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../../providers/ai_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/detail_section.dart';
 import '../../widgets/repo_card.dart';
@@ -152,13 +153,38 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                       ),
                     ],
                     const SizedBox(height: AppSpacing.lg),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => launchUrl(Uri.parse(user.htmlUrl), mode: LaunchMode.externalApplication),
-                        icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                        label: const Text('View on GitHub'),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => launchUrl(Uri.parse(user.htmlUrl), mode: LaunchMode.externalApplication),
+                            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                            label: const Text('View on GitHub'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: Consumer(
+                            builder: (context, ref, _) {
+                              final followState = ref.watch(userFollowProvider(user.login));
+                              return followState.when(
+                                data: (isFollowing) => FilledButton.icon(
+                                  onPressed: () => ref.read(userFollowProvider(user.login).notifier).toggleFollow(),
+                                  icon: Icon(isFollowing ? Icons.person_remove_rounded : Icons.person_add_rounded, size: 18),
+                                  label: Text(isFollowing ? 'Unfollow' : 'Follow'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: isFollowing ? AppColors.danger.withValues(alpha: 0.1) : AppColors.success.withValues(alpha: 0.1),
+                                    foregroundColor: isFollowing ? AppColors.danger : AppColors.success,
+                                    elevation: 0,
+                                  ),
+                                ),
+                                loading: () => const Center(child: GlowingIndicator(size: 24)),
+                                error: (_, __) => const SizedBox.shrink(),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

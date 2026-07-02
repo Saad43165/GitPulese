@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
@@ -38,6 +39,12 @@ class _DeveloperWrappedScreenState extends State<DeveloperWrappedScreen> {
         [XFile(imagePath.path)], 
         text: 'Check out ${widget.user.name ?? widget.user.login}\'s GitHub Stats on GitPulse! 🚀🔥',
       );
+      
+      // Request App Review after sharing
+      final InAppReview inAppReview = InAppReview.instance;
+      if (await inAppReview.isAvailable()) {
+        inAppReview.requestReview();
+      }
     } finally {
       setState(() => _isCapturing = false);
     }

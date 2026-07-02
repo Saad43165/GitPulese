@@ -4,7 +4,7 @@ import '../../../widgets/expandable_section.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/repo_model.dart';
-import '../../../providers/phase2_providers.dart';
+import '../../../providers/ai_providers.dart';
 
 class RiskCheckerCard extends ConsumerWidget {
   const RiskCheckerCard({super.key, required this.repo});

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../core/theme/app_spacing.dart';
 import '../core/theme/app_theme.dart';
+import '../features/auth/auth_dialog.dart';
 
 class ShimmerList extends StatelessWidget {
   const ShimmerList({super.key, this.count = 6});
@@ -127,7 +128,21 @@ class ErrorStateView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (onRetry != null) ...[
+            if (message.toLowerCase().contains('rate limit')) ...[
+              const SizedBox(height: AppSpacing.xl),
+              FilledButton.icon(
+                onPressed: () {
+                  showDialog(context: context, builder: (_) => const AuthDialog());
+                },
+                icon: const Icon(Icons.lock_open_rounded),
+                label: const Text('Sign in with GitHub (Free)'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ] else if (onRetry != null) ...[
               const SizedBox(height: AppSpacing.xl),
               FilledButton.tonal(onPressed: onRetry, child: const Text('Try again')),
             ],

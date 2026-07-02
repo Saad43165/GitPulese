@@ -213,3 +213,37 @@ class CodeExplainerNotifier extends StateNotifier<AsyncValue<String?>> {
     }
   }
 }
+
+// ---------- User Following ----------
+
+final userFollowProvider = StateNotifierProvider.family<FollowNotifier, AsyncValue<bool>, String>((ref, username) {
+  return FollowNotifier(ref.watch(githubApiServiceProvider), username);
+});
+
+class FollowNotifier extends StateNotifier<AsyncValue<bool>> {
+  final GitHubApiService api;
+  final String username;
+  
+  FollowNotifier(this.api, this.username) : super(const AsyncValue.loading()) {
+    checkStatus();
+  }
+
+  Future<void> checkStatus() async {
+    try {
+      final isFollowing = await api.checkFollow(username);
+      if (mounted) state = AsyncValue.data(isFollowing);
+    } catch (e) {
+      if (mounted) state = AsyncValue.data(false);
+    }
+  }
+
+  Future<void> toggleFollow() async {
+    final current = state.valueOrNull ?? false;
+    state = AsyncValue.data(!current); // Optimistic update
+    try {
+      await api.followUser(username, follow: !current);
+    } catch (e) {
+      if (mounted) state = AsyncValue.data(current); // Revert on fail
+    }
+  }
+}

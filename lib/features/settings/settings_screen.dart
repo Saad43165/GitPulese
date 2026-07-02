@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
@@ -186,6 +187,17 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right_rounded),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                AppSurface(
+                  onTap: () => _clearCache(context),
+                  padding: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: _SettingsIcon(icon: Icons.cleaning_services_rounded, color: AppColors.warning),
+                    title: const Text('Clear App Cache'),
+                    subtitle: const Text('Free up storage used by images and data'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ),
               ],
             ),
             _SettingsGroup(
@@ -346,6 +358,35 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _clearCache(BuildContext context) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('App cache cleared successfully!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to clear cache.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _confirmClearHistory(BuildContext context, WidgetRef ref) {

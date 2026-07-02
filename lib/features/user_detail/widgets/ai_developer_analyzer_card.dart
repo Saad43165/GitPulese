@@ -5,7 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/user_and_search_models.dart';
 import '../../../data/models/repo_model.dart';
 import '../../../data/remote/groq_api_service.dart';
-import '../../../providers/phase2_providers.dart';
+import '../../../providers/ai_providers.dart';
 import '../../../widgets/app_surface.dart';
 import '../../../widgets/glowing_indicator.dart';
 

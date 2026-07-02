@@ -5,7 +5,7 @@ import '../../../widgets/glowing_indicator.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/repo_model.dart';
-import '../../../providers/phase2_providers.dart';
+import '../../../providers/ai_providers.dart';
 import '../../../providers/repo_detail_providers.dart';
 import '../../../widgets/app_surface.dart';
 

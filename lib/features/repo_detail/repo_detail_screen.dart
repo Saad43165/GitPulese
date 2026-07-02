@@ -1,6 +1,7 @@
 import 'package:gitexplorer/core/network/dio_client.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -10,7 +11,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/notification_providers.dart';
-import '../../providers/phase2_providers.dart';
+import '../../providers/ai_providers.dart';
 import '../../providers/repo_detail_providers.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../widgets/glowing_indicator.dart';
@@ -277,7 +278,12 @@ class _ActionButtons extends ConsumerWidget {
       final isDark = Theme.of(context).brightness == Brightness.dark;
       return Expanded(
         child: GestureDetector(
-          onTap: onTap,
+          onTap: () {
+            if (onTap != null) {
+              HapticFeedback.lightImpact();
+              onTap();
+            }
+          },
           child: Column(
             children: [
               Container(
@@ -318,7 +324,7 @@ class _ActionButtons extends ConsumerWidget {
             Icons.open_in_new_rounded, 
             () => launchUrl(Uri.parse(repo.htmlUrl), mode: LaunchMode.externalApplication),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           starAsync.when(
             data: (starred) => actionButton(
               starred ? 'Starred' : 'Star', 
@@ -329,7 +335,32 @@ class _ActionButtons extends ConsumerWidget {
             loading: () => const Expanded(child: Center(child: GlowingIndicator())),
             error: (_, __) => const Expanded(child: SizedBox.shrink()),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
+          actionButton(
+            'Fork', 
+            Icons.call_split_rounded, 
+            () async {
+              HapticFeedback.lightImpact();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Forking repository...')),
+              );
+              try {
+                await ref.read(githubApiServiceProvider).forkRepo(owner, repoName);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Repository forked successfully!'), backgroundColor: Colors.green),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to fork. Make sure you are signed in.'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+          ),
+          const SizedBox(width: 8),
           actionButton(
             inCompare ? 'Remove' : 'Compare', 
             inCompare ? Icons.remove_circle_outline : Icons.compare_arrows_rounded, 
@@ -338,13 +369,13 @@ class _ActionButtons extends ConsumerWidget {
               : (compareFull ? null : () => ref.read(compareListProvider.notifier).add(repo)),
             isActive: inCompare,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           actionButton(
             'Triage', 
             Icons.checklist_rtl_rounded, 
             () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TriageScreen(owner: owner, repoName: repoName))),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           trackedAsync.when(
             data: (tracked) => actionButton(
               tracked ? 'Tracking' : 'Track', 

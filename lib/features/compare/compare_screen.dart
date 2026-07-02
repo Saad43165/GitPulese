@@ -6,7 +6,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/repo_model.dart';
-import '../../providers/phase2_providers.dart';
+import '../../providers/ai_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/state_views.dart';

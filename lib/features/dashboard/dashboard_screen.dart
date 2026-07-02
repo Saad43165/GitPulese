@@ -18,28 +18,6 @@ const _popularLanguages = [
   'Go', 'Rust', 'Java', 'Kotlin', 'Swift', 'C++',
 ];
 
-class _OrbitPainter extends CustomPainter {
-  final Color color;
-  _OrbitPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    final center = Offset(size.width, 0); // Top right
-    canvas.drawCircle(center, 100, paint);
-    canvas.drawCircle(center, 180, paint);
-    canvas.drawCircle(center, 260, paint);
-    canvas.drawCircle(center, 340, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
@@ -64,28 +42,43 @@ class DashboardScreen extends ConsumerWidget {
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
               SliverAppBar(
-                expandedHeight: 180,
+                expandedHeight: 160,
                 pinned: true,
-                backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white, // GitHub specific colors
+                backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
                 flexibleSpace: FlexibleSpaceBar(
                   titlePadding: const EdgeInsets.only(left: 24, bottom: 16, right: 24),
-                  title: Text(
-                    'Explore',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      fontSize: 28,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
+                  title: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.rocket_launch_rounded,
+                        size: 20,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Explore',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                          fontSize: 24,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    ],
                   ),
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Positioned.fill(
-                        child: CustomPaint(
-                          painter: _OrbitPainter(
-                            isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)
-                          ),
+                      Positioned(
+                        right: -50,
+                        top: -20,
+                        child: Icon(
+                          Icons.public_rounded,
+                          size: 220,
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
                         ),
                       ),
                     ],

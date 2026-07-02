@@ -4,7 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/user_and_search_models.dart';
-import '../../../providers/phase2_providers.dart';
+import '../../../providers/ai_providers.dart';
 import '../../../widgets/app_surface.dart';
 import '../../../widgets/glowing_indicator.dart';
 
