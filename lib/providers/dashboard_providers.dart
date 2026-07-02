@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/remote/github_api_service.dart';
+import '../core/notifications/widget_manager.dart';
 import 'core_providers.dart';
 
 enum TrendingPeriod { daily, weekly, monthly }
@@ -30,6 +31,12 @@ final trendingReposProvider =
     period: searchPeriod,
     perPage: 20,
   );
+  
+  if (result.items.isNotEmpty && period == TrendingPeriod.weekly) {
+    WidgetManager.updateTrendingWidget(result.items.first);
+  }
+  
+  return result;
 });
 
 /// Real top-by-followers user/org search using the GitHub Search Users API.
