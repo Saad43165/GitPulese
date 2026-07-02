@@ -7,6 +7,8 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/dashboard_providers.dart';
+import '../../providers/settings_providers.dart';
+import '../../features/auth/auth_dialog.dart';
 import '../../widgets/repo_card.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/glowing_indicator.dart';
@@ -47,6 +49,27 @@ class DashboardScreen extends ConsumerWidget {
                 backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
                 surfaceTintColor: Colors.transparent,
                 elevation: 0,
+                actions: [
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final pat = ref.watch(githubPatProvider);
+                      if (pat != null && pat.isNotEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 16.0),
+                        child: FilledButton.icon(
+                          onPressed: () => showDialog(context: context, builder: (_) => const AuthDialog()),
+                          icon: const Icon(Icons.code_rounded, size: 16), // Using code icon to signify GitHub
+                          label: const Text('Sign in with GitHub'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: isDark ? Colors.white : Colors.black,
+                            foregroundColor: isDark ? Colors.black : Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   titlePadding: const EdgeInsets.only(left: 24, bottom: 16, right: 24),
                   title: Row(

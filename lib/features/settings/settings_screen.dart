@@ -149,18 +149,35 @@ class SettingsScreen extends ConsumerWidget {
             _SettingsGroup(
               title: 'Account',
               children: [
-                AppSurface(
-                  onTap: () => showDialog(
-                    context: context,
-                    builder: (_) => const AuthDialog(),
-                  ),
-                  padding: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: _SettingsIcon(icon: Icons.vpn_key_rounded, color: AppColors.accent),
-                    title: const Text('Sign In with GitHub'),
-                    subtitle: const Text('Authenticate to bypass API rate limits'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                  ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final hasPat = ref.watch(githubPatProvider) != null;
+                    return AppSurface(
+                      onTap: () {
+                        if (hasPat) {
+                          ref.read(githubPatProvider.notifier).save(null);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Successfully signed out')),
+                          );
+                        } else {
+                          showDialog(
+                            context: context,
+                            builder: (_) => const AuthDialog(),
+                          );
+                        }
+                      },
+                      padding: EdgeInsets.zero,
+                      child: ListTile(
+                        leading: _SettingsIcon(
+                          icon: hasPat ? Icons.logout_rounded : Icons.vpn_key_rounded,
+                          color: hasPat ? AppColors.danger : AppColors.accent,
+                        ),
+                        title: Text(hasPat ? 'Sign Out of GitHub' : 'Sign In with GitHub'),
+                        subtitle: Text(hasPat ? 'Disconnect your GitHub account' : 'Authenticate to bypass API rate limits'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

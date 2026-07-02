@@ -18,4 +18,9 @@
 -keep class okhttp3.** { *; }
 -keep class okio.** { *; }
 
+# Google Play Core (In App Review)
+-keep class com.google.android.play.core.review.** { *; }
+-keep class com.google.android.play.core.tasks.** { *; }
+-dontwarn com.google.android.play.core.**
+
 -dontwarn io.flutter.plugin.**

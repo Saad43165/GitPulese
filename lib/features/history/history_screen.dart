@@ -1,6 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:intl/intl.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../core/theme/app_spacing.dart';
@@ -203,15 +205,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                           title: 'Nothing matches',
                           subtitle: 'Try a different filter or search term',
                         )
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.pageHorizontal,
-                            0,
-                            AppSpacing.pageHorizontal,
-                            AppSpacing.lg,
-                          ),
-                          children: grouped.entries.expand((section) {
-                            return [
+                      : AnimationLimiter(
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.pageHorizontal,
+                              0,
+                              AppSpacing.pageHorizontal,
+                              AppSpacing.lg,
+                            ),
+                            children: grouped.entries.expand((section) {
+                              return [
                               Padding(
                                 padding: const EdgeInsets.only(
                                   top: AppSpacing.md,
@@ -227,9 +230,15 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               ),
                               ...section.value.map(
                                 (entry) => Padding(
-                                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                                  child: Dismissible(
-                                    key: ValueKey(entry.id),
+                                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                                  child: AnimationConfiguration.staggeredList(
+                                    position: 0,
+                                    duration: const Duration(milliseconds: 375),
+                                    child: SlideAnimation(
+                                      verticalOffset: 50.0,
+                                      child: FadeInAnimation(
+                                        child: Dismissible(
+                                          key: ValueKey(entry.id),
                                     direction: DismissDirection.endToStart,
                                     background: Container(
                                       alignment: Alignment.centerRight,
@@ -305,8 +314,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                   ),
                                 ),
                               ),
-                            ];
-                          }).toList(),
+                            ),
+                          ),
+                        ),
+                      ];
+                    }).toList(),
+                    ),
                         ),
                 ),
               ],

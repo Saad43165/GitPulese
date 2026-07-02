@@ -7,16 +7,17 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/api_constants.dart';
 import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/settings_providers.dart';
 
-class AuthDialog extends StatefulWidget {
+class AuthDialog extends ConsumerStatefulWidget {
   const AuthDialog({super.key});
 
   @override
-  State<AuthDialog> createState() => _AuthDialogState();
+  ConsumerState<AuthDialog> createState() => _AuthDialogState();
 }
 
-class _AuthDialogState extends State<AuthDialog> {
+class _AuthDialogState extends ConsumerState<AuthDialog> {
   final Dio _dio = Dio();
   
   // NOTE: This must be replaced with the user's real GitHub OAuth App Client ID
@@ -96,9 +97,7 @@ class _AuthDialogState extends State<AuthDialog> {
           final token = data['access_token'];
           
           // Save and apply token
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(ApiConstants.patStorageKey, token);
-          DioClient.instance.applyPat(token);
+          ref.read(githubPatProvider.notifier).save(token);
           
           if (mounted) {
             Navigator.of(context).pop(true);

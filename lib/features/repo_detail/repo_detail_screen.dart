@@ -71,6 +71,8 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
               SliverAppBar(
                 pinned: true,
                 expandedHeight: 64,
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                surfaceTintColor: Colors.transparent,
                 title: Text(repo.name, maxLines: 1, overflow: TextOverflow.ellipsis),
                 actions: [
                   IconButton(
@@ -317,75 +319,97 @@ class _ActionButtons extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          actionButton(
-            'GitHub', 
-            Icons.open_in_new_rounded, 
-            () => launchUrl(Uri.parse(repo.htmlUrl), mode: LaunchMode.externalApplication),
-          ),
-          const SizedBox(width: 8),
-          starAsync.when(
-            data: (starred) => actionButton(
-              starred ? 'Starred' : 'Star', 
-              starred ? Icons.star_rounded : Icons.star_border_rounded, 
-              () => ref.read(repoStarProvider((owner: owner, repo: repoName)).notifier).toggleStar(),
-              isActive: starred,
-            ),
-            loading: () => const Expanded(child: Center(child: GlowingIndicator())),
-            error: (_, __) => const Expanded(child: SizedBox.shrink()),
-          ),
-          const SizedBox(width: 8),
-          actionButton(
-            'Fork', 
-            Icons.call_split_rounded, 
-            () async {
-              HapticFeedback.lightImpact();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Forking repository...')),
-              );
-              try {
-                await ref.read(githubApiServiceProvider).forkRepo(owner, repoName);
-                if (context.mounted) {
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              actionButton(
+                'GitHub', 
+                Icons.open_in_new_rounded, 
+                () => launchUrl(Uri.parse(repo.htmlUrl), mode: LaunchMode.externalApplication),
+              ),
+              const SizedBox(width: 8),
+              starAsync.when(
+                data: (starred) => actionButton(
+                  starred ? 'Starred' : 'Star', 
+                  starred ? Icons.star_rounded : Icons.star_border_rounded, 
+                  () async {
+                    try {
+                      await ref.read(repoStarProvider((owner: owner, repo: repoName)).notifier).toggleStar();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please Sign In with GitHub first!'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  isActive: starred,
+                ),
+                loading: () => const Expanded(child: Center(child: GlowingIndicator())),
+                error: (_, __) => const Expanded(child: SizedBox.shrink()),
+              ),
+              const SizedBox(width: 8),
+              actionButton(
+                'Fork', 
+                Icons.call_split_rounded, 
+                () async {
+                  HapticFeedback.lightImpact();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Repository forked successfully!'), backgroundColor: Colors.green),
+                    const SnackBar(content: Text('Forking repository...')),
                   );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to fork. Make sure you are signed in.'), backgroundColor: Colors.red),
-                  );
-                }
-              }
-            },
+                  try {
+                    await ref.read(githubApiServiceProvider).forkRepo(owner, repoName);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Repository forked successfully!'), backgroundColor: Colors.green),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to fork. Make sure you are signed in.'), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          actionButton(
-            inCompare ? 'Remove' : 'Compare', 
-            inCompare ? Icons.remove_circle_outline : Icons.compare_arrows_rounded, 
-            inCompare 
-              ? () => ref.read(compareListProvider.notifier).remove(repo.id)
-              : (compareFull ? null : () => ref.read(compareListProvider.notifier).add(repo)),
-            isActive: inCompare,
-          ),
-          const SizedBox(width: 8),
-          actionButton(
-            'Triage', 
-            Icons.checklist_rtl_rounded, 
-            () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TriageScreen(owner: owner, repoName: repoName))),
-          ),
-          const SizedBox(width: 8),
-          trackedAsync.when(
-            data: (tracked) => actionButton(
-              tracked ? 'Tracking' : 'Track', 
-              tracked ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, 
-              () => ref.read(trackingActionsProvider).toggle(repo),
-              isActive: tracked,
-            ),
-            loading: () => const Expanded(child: Center(child: GlowingIndicator())),
-            error: (_, __) => const Expanded(child: SizedBox.shrink()),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              actionButton(
+                inCompare ? 'Remove' : 'Compare', 
+                inCompare ? Icons.remove_circle_outline : Icons.compare_arrows_rounded, 
+                inCompare 
+                  ? () => ref.read(compareListProvider.notifier).remove(repo.id)
+                  : (compareFull ? null : () => ref.read(compareListProvider.notifier).add(repo)),
+                isActive: inCompare,
+              ),
+              const SizedBox(width: 8),
+              actionButton(
+                'Triage', 
+                Icons.checklist_rtl_rounded, 
+                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TriageScreen(owner: owner, repoName: repoName))),
+              ),
+              const SizedBox(width: 8),
+              trackedAsync.when(
+                data: (tracked) => actionButton(
+                  tracked ? 'Tracking' : 'Track', 
+                  tracked ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, 
+                  () => ref.read(trackingActionsProvider).toggle(repo),
+                  isActive: tracked,
+                ),
+                loading: () => const Expanded(child: Center(child: GlowingIndicator())),
+                error: (_, __) => const Expanded(child: SizedBox.shrink()),
+              ),
+            ],
           ),
         ],
       ),
