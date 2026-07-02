@@ -271,6 +271,7 @@ class _ActionButtons extends ConsumerWidget {
     final inCompare = ref.watch(compareListProvider).any((r) => r.id == repo.id);
     final compareFull = ref.watch(compareListProvider).length >= 3;
     final trackedAsync = ref.watch(isTrackedProvider(repo.id));
+    final starAsync = ref.watch(repoStarProvider((owner: owner, repo: repoName)));
 
     Widget actionButton(String label, IconData icon, VoidCallback? onTap, {bool isActive = false}) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -317,14 +318,17 @@ class _ActionButtons extends ConsumerWidget {
             Icons.open_in_new_rounded, 
             () => launchUrl(Uri.parse(repo.htmlUrl), mode: LaunchMode.externalApplication),
           ),
-          if (repo.homepage != null && repo.homepage!.isNotEmpty) ...[
-            const SizedBox(width: 12),
-            actionButton(
-              'Website', 
-              Icons.language_rounded, 
-              () => launchUrl(Uri.parse(repo.homepage!), mode: LaunchMode.externalApplication),
+          const SizedBox(width: 12),
+          starAsync.when(
+            data: (starred) => actionButton(
+              starred ? 'Starred' : 'Star', 
+              starred ? Icons.star_rounded : Icons.star_border_rounded, 
+              () => ref.read(repoStarProvider((owner: owner, repo: repoName)).notifier).toggleStar(),
+              isActive: starred,
             ),
-          ],
+            loading: () => const Expanded(child: Center(child: GlowingIndicator())),
+            error: (_, __) => const Expanded(child: SizedBox.shrink()),
+          ),
           const SizedBox(width: 12),
           actionButton(
             inCompare ? 'Remove' : 'Compare', 

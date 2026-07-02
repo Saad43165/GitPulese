@@ -72,6 +72,34 @@ class GroqApiService {
       throw GroqApiException.fromDioError(e);
     }
   }
+
+  Future<String> explainCode({
+    required String filename,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.backendBaseUrl}/ai/explain-code',
+        data: {
+          'filename': filename,
+          'code': code,
+        },
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ),
+      );
+
+      final explanation = response.data['explanation'] as String?;
+      if (explanation == null || explanation.trim().isEmpty) {
+        throw GroqApiException('Empty explanation returned.');
+      }
+      return explanation.trim();
+    } on DioException catch (e) {
+      throw GroqApiException.fromDioError(e);
+    }
+  }
 }
 
 class GroqApiException implements Exception {

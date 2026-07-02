@@ -149,3 +149,67 @@ final repoSummaryProvider =
     StateNotifierProvider.autoDispose.family<RepoSummaryNotifier, AsyncValue<String>?, int>(
   (ref, repoId) => RepoSummaryNotifier(ref),
 );
+
+// ---------- Repository Starring ----------
+
+final repoStarProvider = StateNotifierProvider.family<StarNotifier, AsyncValue<bool>, ({String owner, String repo})>((ref, args) {
+  return StarNotifier(ref.watch(githubApiServiceProvider), args);
+});
+
+class StarNotifier extends StateNotifier<AsyncValue<bool>> {
+  final GitHubApiService api;
+  final ({String owner, String repo}) args;
+  
+  StarNotifier(this.api, this.args) : super(const AsyncValue.loading()) {
+    checkStatus();
+  }
+
+  Future<void> checkStatus() async {
+    try {
+      final isStarred = await api.checkStar(args.owner, args.repo);
+      if (mounted) state = AsyncValue.data(isStarred);
+    } catch (e) {
+      if (mounted) state = AsyncValue.data(false);
+    }
+  }
+
+  Future<void> toggleStar() async {
+    final current = state.valueOrNull ?? false;
+    state = AsyncValue.data(!current); // Optimistic update
+    try {
+      await api.starRepo(args.owner, args.repo, star: !current);
+    } catch (e) {
+      if (mounted) state = AsyncValue.data(current); // Revert on fail
+    }
+  }
+}
+
+// ---------- AI Code Explainer ----------
+
+final codeExplainerProvider = StateNotifierProvider.autoDispose<CodeExplainerNotifier, AsyncValue<String?>>((ref) {
+  return CodeExplainerNotifier(ref.watch(groqApiServiceProvider), ref.watch(githubApiServiceProvider));
+});
+
+class CodeExplainerNotifier extends StateNotifier<AsyncValue<String?>> {
+  final GroqApiService groq;
+  final GitHubApiService github;
+  CodeExplainerNotifier(this.groq, this.github) : super(const AsyncValue.data(null));
+
+  Future<void> explainCode({
+    required String owner,
+    required String repo,
+    required String path,
+    required String filename,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final code = await github.getFileRawContent(owner, repo, path);
+      final explanation = await groq.explainCode(filename: filename, code: code);
+      if (!mounted) return;
+      state = AsyncValue.data(explanation);
+    } catch (e) {
+      if (!mounted) return;
+      state = AsyncValue.error(e, StackTrace.current);
+    }
+  }
+}

@@ -16,6 +16,7 @@ import '../../widgets/repo_card.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../repo_detail/repo_detail_screen.dart';
+import 'developer_wrapped_screen.dart';
 import 'widgets/ai_developer_analyzer_card.dart';
 
 final _userDetailProvider =
@@ -181,6 +182,20 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
                         child: AiDeveloperAnalyzerCard(user: user, repos: repos),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeveloperWrappedScreen(user: user, repos: repos))),
+                          icon: const Icon(Icons.style_rounded, size: 18),
+                          label: const Text('Generate Developer Card', style: TextStyle(fontWeight: FontWeight.bold)),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.indigoAccent,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
                       ),
                       DetailSection(
                     title: 'Top Languages',

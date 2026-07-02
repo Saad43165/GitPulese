@@ -423,4 +423,45 @@ class GitHubApiService {
       throw GitHubApiException.fromDioError(e);
     }
   }
+
+  Future<bool> checkStar(String owner, String repo) async {
+    try {
+      final response = await _dio.get(
+        '/user/starred/$owner/$repo',
+      );
+      return response.statusCode == 204;
+    } catch (e) {
+      return false; // 404 means not starred
+    }
+  }
+
+  Future<void> starRepo(String owner, String repo, {required bool star}) async {
+    try {
+      if (star) {
+        await _dio.put(
+          '/user/starred/$owner/$repo',
+          options: Options(headers: {'Content-Length': '0'}),
+        );
+      } else {
+        await _dio.delete('/user/starred/$owner/$repo');
+      }
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<String> getFileRawContent(String owner, String repo, String path) async {
+    try {
+      final response = await _dio.get(
+        '/repos/$owner/$repo/contents/$path',
+        options: Options(
+          headers: {'Accept': 'application/vnd.github.v3.raw'},
+          responseType: ResponseType.plain,
+        ),
+      );
+      return response.data.toString();
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
 }

@@ -11,6 +11,7 @@ import '../../providers/settings_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
+import '../auth/auth_dialog.dart';
 import '../tracked_repos/tracked_repos_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -139,6 +140,23 @@ class SettingsScreen extends ConsumerWidget {
                     leading: _SettingsIcon(icon: Icons.notifications_active_outlined),
                     title: const Text('Tracked repositories'),
                     subtitle: const Text('Manage repos you receive alerts for'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                  ),
+              ],
+            ),
+            _SettingsGroup(
+              title: 'Account',
+              children: [
+                AppSurface(
+                  onTap: () => showDialog(
+                    context: context,
+                    builder: (_) => const AuthDialog(),
+                  ),
+                  padding: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: _SettingsIcon(icon: Icons.vpn_key_rounded, color: AppColors.accent),
+                    title: const Text('Sign In with GitHub'),
+                    subtitle: const Text('Authenticate to bypass API rate limits'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                   ),
                 ),
