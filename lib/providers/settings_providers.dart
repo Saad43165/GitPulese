@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_constants.dart';
 import '../core/network/dio_client.dart';
+import '../data/models/user_and_search_models.dart';
+import '../providers/core_providers.dart';
 import '../providers/search_providers.dart';
 
 /// Optional GitHub PAT — persisted locally, never sent anywhere except GitHub.
@@ -108,3 +110,17 @@ class CompactCardsNotifier extends StateNotifier<bool> {
     await prefs.setBool(_key, value);
   }
 }
+
+// ── Authenticated User ────────────────────────────────────────────────────────
+/// Fetches the signed-in GitHub user profile (/user) whenever a PAT is stored.
+/// Returns null when not authenticated. Auto-refreshes on sign-in/sign-out.
+final authenticatedUserProvider = FutureProvider<GhUser?>((ref) async {
+  final pat = ref.watch(githubPatProvider);
+  if (pat == null || pat.isEmpty) return null;
+  try {
+    final api = ref.read(githubApiServiceProvider);
+    return await api.getAuthenticatedUser();
+  } catch (_) {
+    return null;
+  }
+});

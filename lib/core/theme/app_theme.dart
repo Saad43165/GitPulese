@@ -8,29 +8,29 @@ import 'app_spacing.dart';
 class AppColors {
   AppColors._();
 
-  // Dark — refined developer aesthetic
-  static const Color darkBg = Color(0xFF0B0F14);
-  static const Color darkSurface = Color(0xFF131920);
-  static const Color darkSurfaceElevated = Color(0xFF1A222D);
-  static const Color darkBorder = Color(0xFF2A3441);
-  static const Color darkTextPrimary = Color(0xFFE8EDF4);
-  static const Color darkTextSecondary = Color(0xFF8B9BB0);
-  static const Color darkTextTertiary = Color(0xFF5C6B7E);
+  // Dark — deep space neon aesthetic
+  static const Color darkBg = Color(0xFF000000); // Pure black
+  static const Color darkSurface = Color(0xFF0B0F19); // Very dark blue tint
+  static const Color darkSurfaceElevated = Color(0xFF120E21); // Dark purple surface
+  static const Color darkBorder = Color(0xFF2D1B4E); // Purple tinted border
+  static const Color darkTextPrimary = Color(0xFFF8FAFC);
+  static const Color darkTextSecondary = Color(0xFF94A3B8);
+  static const Color darkTextTertiary = Color(0xFF64748B);
 
   // Light
-  static const Color lightBg = Color(0xFFF4F6F9);
+  static const Color lightBg = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightSurfaceElevated = Color(0xFFF8FAFC);
+  static const Color lightSurfaceElevated = Color(0xFFF1F5F9);
   static const Color lightBorder = Color(0xFFE2E8F0);
   static const Color lightTextPrimary = Color(0xFF0F172A);
   static const Color lightTextSecondary = Color(0xFF64748B);
   static const Color lightTextTertiary = Color(0xFF94A3B8);
 
-  // Brand
-  static const Color accent = Color(0xFF3B82F6);
-  static const Color accentDeep = Color(0xFF2563EB);
-  static const Color accentSoft = Color(0xFF60A5FA);
-  static const Color success = Color(0xFF22C55E);
+  // Brand - Neon Purple/Blue
+  static const Color accent = Color(0xFF8B5CF6); // Vibrant Purple
+  static const Color accentDeep = Color(0xFF6D28D9); // Deep Purple
+  static const Color accentSoft = Color(0xFFC084FC); // Soft Purple/Pink
+  static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFEF4444);
   static const Color star = Color(0xFFFBBF24);
@@ -65,20 +65,22 @@ class AppDecorations {
   static BoxDecoration pageGradient(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
+      color: isDark ? AppColors.darkBg : AppColors.lightBg,
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: isDark
             ? [
-                AppColors.darkBg,
-                const Color(0xFF0E1420),
+                const Color(0xFF140D26), // Subtle dark purple glow at top
+                AppColors.darkBg, // Fade to pitch black
                 AppColors.darkBg,
               ]
             : [
-                AppColors.lightBg,
-                const Color(0xFFEEF2F7),
+                const Color(0xFFF3E8FF), // Subtle light purple glow at top
+                AppColors.lightBg, // Fade to clean white/light-grey
                 AppColors.lightBg,
               ],
+        stops: const [0.0, 0.4, 1.0],
       ),
     );
   }
@@ -89,9 +91,9 @@ class AppDecorations {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          Color(0xFF0B0F14),
-          Color(0xFF111827),
-          Color(0xFF0F172A),
+          Color(0xFF000000),
+          Color(0xFF110B24),
+          Color(0xFF07090E),
         ],
       ),
     );
@@ -108,7 +110,7 @@ class AppTheme {
     final isDark = brightness == Brightness.dark;
     final base = ThemeData(brightness: brightness, useMaterial3: true);
 
-    final textTheme = GoogleFonts.plusJakartaSansTextTheme(base.textTheme).apply(
+    final textTheme = GoogleFonts.outfitTextTheme(base.textTheme).apply(
       bodyColor: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
       displayColor: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
     );
@@ -117,9 +119,9 @@ class AppTheme {
       brightness: brightness,
       primary: AppColors.accent,
       onPrimary: Colors.white,
-      primaryContainer: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFDBEAFE),
+      primaryContainer: isDark ? const Color(0xFF281E4D) : const Color(0xFFF3E8FF),
       onPrimaryContainer: isDark ? AppColors.accentSoft : AppColors.accentDeep,
-      secondary: AppColors.accentDeep,
+      secondary: AppColors.accentSoft,
       onSecondary: Colors.white,
       surface: isDark ? AppColors.darkSurface : AppColors.lightSurface,
       onSurface: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
@@ -139,11 +141,11 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: false,
+        centerTitle: true,
         systemOverlayStyle: isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
+        titleTextStyle: GoogleFonts.outfit(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
           color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           letterSpacing: -0.5,
         ),
@@ -169,43 +171,43 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
-        selectedColor: AppColors.accent.withValues(alpha: isDark ? 0.22 : 0.14),
+        selectedColor: AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.15),
         disabledColor: isDark ? AppColors.darkSurface : AppColors.lightSurfaceElevated,
-        labelStyle: GoogleFonts.plusJakartaSans(
+        labelStyle: GoogleFonts.outfit(
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
         ),
-        secondaryLabelStyle: GoogleFonts.plusJakartaSans(
+        secondaryLabelStyle: GoogleFonts.outfit(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: AppColors.accent,
+          color: AppColors.accentSoft,
         ),
         side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusXl)),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: 70,
         elevation: 0,
-        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        indicatorColor: AppColors.accent.withValues(alpha: isDark ? 0.2 : 0.12),
+        backgroundColor: isDark ? const Color(0xFF030305) : AppColors.lightSurface,
+        indicatorColor: AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return GoogleFonts.plusJakartaSans(
-            fontSize: 11,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          return GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             color: selected
-                ? AppColors.accent
+                ? AppColors.accentSoft
                 : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
           );
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return IconThemeData(
-            size: 22,
+            size: 24,
             color: selected
-                ? AppColors.accent
+                ? AppColors.accentSoft
                 : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
           );
         }),
@@ -214,7 +216,7 @@ class AppTheme {
         filled: true,
         fillColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        hintStyle: GoogleFonts.plusJakartaSans(
+        hintStyle: GoogleFonts.outfit(
           color: isDark ? AppColors.darkTextTertiary : AppColors.lightTextTertiary,
           fontSize: 14,
         ),
@@ -236,12 +238,12 @@ class AppTheme {
           visualDensity: VisualDensity.compact,
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
-              return AppColors.accent.withValues(alpha: isDark ? 0.22 : 0.14);
+              return AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.15);
             }
             return isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated;
           }),
           foregroundColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) return AppColors.accent;
+            if (states.contains(WidgetState.selected)) return AppColors.accentSoft;
             return isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
           }),
           side: WidgetStateProperty.all(
@@ -251,7 +253,7 @@ class AppTheme {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           ),
           textStyle: WidgetStateProperty.all(
-            GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600),
+            GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
           ),
           shape: WidgetStateProperty.all(
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSm)),
@@ -267,7 +269,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 14),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -278,13 +280,13 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           ),
-          textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 14),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.accent,
-          textStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600, fontSize: 14),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
         ),
       ),
       listTileTheme: ListTileThemeData(
@@ -295,7 +297,7 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightTextPrimary,
-        contentTextStyle: GoogleFonts.plusJakartaSans(
+        contentTextStyle: GoogleFonts.outfit(
           color: isDark ? AppColors.darkTextPrimary : Colors.white,
           fontWeight: FontWeight.w500,
         ),
@@ -304,7 +306,7 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusLg)),
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.outfit(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
@@ -316,7 +318,7 @@ class AppTheme {
       badgeTheme: BadgeThemeData(
         backgroundColor: AppColors.accent,
         textColor: Colors.white,
-        textStyle: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.w700),
+        textStyle: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

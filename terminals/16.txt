@@ -3,7 +3,7 @@ pid: 13632
 cwd: "D:\Projects\GitExplorer\gitexplorer-2"
 command: "cd \"D:\\Projects\\GitExplorer\\gitexplorer-2\" && flutter analyze 2>&1"
 started_at: 2026-07-02T21:55:17.664Z
-running_for_ms: 380004   
+running_for_ms: 4405025  
 ---
 Analyzing gitexplorer-2...                                      
 

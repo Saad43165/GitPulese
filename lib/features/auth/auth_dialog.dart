@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,6 +31,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
   String? _error;
   Timer? _pollTimer;
   int _interval = 5;
+  bool _copied = false;
 
   @override
   void initState() {
@@ -56,12 +58,20 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
         ),
       );
 
-      final data = response.data;
+      var data = response.data;
+      if (data is String) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {
+          data = Uri.splitQueryString(data);
+        }
+      }
+
       setState(() {
         _userCode = data['user_code'];
         _verificationUri = data['verification_uri'];
         _deviceCode = data['device_code'];
-        _interval = data['interval'] ?? 5;
+        _interval = int.tryParse(data['interval']?.toString() ?? '') ?? 5;
         _loading = false;
       });
 
@@ -91,13 +101,21 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
           ),
         );
 
-        final data = response.data;
+        var data = response.data;
+        if (data is String) {
+          try {
+            data = jsonDecode(data);
+          } catch (_) {
+            data = Uri.splitQueryString(data);
+          }
+        }
+
         if (data['access_token'] != null) {
           timer.cancel();
           final token = data['access_token'];
           
           // Save and apply token
-          ref.read(githubPatProvider.notifier).save(token);
+          await ref.read(githubPatProvider.notifier).save(token);
           
           if (mounted) {
             Navigator.of(context).pop(true);
@@ -135,13 +153,18 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
           children: [
             Row(
               children: [
-                Icon(Icons.vpn_key_rounded, color: AppColors.accent),
-                const SizedBox(width: 8),
+                Image.asset(
+                  'assets/images/github.png',
+                  width: 24,
+                  height: 24,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
+                const SizedBox(width: 12),
                 Text(
-                  'Sign In with GitHub',
+                  'Connect with GitHub',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                     color: isDark ? Colors.white : Colors.black,
                   ),
                 ),
@@ -154,64 +177,91 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
             else if (_error != null)
               Text(_error!, style: const TextStyle(color: AppColors.danger))
             else ...[
-              const Text(
-                '1. Copy this code:',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              Text(
+                '1. Copy this verification code',
+                style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black87),
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
                 decoration: BoxDecoration(
-                  color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                  color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3), width: 2),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _userCode ?? '',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        letterSpacing: 4,
-                        fontWeight: FontWeight.w900,
+                    Expanded(
+                      child: Text(
+                        _userCode ?? '',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          letterSpacing: 4,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded, size: 20),
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: _userCode ?? ''));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Code copied!')),
-                        );
-                      },
+                    Container(
+                      decoration: BoxDecoration(
+                        color: (_copied ? AppColors.success : AppColors.accent).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          _copied ? Icons.check_rounded : Icons.copy_rounded, 
+                          size: 22, 
+                          color: _copied ? AppColors.success : AppColors.accent
+                        ),
+                        tooltip: 'Copy Code',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: _userCode ?? ''));
+                          setState(() => _copied = true);
+                          Future.delayed(const Duration(seconds: 2), () {
+                            if (mounted) setState(() => _copied = false);
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Code copied to clipboard!')),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                '2. Click below to paste it and authorize GitPulse.',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              Text(
+                '2. Paste it on GitHub to authorize',
+                style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : Colors.black87),
               ),
               const SizedBox(height: 12),
-              ElevatedButton.icon(
+              FilledButton.icon(
                 onPressed: () => launchUrl(Uri.parse(_verificationUri ?? 'https://github.com/login/device'), mode: LaunchMode.externalApplication),
                 icon: const Icon(Icons.open_in_browser_rounded),
-                label: const Text('Open GitHub.com'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                label: const Text('Open GitHub Settings'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: isDark ? Colors.white : Colors.black,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
               ),
-              const SizedBox(height: 16),
-              Center(
-                child: Text(
-                  'Waiting for authorization...',
-                  style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontSize: 13),
-                ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Waiting for authorization...',
+                    style: TextStyle(color: isDark ? Colors.white60 : Colors.black54, fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ],
               ),
             ],
             

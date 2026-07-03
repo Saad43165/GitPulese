@@ -16,8 +16,14 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   DioClient.instance.applyPat(prefs.getString(ApiConstants.patStorageKey));
 
-  await NotificationService.instance.init();
-  await BackgroundTaskManager.initialize();
+  // Guard each init separately — a failure in one must NOT freeze the app.
+  try {
+    await NotificationService.instance.init();
+  } catch (_) {}
+
+  try {
+    await BackgroundTaskManager.initialize();
+  } catch (_) {}
 
   runApp(const ProviderScope(child: GitPulseApp()));
 }

@@ -5,7 +5,7 @@
     <application
         android:label="GitPulse"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -41,6 +41,42 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
+        </receiver>
+
+        <receiver android:name=".OverviewWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"        
+                android:resource="@xml/widget_overview_info" />
+        </receiver>
+
+        <receiver android:name=".TopRepoWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"        
+                android:resource="@xml/widget_top_repo_info" />
+        </receiver>
+
+        <receiver android:name=".ContributionWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"        
+                android:resource="@xml/widget_contribution_info" />
+        </receiver>
+
+        <receiver android:name=".LanguageWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"        
+                android:resource="@xml/widget_language_info" />
         </receiver>
     </application>
     <!-- Required to query activities that can process text, see:

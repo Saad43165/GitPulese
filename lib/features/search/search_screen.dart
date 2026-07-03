@@ -174,17 +174,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           
           // CUSTOM GLOWING PILL TABS
           SizedBox(
-            height: 44,
+            height: 38,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
               children: [
                 _buildTab(SearchTab.repositories, 'Repositories', Icons.folder_rounded, tab),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 _buildTab(SearchTab.users, 'Users', Icons.person_rounded, tab),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 _buildTab(SearchTab.code, 'Code', Icons.code_rounded, tab),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 _buildTab(SearchTab.issues, 'Issues', Icons.bug_report_rounded, tab),
               ],
             ),
@@ -221,10 +221,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       onTap: () => ref.read(searchTabProvider.notifier).state = value,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: isSelected ? AppColors.accent : (isDark ? AppColors.darkSurface : AppColors.lightSurface),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected ? AppColors.accent : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
             width: 1,
@@ -235,16 +236,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           children: [
             Icon(
               icon, 
-              size: 16, 
+              size: 14, 
               color: isSelected ? Colors.white : (isDark ? Colors.white60 : Colors.black54),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : (isDark ? Colors.white60 : Colors.black54),
-                fontSize: 14,
+                fontSize: 13,
               ),
             ),
           ],

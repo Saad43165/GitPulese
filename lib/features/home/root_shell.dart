@@ -51,7 +51,7 @@ class _RootShellState extends State<RootShell> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
+                  color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),
@@ -68,7 +68,7 @@ class _RootShellState extends State<RootShell> {
                   HapticFeedback.lightImpact();
                   setState(() => _index = i);
                 },
-                labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
                 destinations: [
                   NavigationDestination(
                     icon: const Icon(Icons.dashboard_outlined),

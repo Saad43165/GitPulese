@@ -1,3 +1,4 @@
+import 'dart:ui' as dart_ui;
 import 'package:gitexplorer/core/network/dio_client.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -14,7 +15,9 @@ import '../../providers/history_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/ai_providers.dart';
 import '../../providers/repo_detail_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/services/haptic_service.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/detail_section.dart';
@@ -66,8 +69,10 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
           }
           final bookmarkedAsync = ref.watch(isBookmarkedProvider(repo.id));
 
-          return CustomScrollView(
-            slivers: [
+          return Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
               SliverAppBar(
                 pinned: true,
                 expandedHeight: 64,
@@ -106,7 +111,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                     AppSpacing.pageHorizontal,
                     AppSpacing.md,
                     AppSpacing.pageHorizontal,
-                    AppSpacing.xxl,
+                    120, // Extra space for floating action bar
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,7 +198,6 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       const SizedBox(height: AppSpacing.lg),
                       AiSummaryCard(repo: repo),
                       const SizedBox(height: AppSpacing.lg),
-                      _ActionButtons(repo: repo, owner: widget.owner, repoName: widget.repoName),
                       DetailSection(
                         title: 'Star History',
                         subtitle: 'Growth over the last 12 months',
@@ -248,6 +252,14 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                   ),
                 ),
               ),
+                ],
+              ),
+              Positioned(
+                bottom: 24,
+                left: 24,
+                right: 24,
+                child: _GlassmorphicActionBar(repo: repo, owner: widget.owner, repoName: widget.repoName),
+              ),
             ],
           );
         },
@@ -263,8 +275,8 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
   }
 }
 
-class _ActionButtons extends ConsumerWidget {
-  const _ActionButtons({required this.repo, required this.owner, required this.repoName});
+class _GlassmorphicActionBar extends ConsumerWidget {
+  const _GlassmorphicActionBar({required this.repo, required this.owner, required this.repoName});
 
   final dynamic repo;
   final String owner;
@@ -276,39 +288,53 @@ class _ActionButtons extends ConsumerWidget {
     final compareFull = ref.watch(compareListProvider).length >= 3;
     final trackedAsync = ref.watch(isTrackedProvider(repo.id));
     final starAsync = ref.watch(repoStarProvider((owner: owner, repo: repoName)));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final authUser = ref.watch(authenticatedUserProvider).valueOrNull;
+    final isOwnRepo = authUser?.login.toLowerCase() == owner.toLowerCase();
 
-    Widget actionButton(String label, IconData icon, VoidCallback? onTap, {bool isActive = false}) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget actionButton(String label, IconData icon, VoidCallback? onTap, {bool isActive = false, bool isLoading = false}) {
       return Expanded(
         child: GestureDetector(
           onTap: () {
             if (onTap != null) {
-              HapticFeedback.lightImpact();
+              HapticService.selectionClick();
               onTap();
             }
           },
+          behavior: HitTestBehavior.opaque,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                height: 56,
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: isActive ? AppColors.accent : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isActive ? AppColors.accent : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
-                    width: 1,
-                  ),
+                  shape: BoxShape.circle,
+                  color: isActive 
+                      ? AppColors.accent 
+                      : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
                 ),
                 child: Center(
-                  child: Icon(icon, color: isActive ? Colors.white : (isDark ? Colors.white : Colors.black87)),
+                  child: isLoading 
+                      ? const SizedBox(
+                          width: 20, height: 20, 
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                        )
+                      : Icon(
+                          icon, 
+                          size: 20,
+                          color: isActive ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                        ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                maxLines: 2,
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -317,12 +343,25 @@ class _ActionButtons extends ConsumerWidget {
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(32),
+            border: Border.all(
+              color: (isDark ? Colors.white : Colors.black).withOpacity(0.15),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               actionButton(
                 'GitHub', 
@@ -330,60 +369,34 @@ class _ActionButtons extends ConsumerWidget {
                 () => launchUrl(Uri.parse(repo.htmlUrl), mode: LaunchMode.externalApplication),
               ),
               const SizedBox(width: 8),
-              starAsync.when(
-                data: (starred) => actionButton(
-                  starred ? 'Starred' : 'Star', 
-                  starred ? Icons.star_rounded : Icons.star_border_rounded, 
+              if (!isOwnRepo) ...[
+                starAsync.when(
+                  data: (starred) => actionButton(
+                    starred ? 'Starred' : 'Star', 
+                    starred ? Icons.star_rounded : Icons.star_border_rounded, 
+                    () async {
+                      try {
+                        await ref.read(repoStarProvider((owner: owner, repo: repoName)).notifier).toggleStar();
+                      } catch (e) {}
+                    },
+                    isActive: starred,
+                  ),
+                  loading: () => actionButton('Star', Icons.star_border_rounded, null, isLoading: true),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+                actionButton(
+                  'Fork', 
+                  Icons.call_split_rounded, 
                   () async {
                     try {
-                      await ref.read(repoStarProvider((owner: owner, repo: repoName)).notifier).toggleStar();
-                    } catch (e) {
+                      await ref.read(githubApiServiceProvider).forkRepo(owner, repoName);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please Sign In with GitHub first!'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Forked!'), backgroundColor: Colors.green));
                       }
-                    }
+                    } catch (e) {}
                   },
-                  isActive: starred,
                 ),
-                loading: () => const Expanded(child: Center(child: GlowingIndicator())),
-                error: (_, __) => const Expanded(child: SizedBox.shrink()),
-              ),
-              const SizedBox(width: 8),
-              actionButton(
-                'Fork', 
-                Icons.call_split_rounded, 
-                () async {
-                  HapticFeedback.lightImpact();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Forking repository...')),
-                  );
-                  try {
-                    await ref.read(githubApiServiceProvider).forkRepo(owner, repoName);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Repository forked successfully!'), backgroundColor: Colors.green),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Failed to fork. Make sure you are signed in.'), backgroundColor: Colors.red),
-                      );
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              ],
               actionButton(
                 inCompare ? 'Remove' : 'Compare', 
                 inCompare ? Icons.remove_circle_outline : Icons.compare_arrows_rounded, 
@@ -392,13 +405,6 @@ class _ActionButtons extends ConsumerWidget {
                   : (compareFull ? null : () => ref.read(compareListProvider.notifier).add(repo)),
                 isActive: inCompare,
               ),
-              const SizedBox(width: 8),
-              actionButton(
-                'Triage', 
-                Icons.checklist_rtl_rounded, 
-                () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TriageScreen(owner: owner, repoName: repoName))),
-              ),
-              const SizedBox(width: 8),
               trackedAsync.when(
                 data: (tracked) => actionButton(
                   tracked ? 'Tracking' : 'Track', 
@@ -406,13 +412,11 @@ class _ActionButtons extends ConsumerWidget {
                   () => ref.read(trackingActionsProvider).toggle(repo),
                   isActive: tracked,
                 ),
-                loading: () => const Expanded(child: Center(child: GlowingIndicator())),
-                error: (_, __) => const Expanded(child: SizedBox.shrink()),
+                loading: () => actionButton('Track', Icons.notifications_none_rounded, null, isLoading: true),
+                error: (_, __) => const SizedBox.shrink(),
               ),
             ],
           ),
-        ],
-      ),
     );
   }
 }
@@ -691,8 +695,8 @@ class _ReadmeSection extends ConsumerWidget {
         if (readme == null || readme.trim().isEmpty) {
           return Text('No README available.', style: TextStyle(color: Theme.of(context).hintColor));
         }
-        return AppSurface(
-          padding: const EdgeInsets.all(20),
+        return Padding(
+          padding: const EdgeInsets.all(2),
           child: ExpandableSection(
             collapsedHeight: 300,
             child: MarkdownBody(

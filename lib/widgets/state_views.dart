@@ -134,7 +134,12 @@ class ErrorStateView extends StatelessWidget {
                 onPressed: () {
                   showDialog(context: context, builder: (_) => const AuthDialog());
                 },
-                icon: const Icon(Icons.lock_open_rounded),
+                icon: Image.asset(
+                  'assets/images/github.png',
+                  width: 18,
+                  height: 18,
+                  color: Colors.white,
+                ),
                 label: const Text('Sign in with GitHub (Free)'),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.accent,

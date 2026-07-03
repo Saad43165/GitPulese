@@ -74,6 +74,16 @@ class GitHubApiService {
     return 'created:>=$iso';
   }
 
+  /// Returns the GitHub user who owns the current PAT (GET /user).
+  Future<GhUser> getAuthenticatedUser() async {
+    try {
+      final response = await _dio.get('/user');
+      return GhUser.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
   Future<SearchReposResult> searchRepositories({
     required String query,
     String? language,
@@ -204,19 +214,22 @@ class GitHubApiService {
       throw GitHubApiException.fromDioError(e);
     }
   }
-
   /// Returns decoded README markdown as plain text (decoded from base64).
   Future<String?> getRepoReadme(String owner, String repo) async {
     try {
       final response = await _dio.get(
         ApiConstants.repoReadme(owner, repo),
-        options: Options(headers: {'Accept': 'application/vnd.github.raw+json'}),
+        options: Options(headers: {'Accept': 'application/vnd.github.v3.raw'}),
       );
       if (response.data is String) return response.data as String;
       // Fallback: base64 content field
       final content = response.data['content'] as String?;
       if (content == null) return null;
-      return utf8.decode(base64.decode(content.replaceAll('\n', '')));
+      try {
+        return utf8.decode(base64.decode(content.replaceAll(RegExp(r'\s+'), '')));
+      } catch (_) {
+        return null;
+      }
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
       throw GitHubApiException.fromDioError(e);
@@ -440,7 +453,7 @@ class GitHubApiService {
       if (star) {
         await _dio.put(
           '/user/starred/$owner/$repo',
-          options: Options(headers: {'Content-Length': '0'}),
+          data: {},
         );
       } else {
         await _dio.delete('/user/starred/$owner/$repo');
@@ -479,7 +492,7 @@ class GitHubApiService {
       if (follow) {
         await _dio.put(
           '/user/following/$username',
-          options: Options(headers: {'Content-Length': '0'}),
+          data: {},
         );
       } else {
         await _dio.delete('/user/following/$username');

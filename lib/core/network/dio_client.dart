@@ -123,8 +123,10 @@ class DioClient {
   void applyPat(String? token) {
     if (token != null && token.isNotEmpty) {
       _dio.options.headers['Authorization'] = 'Bearer $token';
+      _dio.options.baseUrl = ApiConstants.baseUrl;
     } else {
       _dio.options.headers.remove('Authorization');
+      _dio.options.baseUrl = '${ApiConstants.backendBaseUrl}/github';
     }
   }
 }
