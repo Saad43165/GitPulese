@@ -10,12 +10,14 @@ import '../../providers/history_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/search_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../../providers/ai_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
 import '../auth/auth_dialog.dart';
 import '../tracked_repos/tracked_repos_screen.dart';
 import '../user_detail/user_detail_screen.dart';
+import '../bookmarks/bookmarks_screen.dart';
 import 'widgets_configuration_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -322,7 +324,7 @@ class _ProfileCard extends StatelessWidget {
             children: [
               _StatBadge(label: 'Followers', value: user.followers as int),
               const SizedBox(width: 8),
-              _StatBadge(label: 'Following', value: user.following as int),
+              _StatBadge(label: 'Following', value: (user.following as int) + ref.watch(followingDeltaProvider)),
               const SizedBox(width: 8),
               _StatBadge(label: 'Repos', value: user.publicRepos as int),
             ],
@@ -583,6 +585,33 @@ class _NotificationsGroup extends ConsumerWidget {
             leading: _SettingsIcon(icon: Icons.notifications_active_outlined),
             title: const Text('Tracked repositories'),
             subtitle: const Text('Manage repos you receive alerts for'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonalGroup extends StatelessWidget {
+  const _PersonalGroup();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsGroup(
+      title: 'Personal',
+      children: [
+        AppSurface(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BookmarksScreen()),
+            );
+          },
+          padding: EdgeInsets.zero,
+          child: ListTile(
+            leading: _SettingsIcon(icon: Icons.bookmark_border_rounded, color: AppColors.accent),
+            title: const Text('Saved Repositories'),
+            subtitle: const Text('View your bookmarked open-source projects'),
             trailing: const Icon(Icons.chevron_right_rounded),
           ),
         ),

@@ -16,7 +16,7 @@ class AiDeveloperAnalyzerCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final analyzerState = ref.watch(developerAnalyzerProvider);
+    final analyzerState = ref.watch(developerAnalyzerProvider(user.login));
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AppSurface(
@@ -47,7 +47,7 @@ class AiDeveloperAnalyzerCard extends ConsumerWidget {
                 return Center(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      ref.read(developerAnalyzerProvider.notifier).analyzeDeveloper(
+                      ref.read(developerAnalyzerProvider(user.login).notifier).analyzeDeveloper(
                         username: user.login,
                         bio: user.bio,
                         topRepos: repos,
@@ -109,7 +109,7 @@ class AiDeveloperAnalyzerCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   TextButton(
-                    onPressed: () => ref.read(developerAnalyzerProvider.notifier).analyzeDeveloper(
+                    onPressed: () => ref.read(developerAnalyzerProvider(user.login).notifier).analyzeDeveloper(
                       username: user.login,
                       bio: user.bio,
                       topRepos: repos,

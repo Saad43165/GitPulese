@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/models/repo_model.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/settings_providers.dart';
@@ -22,6 +23,7 @@ import '../../widgets/glowing_indicator.dart';
 import '../repo_detail/repo_detail_screen.dart';
 import 'developer_wrapped_screen.dart';
 import 'widgets/ai_developer_analyzer_card.dart';
+import '../../core/notifications/widget_manager.dart';
 
 final _userDetailProvider =
     FutureProvider.autoDispose.family((ref, String username) async {
@@ -33,6 +35,18 @@ final _userReposProvider =
     FutureProvider.autoDispose.family((ref, String username) async {
   final api = ref.watch(githubApiServiceProvider);
   return api.getUserRepos(username);
+});
+
+final _userFollowersProvider =
+    FutureProvider.autoDispose.family((ref, String username) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getUserFollowers(username);
+});
+
+final _userFollowingProvider =
+    FutureProvider.autoDispose.family((ref, String username) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getUserFollowing(username);
 });
 
 class UserDetailScreen extends ConsumerStatefulWidget {
@@ -50,7 +64,27 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
   Widget build(BuildContext context) {
     final userAsync = ref.watch(_userDetailProvider(widget.username));
     final reposAsync = ref.watch(_userReposProvider(widget.username));
+    final authUser = ref.watch(authenticatedUserProvider);
+    final isOwnProfile = authUser.valueOrNull?.login.toLowerCase() == widget.username.toLowerCase();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Update Android Home Screen Widgets whenever we successfully load profile data
+    ref.listen(_userDetailProvider(widget.username), (prev, nextUser) {
+      if (nextUser is AsyncData) {
+        final repos = ref.read(_userReposProvider(widget.username)).valueOrNull;
+        if (repos != null) {
+          WidgetManager.updateProfileWidgets(nextUser.value, repos as List<GhRepo>);
+        }
+      }
+    });
+    ref.listen(_userReposProvider(widget.username), (prev, nextRepos) {
+      if (nextRepos is AsyncData) {
+        final user = ref.read(_userDetailProvider(widget.username)).valueOrNull;
+        if (user != null) {
+          WidgetManager.updateProfileWidgets(user, nextRepos.value as List<GhRepo>);
+        }
+      }
+    });
 
     return DecoratedBox(
       decoration: AppDecorations.pageGradient(context),
@@ -96,16 +130,11 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                         const SizedBox(height: AppSpacing.lg),
 
                         // Action Buttons — own profile vs other user
-                        Builder(builder: (context) {
-                          final authUser = ref.watch(authenticatedUserProvider);
-                          final isOwnProfile = authUser.valueOrNull?.login.toLowerCase() ==
-                              widget.username.toLowerCase();
-                          return _buildActionButtons(user, isOwnProfile: isOwnProfile);
-                        }),
+                        _buildActionButtons(user, isOwnProfile: isOwnProfile),
                         const SizedBox(height: AppSpacing.xl),
 
                         // Stats Box
-                        _buildStatsBox(user),
+                        _buildStatsBox(user, isOwnProfile: isOwnProfile),
                         const SizedBox(height: AppSpacing.xl),
 
                         // Contribution Graph
@@ -350,9 +379,12 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(100),
-                        child: CachedNetworkImage(
-                          imageUrl: user.avatarUrl,
-                          fit: BoxFit.cover,
+                        child: GestureDetector(
+                          onTap: () => _showAvatarDialog(context, user.avatarUrl),
+                          child: CachedNetworkImage(
+                            imageUrl: user.avatarUrl,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),
@@ -447,19 +479,44 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     );
   }
 
-  Widget _buildStatsBox(dynamic user) {
-    return AppSurface(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Expanded(child: _StatLabel(value: formatCount(user.followers), label: 'Followers', icon: Icons.people_alt_rounded)),
-          Container(width: 1, height: 48, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-          Expanded(child: _StatLabel(value: formatCount(user.following), label: 'Following', icon: Icons.person_add_alt_1_rounded)),
-          Container(width: 1, height: 48, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-          Expanded(child: _StatLabel(value: '${user.publicRepos}', label: 'Repos', icon: Icons.source_rounded)),
-        ],
-      ),
+  Widget _buildStatsBox(dynamic user, {required bool isOwnProfile}) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final followState = ref.watch(userFollowProvider(user.login));
+        final notifier = ref.read(userFollowProvider(user.login).notifier);
+        final followersDelta = notifier.followersDelta;
+        
+        final followingDelta = ref.watch(followingDeltaProvider);
+
+        final displayFollowers = (user.followers ?? 0) + followersDelta;
+        final displayFollowing = (user.following ?? 0) + (isOwnProfile ? followingDelta : 0);
+
+        return AppSurface(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showUsersList(context, 'Followers', _userFollowersProvider(user.login)),
+                  behavior: HitTestBehavior.opaque,
+                  child: _StatLabel(value: formatCount(displayFollowers), label: 'Followers', icon: Icons.people_alt_rounded),
+                ),
+              ),
+              Container(width: 1, height: 48, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showUsersList(context, 'Following', _userFollowingProvider(user.login)),
+                  behavior: HitTestBehavior.opaque,
+                  child: _StatLabel(value: formatCount(displayFollowing), label: 'Following', icon: Icons.person_add_alt_1_rounded),
+                ),
+              ),
+              Container(width: 1, height: 48, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+              Expanded(child: _StatLabel(value: '${user.publicRepos}', label: 'Repos', icon: Icons.source_rounded)),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -837,3 +894,97 @@ class _InfoRow {
   final Color? color;
   final VoidCallback? onTap;
 }
+
+  void _showAvatarDialog(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: InteractiveViewer(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUsersList(BuildContext context, String title, AutoDisposeFutureProvider<List<dynamic>> provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              Expanded(
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final asyncData = ref.watch(provider);
+                    return asyncData.when(
+                      data: (users) {
+                        if (users.isEmpty) {
+                          return const Center(child: Text('No users found.', style: TextStyle(color: Colors.grey)));
+                        }
+                        return ListView.builder(
+                          controller: controller,
+                          itemCount: users.length,
+                          itemBuilder: (context, index) {
+                            final user = users[index];
+                            final followState = ref.watch(userFollowProvider(user.login));
+                            
+                            return ListTile(
+                              leading: CircleAvatar(backgroundImage: CachedNetworkImageProvider(user.avatarUrl)),
+                              title: Text(user.login, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              trailing: followState.when(
+                                data: (isFollowing) => FilledButton(
+                                  onPressed: () => ref.read(userFollowProvider(user.login).notifier).toggleFollow(),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: isFollowing ? Colors.transparent : Theme.of(context).colorScheme.primary,
+                                    foregroundColor: isFollowing ? Theme.of(context).hintColor : Colors.white,
+                                    side: isFollowing ? BorderSide(color: Theme.of(context).dividerColor) : null,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    minimumSize: const Size(0, 36),
+                                  ),
+                                  child: Text(isFollowing ? 'Unfollow' : 'Follow', style: const TextStyle(fontSize: 13)),
+                                ),
+                                loading: () => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                                error: (_, __) => const SizedBox.shrink(),
+                              ),
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: user.login))),
+                            );
+                          },
+                        );
+                      },
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Error: $e')),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }

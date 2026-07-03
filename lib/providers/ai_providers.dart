@@ -225,7 +225,7 @@ class DeveloperAnalyzerNotifier extends StateNotifier<AsyncValue<String?>> {
 }
 
 final developerAnalyzerProvider =
-    StateNotifierProvider.autoDispose<DeveloperAnalyzerNotifier, AsyncValue<String?>>((ref) {
+    StateNotifierProvider.autoDispose.family<DeveloperAnalyzerNotifier, AsyncValue<String?>, String>((ref, username) {
   return DeveloperAnalyzerNotifier(ref.watch(groqApiServiceProvider));
 });
 
@@ -261,34 +261,97 @@ class CodeExplainerNotifier extends StateNotifier<AsyncValue<String?>> {
 
 // ---------- User Following ----------
 
+final followingDeltaProvider = StateProvider<int>((ref) => 0);
+
 final userFollowProvider = StateNotifierProvider.family<FollowNotifier, AsyncValue<bool>, String>((ref, username) {
-  return FollowNotifier(ref.watch(githubApiServiceProvider), username);
+  return FollowNotifier(ref, ref.watch(githubApiServiceProvider), username);
 });
 
 class FollowNotifier extends StateNotifier<AsyncValue<bool>> {
+  final Ref ref;
   final GitHubApiService api;
   final String username;
+  bool? _initialFollowState;
   
-  FollowNotifier(this.api, this.username) : super(const AsyncValue.loading()) {
+  FollowNotifier(this.ref, this.api, this.username) : super(const AsyncValue.loading()) {
     checkStatus();
   }
 
   Future<void> checkStatus() async {
     try {
       final isFollowing = await api.checkFollow(username);
+      _initialFollowState = isFollowing;
       if (mounted) state = AsyncValue.data(isFollowing);
     } catch (e) {
       if (mounted) state = AsyncValue.data(false);
     }
   }
 
+  int get followersDelta {
+    if (_initialFollowState == null) return 0;
+    final current = state.valueOrNull ?? false;
+    if (_initialFollowState == false && current == true) return 1;
+    if (_initialFollowState == true && current == false) return -1;
+    return 0;
+  }
+
   Future<void> toggleFollow() async {
     final current = state.valueOrNull ?? false;
-    state = AsyncValue.data(!current); // Optimistic update
+    final next = !current;
+    state = AsyncValue.data(next); // Optimistic update
+    ref.read(followingDeltaProvider.notifier).state += (next ? 1 : -1);
+    
     try {
-      await api.followUser(username, follow: !current);
+      await api.followUser(username, follow: next);
     } catch (e) {
+      ref.read(followingDeltaProvider.notifier).state -= (next ? 1 : -1);
       if (mounted) state = AsyncValue.data(current); // Revert on fail
     }
   }
 }
+
+class CompareAiNotifier extends StateNotifier<AsyncValue<String?>> {
+  final GroqApiService groq;
+  CompareAiNotifier(this.groq) : super(const AsyncValue.data(null));
+
+  Future<void> runComparison(List<GhRepo> repos) async {
+    if (repos.length < 2) return;
+    state = const AsyncValue.loading();
+    try {
+      final summary = await groq.summarizeRepo(
+        repoFullName: 'Repository Comparison Arena',
+        description: 'Comparing ${repos.map((r) => r.fullName).join(' vs ')}',
+        readme: '''
+You are an expert software architect comparing repositories in the 'AI Repo Arena'.
+Please compare the following repositories in detail and provide a final verdict on which one to choose for different scenarios:
+
+${repos.map((r) => '''
+- Repository: ${r.fullName}
+  Stars: ${r.stargazersCount}
+  Forks: ${r.forksCount}
+  Open Issues: ${r.openIssuesCount}
+  Language: ${r.language ?? 'Mixed'}
+  Description: ${r.description ?? 'No description'}
+  Health Score: ${r.healthScore}
+''').join('\n')}
+
+Format your response cleanly:
+1. Short overview of the comparison
+2. Side-by-side strengths and weaknesses of each (brief bullet points)
+3. Direct Verdict: "Choose A if..., Choose B if..."
+''',
+        primaryLanguage: 'Comparison',
+        topics: ['compare', 'arena'],
+      );
+      state = AsyncValue.data(summary);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+  
+  void reset() => state = const AsyncValue.data(null);
+}
+
+final compareAiProvider = StateNotifierProvider.autoDispose<CompareAiNotifier, AsyncValue<String?>>((ref) {
+  return CompareAiNotifier(ref.watch(groqApiServiceProvider));
+});

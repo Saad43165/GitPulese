@@ -256,7 +256,34 @@ class GitHubApiService {
           .map((e) => GhOwner.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
-      if (e.response?.statusCode == 404) return [];
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<List<GhUser>> getUserFollowers(String username, {int perPage = 30}) async {
+    try {
+      final response = await _dio.get(
+        '/users/$username/followers',
+        queryParameters: {'per_page': perPage},
+      );
+      return (response.data as List<dynamic>)
+          .map((e) => GhUser.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<List<GhUser>> getUserFollowing(String username, {int perPage = 30}) async {
+    try {
+      final response = await _dio.get(
+        '/users/$username/following',
+        queryParameters: {'per_page': perPage},
+      );
+      return (response.data as List<dynamic>)
+          .map((e) => GhUser.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
   }
