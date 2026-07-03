@@ -55,7 +55,7 @@ class _GlowingIndicatorState extends State<GlowingIndicator> with SingleTickerPr
                     child: Container(
                       width: widget.size * 0.15,
                       height: widget.size * 0.15,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.accent,
                       ),
@@ -79,7 +79,7 @@ class _GlowingIndicatorState extends State<GlowingIndicator> with SingleTickerPr
                     child: Container(
                       width: widget.size * 0.1,
                       height: widget.size * 0.1,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.accent,
                       ),

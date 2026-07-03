@@ -31,3 +31,19 @@ final repoReleasesProvider = FutureProvider.autoDispose
   final api = ref.watch(githubApiServiceProvider);
   return api.getRepoReleases(args.owner, args.repo);
 });
+
+final repoPullRequestsProvider = FutureProvider.autoDispose
+    .family<List<dynamic>, ({String owner, String repo})>((ref, args) async {
+  final api = ref.watch(githubApiServiceProvider);
+  final result = await api.searchIssues(
+    query: 'repo:${args.owner}/${args.repo}', 
+    pullRequestsOnly: true,
+  );
+  return result.items;
+});
+
+final repoContentsProvider = FutureProvider.autoDispose
+    .family<List<Map<String, dynamic>>, ({String owner, String repo, String path})>((ref, args) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getRepoContents(args.owner, args.repo, args.path);
+});

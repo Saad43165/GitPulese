@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:gitexplorer/core/network/dio_client.dart' show GitHubApiException;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -73,7 +72,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
       if (nextUser is AsyncData) {
         final repos = ref.read(_userReposProvider(widget.username)).valueOrNull;
         if (repos != null) {
-          WidgetManager.updateProfileWidgets(nextUser.value, repos as List<GhRepo>);
+          WidgetManager.updateProfileWidgets(nextUser.value, repos);
         }
       }
     });
@@ -178,11 +177,11 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(16),
                                   onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeveloperWrappedScreen(user: user, repos: repos))),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(20),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(20),
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.center,
-                                      children: const [
+                                      children: [
                                         Icon(Icons.auto_awesome_rounded, color: Colors.white),
                                         SizedBox(width: 12),
                                         Text('Generate Developer Card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
@@ -526,11 +525,13 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     // Build list of info rows to show
     final items = <_InfoRow>[];
 
-    if (user.company != null && user.company!.isNotEmpty)
+    if (user.company != null && user.company!.isNotEmpty) {
       items.add(_InfoRow(icon: Icons.apartment_rounded, text: user.company!));
-    if (user.location != null && user.location!.isNotEmpty)
+    }
+    if (user.location != null && user.location!.isNotEmpty) {
       items.add(_InfoRow(icon: Icons.location_on_rounded, text: user.location!));
-    if (user.twitterUsername != null && user.twitterUsername!.isNotEmpty)
+    }
+    if (user.twitterUsername != null && user.twitterUsername!.isNotEmpty) {
       items.add(_InfoRow(
         icon: Icons.alternate_email_rounded,
         text: '@${user.twitterUsername}',
@@ -540,6 +541,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
           mode: LaunchMode.externalApplication,
         ),
       ));
+    }
     if (user.blog != null && user.blog!.isNotEmpty) {
       var url = user.blog as String;
       final displayUrl = url.replaceAll(RegExp(r'https?://'), '');
@@ -551,11 +553,12 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
         onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
       ));
     }
-    if (user.createdAt != null)
+    if (user.createdAt != null) {
       items.add(_InfoRow(
         icon: Icons.calendar_today_rounded,
         text: 'Joined ${DateFormat('MMM yyyy').format(user.createdAt)}',
       ));
+    }
 
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -747,7 +750,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                       child: GridView.builder(
                         scrollDirection: Axis.horizontal,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: rows,
                           crossAxisSpacing: gap,
                           mainAxisSpacing: gap,
@@ -788,10 +791,10 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                 children: [
                   Text('Less ', style: TextStyle(color: dimText, fontSize: 10)),
                   _HeatBox(isDark ? const Color(0xFF21262D) : const Color(0xFFEBEDF0)),
-                  _HeatBox(const Color(0xFF9BE9A8)),
-                  _HeatBox(const Color(0xFF40C463)),
-                  _HeatBox(const Color(0xFF30A14E)),
-                  _HeatBox(const Color(0xFF216E39)),
+                  const _HeatBox(Color(0xFF9BE9A8)),
+                  const _HeatBox(Color(0xFF40C463)),
+                  const _HeatBox(Color(0xFF30A14E)),
+                  const _HeatBox(Color(0xFF216E39)),
                   Text(' More', style: TextStyle(color: dimText, fontSize: 10)),
                 ],
               ),
@@ -842,44 +845,6 @@ class _StatLabel extends StatelessWidget {
   }
 }
 
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.text, this.color});
-  final IconData icon;
-  final String text;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: (color ?? Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: (color ?? Theme.of(context).colorScheme.onSurface).withValues(alpha: 0.1), width: 1.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-                letterSpacing: 0.2,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Data class for each row in the profile info card.
 class _InfoRow {

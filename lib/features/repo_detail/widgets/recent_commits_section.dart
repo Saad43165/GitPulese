@@ -29,7 +29,7 @@ class RecentCommitsSection extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.commit_rounded, color: AppColors.accent, size: 20),
+                  const Icon(Icons.commit_rounded, color: AppColors.accent, size: 20),
                   const SizedBox(width: AppSpacing.sm),
                   Text(
                     'Recent Commits',
@@ -97,7 +97,7 @@ class RecentCommitsSection extends ConsumerWidget {
                                           borderRadius: BorderRadius.circular(12),
                                           child: Image.network(commit.authorAvatarUrl!, fit: BoxFit.cover),
                                         )
-                                      : Icon(Icons.person, size: 14, color: AppColors.accent),
+                                      : const Icon(Icons.person, size: 14, color: AppColors.accent),
                                 ),
                                 const SizedBox(width: 8),
                                 Flexible(
@@ -157,7 +157,7 @@ class RecentCommitsSection extends ConsumerWidget {
                                 padding: const EdgeInsets.all(20),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.commit_rounded, color: AppColors.accent),
+                                    const Icon(Icons.commit_rounded, color: AppColors.accent),
                                     const SizedBox(width: 12),
                                     Text('All Recent Commits', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black)),
                                   ],
@@ -176,7 +176,7 @@ class RecentCommitsSection extends ConsumerWidget {
                                       leading: CircleAvatar(
                                         backgroundColor: isDark ? Colors.black26 : Colors.black12,
                                         backgroundImage: commit.authorAvatarUrl != null ? NetworkImage(commit.authorAvatarUrl!) : null,
-                                        child: commit.authorAvatarUrl == null ? Icon(Icons.person, size: 20, color: AppColors.accent) : null,
+                                        child: commit.authorAvatarUrl == null ? const Icon(Icons.person, size: 20, color: AppColors.accent) : null,
                                       ),
                                       title: Text(commit.message, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                                       subtitle: Padding(

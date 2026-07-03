@@ -1,11 +1,11 @@
-import 'dart:ui' as dart_ui;
-import 'package:gitexplorer/core/network/dio_client.dart';
+import 'package:dio/dio.dart';
+import '../../core/network/dio_client.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
@@ -23,7 +23,6 @@ import '../../widgets/app_surface.dart';
 import '../../widgets/detail_section.dart';
 import '../../widgets/state_views.dart';
 import '../compare/compare_screen.dart';
-import '../triage/triage_screen.dart';
 import '../user_detail/user_detail_screen.dart';
 import 'widgets/ai_summary_card.dart';
 import 'widgets/recent_commits_section.dart';
@@ -31,6 +30,8 @@ import 'widgets/risk_checker_card.dart';
 import 'widgets/security_advisories_card.dart';
 import 'widgets/similar_repos_section.dart';
 import 'widgets/star_history_chart.dart';
+import 'widgets/pull_requests_section.dart';
+import 'widgets/source_code_section.dart';
 import '../../widgets/expandable_section.dart';
 
 class RepoDetailScreen extends ConsumerStatefulWidget {
@@ -86,9 +87,15 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       label: Text('${ref.watch(compareListProvider).length}'),
                       child: const Icon(Icons.compare_arrows),
                     ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const CompareScreen()),
-                    ),
+                    onPressed: () {
+                      final compareList = ref.read(compareListProvider);
+                      if (!compareList.any((r) => r.id == repo.id) && compareList.length < 3) {
+                        ref.read(compareListProvider.notifier).add(repo);
+                      }
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const CompareScreen()),
+                      );
+                    },
                   ),
                   IconButton(
                     icon: Icon(AdaptiveIcons.share),
@@ -96,8 +103,8 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                   ),
                   bookmarkedAsync.when(
                     data: (saved) => IconButton(
-                      icon: Icon(saved ? AdaptiveIcons.star : AdaptiveIcons.starOutline,
-                          color: saved ? AppColors.star : null),
+                      icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                          color: saved ? AppColors.accent : null),
                       onPressed: () => ref.read(bookmarkActionsProvider).toggle(repo),
                     ),
                     loading: () => const SizedBox(width: 48),
@@ -234,8 +241,23 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                         wrapInSurface: false,
                         child: _ContributorsSection(owner: widget.owner, repoName: widget.repoName),
                       ),
-                      const SizedBox(height: AppSpacing.lg),
                       RecentCommitsSection(owner: widget.owner, repoName: widget.repoName),
+                      const SizedBox(height: AppSpacing.lg),
+                      DetailSection(
+                        title: 'Source Code',
+                        subtitle: 'Browse repository files',
+                        icon: Icons.code_rounded,
+                        wrapInSurface: false,
+                        child: SourceCodeSection(owner: widget.owner, repoName: widget.repoName),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      DetailSection(
+                        title: 'Pull Requests',
+                        subtitle: 'AI translated code changes',
+                        icon: Icons.call_merge_rounded,
+                        wrapInSurface: false,
+                        child: PullRequestsSection(owner: widget.owner, repoName: widget.repoName),
+                      ),
                       const SizedBox(height: AppSpacing.lg),
                       DetailSection(
                         title: 'Latest Releases',
@@ -275,7 +297,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
   }
 }
 
-class _GlassmorphicActionBar extends ConsumerWidget {
+class _GlassmorphicActionBar extends ConsumerStatefulWidget {
   const _GlassmorphicActionBar({required this.repo, required this.owner, required this.repoName});
 
   final dynamic repo;
@@ -283,21 +305,74 @@ class _GlassmorphicActionBar extends ConsumerWidget {
   final String repoName;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final inCompare = ref.watch(compareListProvider).any((r) => r.id == repo.id);
+  ConsumerState<_GlassmorphicActionBar> createState() => _GlassmorphicActionBarState();
+}
+
+class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> {
+  bool _isDownloading = false;
+  double _downloadProgress = 0.0;
+
+  Future<void> _downloadZip() async {
+    if (_isDownloading) return;
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+    });
+    try {
+      final branch = widget.repo.defaultBranch ?? 'main';
+      final zipUrl = 'https://github.com/${widget.owner}/${widget.repoName}/archive/refs/heads/$branch.zip';
+      
+      final tempDir = await getTemporaryDirectory();
+      final savePath = '${tempDir.path}/${widget.repoName}-$branch.zip';
+      
+      final dio = Dio();
+      await dio.download(
+        zipUrl,
+        savePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+      );
+      
+      if (mounted) {
+        Share.shareXFiles([XFile(savePath)], text: '${widget.repoName} Source Code');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDownloading = false;
+          _downloadProgress = 0.0;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final inCompare = ref.watch(compareListProvider).any((r) => r.id == widget.repo.id);
     final compareFull = ref.watch(compareListProvider).length >= 3;
-    final trackedAsync = ref.watch(isTrackedProvider(repo.id));
-    final starAsync = ref.watch(repoStarProvider((owner: owner, repo: repoName)));
+    final trackedAsync = ref.watch(isTrackedProvider(widget.repo.id));
+    final starAsync = ref.watch(repoStarProvider((owner: widget.owner, repo: widget.repoName)));
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     final authUser = ref.watch(authenticatedUserProvider).valueOrNull;
-    final isOwnRepo = authUser?.login.toLowerCase() == owner.toLowerCase();
+    final isOwnRepo = authUser?.login.toLowerCase() == widget.owner.toLowerCase();
 
-    Widget actionButton(String label, IconData icon, VoidCallback? onTap, {bool isActive = false, bool isLoading = false}) {
+    Widget actionButton(String label, IconData icon, VoidCallback? onTap, {bool isActive = false, bool isLoading = false, double? progress}) {
       return Expanded(
         child: GestureDetector(
           onTap: () {
-            if (onTap != null) {
+            if (onTap != null && !isLoading) {
               HapticService.selectionClick();
               onTap();
             }
@@ -314,13 +389,17 @@ class _GlassmorphicActionBar extends ConsumerWidget {
                   shape: BoxShape.circle,
                   color: isActive 
                       ? AppColors.accent 
-                      : (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.05)),
+                      : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
                 ),
                 child: Center(
                   child: isLoading 
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 20, height: 20, 
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2, 
+                            color: Colors.white,
+                            value: progress,
+                          )
                         )
                       : Icon(
                           icon, 
@@ -343,80 +422,79 @@ class _GlassmorphicActionBar extends ConsumerWidget {
       );
     }
 
-      return Container(
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: (isDark ? Colors.white : Colors.black).withOpacity(0.15),
-              width: 1,
+        border: Border.all(
+          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          actionButton(
+            'GitHub', 
+            Icons.open_in_new_rounded, 
+            () => launchUrl(Uri.parse(widget.repo.htmlUrl), mode: LaunchMode.externalApplication),
+          ),
+          const SizedBox(width: 8),
+          if (!isOwnRepo) ...[
+            starAsync.when(
+              data: (starred) => actionButton(
+                starred ? 'Starred' : 'Star', 
+                starred ? Icons.star_rounded : Icons.star_border_rounded, 
+                () async {
+                  try {
+                    await ref.read(repoStarProvider((owner: widget.owner, repo: widget.repoName)).notifier).toggleStar();
+                  } catch (e) {}
+                },
+                isActive: starred,
+              ),
+              loading: () => actionButton('Star', Icons.star_border_rounded, null, isLoading: true),
+              error: (_, __) => const SizedBox.shrink(),
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
+            actionButton(
+              'Fork', 
+              Icons.call_split_rounded, 
+              () async {
+                try {
+                  await ref.read(githubApiServiceProvider).forkRepo(widget.owner, widget.repoName);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Forked!'), backgroundColor: Colors.green));
+                  }
+                } catch (e) {}
+              },
+            ),
+          ],
+          actionButton(
+            _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'ZIP', 
+            Icons.folder_zip_rounded, 
+            _downloadZip,
+            isLoading: _isDownloading,
+            progress: _downloadProgress > 0 ? _downloadProgress : null,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              actionButton(
-                'GitHub', 
-                Icons.open_in_new_rounded, 
-                () => launchUrl(Uri.parse(repo.htmlUrl), mode: LaunchMode.externalApplication),
-              ),
-              const SizedBox(width: 8),
-              if (!isOwnRepo) ...[
-                starAsync.when(
-                  data: (starred) => actionButton(
-                    starred ? 'Starred' : 'Star', 
-                    starred ? Icons.star_rounded : Icons.star_border_rounded, 
-                    () async {
-                      try {
-                        await ref.read(repoStarProvider((owner: owner, repo: repoName)).notifier).toggleStar();
-                      } catch (e) {}
-                    },
-                    isActive: starred,
-                  ),
-                  loading: () => actionButton('Star', Icons.star_border_rounded, null, isLoading: true),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-                actionButton(
-                  'Fork', 
-                  Icons.call_split_rounded, 
-                  () async {
-                    try {
-                      await ref.read(githubApiServiceProvider).forkRepo(owner, repoName);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Forked!'), backgroundColor: Colors.green));
-                      }
-                    } catch (e) {}
-                  },
-                ),
-              ],
-              actionButton(
-                inCompare ? 'Remove' : 'Compare', 
-                inCompare ? Icons.remove_circle_outline : Icons.compare_arrows_rounded, 
-                inCompare 
-                  ? () => ref.read(compareListProvider.notifier).remove(repo.id)
-                  : (compareFull ? null : () => ref.read(compareListProvider.notifier).add(repo)),
-                isActive: inCompare,
-              ),
-              trackedAsync.when(
-                data: (tracked) => actionButton(
-                  tracked ? 'Tracking' : 'Track', 
-                  tracked ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, 
-                  () => ref.read(trackingActionsProvider).toggle(repo),
-                  isActive: tracked,
-                ),
-                loading: () => actionButton('Track', Icons.notifications_none_rounded, null, isLoading: true),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-            ],
+          trackedAsync.when(
+            data: (tracked) => actionButton(
+              tracked ? 'Tracking' : 'Track', 
+              tracked ? Icons.notifications_active_rounded : Icons.notifications_none_rounded, 
+              () => ref.read(trackingActionsProvider).toggle(widget.repo),
+              isActive: tracked,
+            ),
+            loading: () => actionButton('Track', Icons.notifications_none_rounded, null, isLoading: true),
+            error: (_, __) => const SizedBox.shrink(),
           ),
+        ],
+      ),
     );
   }
 }

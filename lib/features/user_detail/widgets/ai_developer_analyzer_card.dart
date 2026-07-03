@@ -28,7 +28,7 @@ class AiDeveloperAnalyzerCard extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.psychology_rounded, color: AppColors.accent, size: 22),
+              const Icon(Icons.psychology_rounded, color: AppColors.accent, size: 22),
               const SizedBox(width: AppSpacing.sm),
               Text(
                 'AI Developer Vibe Check',

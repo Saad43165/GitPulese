@@ -3,7 +3,6 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class WidgetsConfigurationScreen extends StatelessWidget {
   const WidgetsConfigurationScreen({super.key});
@@ -155,14 +154,14 @@ class _WidgetPreview1 extends StatelessWidget {
                 const Text('GitPulse', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
               ],
             ),
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _WidgetStat(icon: Icons.commit_rounded, value: '14', label: 'Commits'),
                 _WidgetStat(icon: Icons.source_rounded, value: '2', label: 'PRs'),
               ],
             ),
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _WidgetStat(icon: Icons.star_rounded, value: '45', label: 'Stars'),
@@ -228,12 +227,12 @@ class _WidgetPreview2 extends StatelessWidget {
             const Spacer(),
             const Text('gitexplorer-app', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(height: 12),
-            Row(
+            const Row(
               children: [
                 _WidgetStatRow(icon: Icons.star_rounded, value: '1.2k', label: 'Stars'),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 _WidgetStatRow(icon: Icons.call_split_rounded, value: '340', label: 'Forks'),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 _WidgetStatRow(icon: Icons.code_rounded, value: 'Dart', label: 'Language'),
               ],
             ),
@@ -277,7 +276,7 @@ class _WidgetPreview3 extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.timeline_rounded, color: AppColors.accent, size: 20),
+                    const Icon(Icons.timeline_rounded, color: AppColors.accent, size: 20),
                     const SizedBox(width: 8),
                     Text(
                       'Contributions',
@@ -289,7 +288,7 @@ class _WidgetPreview3 extends StatelessWidget {
                     ),
                   ],
                 ),
-                Text('30 Days', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12)),
+                const Text('30 Days', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 24),
@@ -336,11 +335,11 @@ class _WidgetPreview3 extends StatelessWidget {
                   children: [
                     Text('Less', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11)),
                     const SizedBox(width: 4),
-                    _HeatBox(const Color(0xFFEBEDF0)),
-                    _HeatBox(const Color(0xFF9BE9A8)),
-                    _HeatBox(const Color(0xFF40C463)),
-                    _HeatBox(const Color(0xFF30A14E)),
-                    _HeatBox(const Color(0xFF216E39)),
+                    const _HeatBox(Color(0xFFEBEDF0)),
+                    const _HeatBox(Color(0xFF9BE9A8)),
+                    const _HeatBox(Color(0xFF40C463)),
+                    const _HeatBox(Color(0xFF30A14E)),
+                    const _HeatBox(Color(0xFF216E39)),
                     const SizedBox(width: 4),
                     Text('More', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 11)),
                   ],
@@ -451,7 +450,7 @@ class _WidgetPreview4 extends StatelessWidget {
               ],
             ),
             const Spacer(),
-            Row(
+            const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _WidgetStatRow(icon: Icons.circle, value: 'Dart', label: '54%'),

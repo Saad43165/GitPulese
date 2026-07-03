@@ -1,5 +1,4 @@
 import 'package:sqflite/sqflite.dart';
-import 'database_helper.dart';
 
 /// Extends the existing DatabaseHelper with a "tracked_repos" table —
 /// repos the user wants notified about when a new release or advisory

@@ -1,6 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/models/repo_model.dart';
-import '../data/models/user_and_search_models.dart';
 import '../data/remote/github_api_service.dart';
 import 'core_providers.dart';
 

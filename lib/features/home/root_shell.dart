@@ -5,7 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../search/search_screen.dart';
 import '../history/history_screen.dart';
-import '../bookmarks/bookmarks_screen.dart';
+import '../discovery/discovery_screen.dart';
 import '../settings/settings_screen.dart';
 
 class RootShell extends StatefulWidget {
@@ -21,7 +21,7 @@ class _RootShellState extends State<RootShell> {
   static const _screens = [
     DashboardScreen(),
     SearchScreen(),
-    BookmarksScreen(),
+    DiscoveryScreen(),
     HistoryScreen(),
     SettingsScreen(),
   ];
@@ -69,30 +69,30 @@ class _RootShellState extends State<RootShell> {
                   setState(() => _index = i);
                 },
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-                destinations: [
+                destinations: const [
                   NavigationDestination(
-                    icon: const Icon(Icons.dashboard_outlined),
-                    selectedIcon: Icon(AdaptiveIcons.home, color: AppColors.accent),
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard_rounded, color: AppColors.accent),
                     label: 'Home',
                   ),
                   NavigationDestination(
-                    icon: const Icon(Icons.search_outlined),
-                    selectedIcon: Icon(AdaptiveIcons.search, color: AppColors.accent),
+                    icon: Icon(Icons.search_outlined),
+                    selectedIcon: Icon(Icons.search_rounded, color: AppColors.accent),
                     label: 'Search',
                   ),
                   NavigationDestination(
-                    icon: const Icon(Icons.bookmark_border_rounded),
-                    selectedIcon: Icon(AdaptiveIcons.bookmark, color: AppColors.accent),
-                    label: 'Saved',
+                    icon: Icon(Icons.local_fire_department_outlined),
+                    selectedIcon: Icon(Icons.local_fire_department_rounded, color: AppColors.accent),
+                    label: 'Discover',
                   ),
                   NavigationDestination(
-                    icon: const Icon(Icons.history_outlined),
-                    selectedIcon: Icon(AdaptiveIcons.history, color: AppColors.accent),
+                    icon: Icon(Icons.history_outlined),
+                    selectedIcon: Icon(Icons.history_rounded, color: AppColors.accent),
                     label: 'History',
                   ),
                   NavigationDestination(
-                    icon: const Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(AdaptiveIcons.settings, color: AppColors.accent),
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded, color: AppColors.accent),
                     label: 'Settings',
                   ),
                 ],

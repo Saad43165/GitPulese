@@ -162,6 +162,40 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                             : Colors.black.withValues(alpha: 0.03),
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // Intelligent Search Suggestions
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          'org:', 'user:', 'language:', 'stars:>'
+                        ].map((prefix) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ActionChip(
+                              label: Text(
+                                prefix,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white70 : Colors.black87,
+                                ),
+                              ),
+                              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              side: BorderSide.none,
+                              onPressed: () {
+                                final text = _searchController.text;
+                                _searchController.text = '$text $prefix'.trimLeft();
+                                _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+                                ref.read(_localSearchQueryProvider.notifier).state = _searchController.text;
+                                _searchFocusNode.requestFocus();
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.xl),
 
                     // Comparison Dashboard & AI section
@@ -632,7 +666,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
               p: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white70 : Colors.black87),
               h1: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               h2: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              listBullet: TextStyle(color: AppColors.accent),
+              listBullet: const TextStyle(color: AppColors.accent),
             ),
           ),
         ],
@@ -641,10 +675,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   }
 
   Widget _buildAiLoadingPanel(bool isDark) {
-    return AppSurface(
-      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: const Center(
+    return const AppSurface(
+      margin: EdgeInsets.only(bottom: AppSpacing.lg),
+      padding: EdgeInsets.symmetric(vertical: 24),
+      child: Center(
         child: Column(
           children: [
             GlowingIndicator(),

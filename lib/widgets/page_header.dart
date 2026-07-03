@@ -29,6 +29,14 @@ class PageHeader extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (Navigator.of(context).canPop()) ...[
+              IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () => Navigator.of(context).pop(),
+                padding: const EdgeInsets.only(right: 16),
+                constraints: const BoxConstraints(),
+              ),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

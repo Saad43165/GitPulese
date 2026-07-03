@@ -246,6 +246,19 @@ class GitHubApiService {
     }
   }
 
+  Future<String?> getPullRequestDiff(String owner, String repo, int pullNumber) async {
+    try {
+      final response = await _dio.get(
+        '/repos/$owner/$repo/pulls/$pullNumber',
+        options: Options(headers: {'Accept': 'application/vnd.github.v3.diff'}),
+      );
+      return response.data as String;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
   Future<List<GhOwner>> getRepoContributors(String owner, String repo, {int perPage = 15}) async {
     try {
       final response = await _dio.get(
@@ -403,6 +416,23 @@ class GitHubApiService {
       return utf8.decode(base64.decode(content.replaceAll('\n', '')));
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  /// Fetches the contents of a directory in a repository.
+  /// If path is empty, it fetches the root directory.
+  Future<List<Map<String, dynamic>>> getRepoContents(String owner, String repo, [String path = '']) async {
+    try {
+      final response = await _dio.get(
+        '/repos/$owner/$repo/contents/$path',
+      );
+      if (response.data is List) {
+        return (response.data as List<dynamic>).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return [];
       throw GitHubApiException.fromDioError(e);
     }
   }

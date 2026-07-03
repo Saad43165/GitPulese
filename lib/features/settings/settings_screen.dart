@@ -37,19 +37,20 @@ class SettingsScreen extends ConsumerWidget {
       body: SafePage(
         child: ListView(
           padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-          children: [
-            const PageHeader(
+          children: const [
+            PageHeader(
               title: 'Settings',
               subtitle: 'Appearance, search, data, and notifications',
             ),
-            const _GitHubAccessGroup(),
-            const _AppearanceGroup(),
-            const _HomeWidgetConfigGroup(),
-            const _SearchGroup(),
-            const _NotificationsGroup(),
-            const _DataGroup(),
-            const _AboutGroup(),
-            const SizedBox(height: 100),
+            _GitHubAccessGroup(),
+            _AppearanceGroup(),
+            _HomeWidgetConfigGroup(),
+            _SearchGroup(),
+            _NotificationsGroup(),
+            _PersonalGroup(),
+            _DataGroup(),
+            _AboutGroup(),
+            SizedBox(height: 100),
           ],
         ),
       ),
@@ -81,9 +82,11 @@ class _GitHubAccessGroup extends ConsumerWidget {
               ref.read(githubPatProvider.notifier).save(null);
             }),
             data: (user) {
-              if (user == null) return _SignedInErrorCard(onSignOut: () {
+              if (user == null) {
+                return _SignedInErrorCard(onSignOut: () {
                 ref.read(githubPatProvider.notifier).save(null);
               });
+              }
               return _ProfileCard(user: user, isDark: isDark, ref: ref, context: context);
             },
           )
@@ -127,13 +130,13 @@ class _GitHubAccessGroup extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _BenefitRow(icon: Icons.star_rounded, text: 'Star repositories with one tap', color: const Color(0xFFF59E0B)),
+                const _BenefitRow(icon: Icons.star_rounded, text: 'Star repositories with one tap', color: Color(0xFFF59E0B)),
                 const SizedBox(height: 8),
-                _BenefitRow(icon: Icons.people_rounded, text: 'Follow & unfollow developers', color: AppColors.accent),
+                const _BenefitRow(icon: Icons.people_rounded, text: 'Follow & unfollow developers', color: AppColors.accent),
                 const SizedBox(height: 8),
-                _BenefitRow(icon: Icons.speed_rounded, text: 'Higher API rate limits (5000/hr)', color: const Color(0xFF10B981)),
+                const _BenefitRow(icon: Icons.speed_rounded, text: 'Higher API rate limits (5000/hr)', color: Color(0xFF10B981)),
                 const SizedBox(height: 8),
-                _BenefitRow(icon: Icons.person_rounded, text: 'View your own full profile', color: const Color(0xFF3B82F6)),
+                const _BenefitRow(icon: Icons.person_rounded, text: 'View your own full profile', color: Color(0xFF3B82F6)),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -262,7 +265,7 @@ class _ProfileCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '@${user.login}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.accent,
                         fontWeight: FontWeight.w600,
@@ -481,7 +484,7 @@ class _AppearanceGroup extends ConsumerWidget {
         const SizedBox(height: AppSpacing.sm),
         AppSurface(
           child: SwitchListTile(
-            secondary: _SettingsIcon(icon: Icons.view_agenda_outlined),
+            secondary: const _SettingsIcon(icon: Icons.view_agenda_outlined),
             title: const Text('Compact cards'),
             subtitle: const Text('Denser layout for repository lists'),
             value: compactCards,
@@ -545,7 +548,7 @@ class _SearchGroup extends ConsumerWidget {
           onTap: () => _showDefaultTabPicker(context, ref, defaultTab),
           padding: EdgeInsets.zero,
           child: ListTile(
-            leading: _SettingsIcon(icon: Icons.tab_outlined),
+            leading: const _SettingsIcon(icon: Icons.tab_outlined),
             title: const Text('Default search tab'),
             subtitle: Text(defaultTab.name.toUpperCase()),
             trailing: const Icon(Icons.chevron_right_rounded),
@@ -568,7 +571,7 @@ class _NotificationsGroup extends ConsumerWidget {
         AppSurface(
           padding: EdgeInsets.zero,
           child: SwitchListTile(
-            secondary: _SettingsIcon(icon: Icons.sync_outlined),
+            secondary: const _SettingsIcon(icon: Icons.sync_outlined),
             title: const Text('Background release checks'),
             subtitle: const Text('Periodically check tracked repos for new releases'),
             value: backgroundEnabled,
@@ -581,11 +584,11 @@ class _NotificationsGroup extends ConsumerWidget {
             MaterialPageRoute(builder: (_) => const TrackedReposScreen()),
           ),
           padding: EdgeInsets.zero,
-          child: ListTile(
+          child: const ListTile(
             leading: _SettingsIcon(icon: Icons.notifications_active_outlined),
-            title: const Text('Tracked repositories'),
-            subtitle: const Text('Manage repos you receive alerts for'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            title: Text('Tracked repositories'),
+            subtitle: Text('Manage repos you receive alerts for'),
+            trailing: Icon(Icons.chevron_right_rounded),
           ),
         ),
       ],
@@ -608,11 +611,11 @@ class _PersonalGroup extends StatelessWidget {
             );
           },
           padding: EdgeInsets.zero,
-          child: ListTile(
+          child: const ListTile(
             leading: _SettingsIcon(icon: Icons.bookmark_border_rounded, color: AppColors.accent),
-            title: const Text('Saved Repositories'),
-            subtitle: const Text('View your bookmarked open-source projects'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            title: Text('Saved Repositories'),
+            subtitle: Text('View your bookmarked open-source projects'),
+            trailing: Icon(Icons.chevron_right_rounded),
           ),
         ),
       ],
@@ -631,33 +634,33 @@ class _DataGroup extends ConsumerWidget {
         AppSurface(
           onTap: () => _confirmClearHistory(context, ref),
           padding: EdgeInsets.zero,
-          child: ListTile(
+          child: const ListTile(
             leading: _SettingsIcon(icon: Icons.history_rounded, color: AppColors.danger),
-            title: const Text('Clear history'),
-            subtitle: const Text('Remove all search and view history'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            title: Text('Clear history'),
+            subtitle: Text('Remove all search and view history'),
+            trailing: Icon(Icons.chevron_right_rounded),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
         AppSurface(
           onTap: () => _confirmClearBookmarks(context, ref),
           padding: EdgeInsets.zero,
-          child: ListTile(
+          child: const ListTile(
             leading: _SettingsIcon(icon: Icons.bookmark_remove_outlined, color: AppColors.danger),
-            title: const Text('Clear saved repos'),
-            subtitle: const Text('Remove all bookmarked repositories'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            title: Text('Clear saved repos'),
+            subtitle: Text('Remove all bookmarked repositories'),
+            trailing: Icon(Icons.chevron_right_rounded),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
         AppSurface(
           onTap: () => _clearCache(context),
           padding: EdgeInsets.zero,
-          child: ListTile(
+          child: const ListTile(
             leading: _SettingsIcon(icon: Icons.cleaning_services_rounded, color: AppColors.warning),
-            title: const Text('Clear App Cache'),
-            subtitle: const Text('Free up storage used by images and data'),
-            trailing: const Icon(Icons.chevron_right_rounded),
+            title: Text('Clear App Cache'),
+            subtitle: Text('Free up storage used by images and data'),
+            trailing: Icon(Icons.chevron_right_rounded),
           ),
         ),
       ],
@@ -677,21 +680,21 @@ class _AboutGroup extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           child: Column(
             children: [
-              ListTile(
+              const ListTile(
                 leading: _SettingsIcon(icon: Icons.info_outline_rounded),
-                title: const Text('GitPulse'),
-                subtitle: const Text('v1.0.0 · Developed by Saad Ikram'),
+                title: Text('GitPulse'),
+                subtitle: Text('v1.0.0 · Developed by Saad Ikram'),
               ),
               const Divider(height: 1),
               ListTile(
-                leading: _SettingsIcon(icon: Icons.privacy_tip_outlined),
+                leading: const _SettingsIcon(icon: Icons.privacy_tip_outlined),
                 title: const Text('Privacy'),
                 subtitle: const Text('Data stays on your device. PAT is stored locally only.'),
                 onTap: () => _showPrivacySheet(context),
               ),
               const Divider(height: 1),
               ListTile(
-                leading: _SettingsIcon(icon: Icons.api_outlined),
+                leading: const _SettingsIcon(icon: Icons.api_outlined),
                 title: const Text('Powered by GitHub API'),
                 trailing: const Icon(Icons.open_in_new_rounded, size: 18),
                 onTap: () => launchUrl(
@@ -804,7 +807,7 @@ class _AboutGroup extends StatelessWidget {
                   );
                 }
               },
-              child: Text('Remove', style: TextStyle(color: AppColors.danger)),
+              child: const Text('Remove', style: TextStyle(color: AppColors.danger)),
             ),
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
@@ -845,8 +848,8 @@ class _AboutGroup extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to clear cache.'),
+          const SnackBar(
+            content: Text('Failed to clear cache.'),
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
           ),

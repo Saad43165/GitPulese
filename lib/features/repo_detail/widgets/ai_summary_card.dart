@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../widgets/glowing_indicator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../widgets/glowing_indicator.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/repo_model.dart';

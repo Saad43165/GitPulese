@@ -172,7 +172,7 @@ class StarNotifier extends StateNotifier<AsyncValue<bool>> {
       final isStarred = await api.checkStar(args.owner, args.repo);
       if (mounted) state = AsyncValue.data(isStarred);
     } catch (e) {
-      if (mounted) state = AsyncValue.data(false);
+      if (mounted) state = const AsyncValue.data(false);
     }
   }
 
@@ -235,6 +235,7 @@ final codeExplainerProvider = StateNotifierProvider.autoDispose<CodeExplainerNot
   return CodeExplainerNotifier(ref.watch(groqApiServiceProvider), ref.watch(githubApiServiceProvider));
 });
 
+
 class CodeExplainerNotifier extends StateNotifier<AsyncValue<String?>> {
   final GroqApiService groq;
   final GitHubApiService github;
@@ -255,6 +256,48 @@ class CodeExplainerNotifier extends StateNotifier<AsyncValue<String?>> {
     } catch (e) {
       if (!mounted) return;
       state = AsyncValue.error(e, StackTrace.current);
+    }
+  }
+}
+
+// ---------- AI Pull Request Summarizer ----------
+
+final prSummaryProvider = StateNotifierProvider.autoDispose<PrSummaryNotifier, AsyncValue<String?>>((ref) {
+  return PrSummaryNotifier(ref.watch(groqApiServiceProvider), ref.watch(githubApiServiceProvider));
+});
+
+class PrSummaryNotifier extends StateNotifier<AsyncValue<String?>> {
+  final GroqApiService groq;
+  final GitHubApiService github;
+  PrSummaryNotifier(this.groq, this.github) : super(const AsyncValue.data(null));
+
+  Future<void> summarizePR({
+    required String owner,
+    required String repo,
+    required int pullNumber,
+    required String title,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final diff = await github.getPullRequestDiff(owner, repo, pullNumber);
+      if (diff == null || diff.isEmpty) {
+        state = const AsyncValue.error('Pull request diff is empty or not found.', StackTrace.empty);
+        return;
+      }
+      
+      // Limit diff size to avoid token limit errors
+      final truncatedDiff = diff.length > 3000 ? '${diff.substring(0, 3000)}\n...[Diff Truncated]' : diff;
+      
+      // We can cleverly use the explain-code endpoint for PR diffs too
+      final explanation = await groq.explainCode(
+        filename: 'Pull Request: $title',
+        code: truncatedDiff,
+      );
+      if (!mounted) return;
+      state = AsyncValue.data(explanation);
+    } catch (e, st) {
+      if (!mounted) return;
+      state = AsyncValue.error(e, st);
     }
   }
 }
@@ -283,7 +326,7 @@ class FollowNotifier extends StateNotifier<AsyncValue<bool>> {
       _initialFollowState = isFollowing;
       if (mounted) state = AsyncValue.data(isFollowing);
     } catch (e) {
-      if (mounted) state = AsyncValue.data(false);
+      if (mounted) state = const AsyncValue.data(false);
     }
   }
 
