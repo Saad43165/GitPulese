@@ -1,22 +1,18 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/core_providers.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../search/search_screen.dart';
 import '../history/history_screen.dart';
 import '../discovery/discovery_screen.dart';
 import '../settings/settings_screen.dart';
 
-class RootShell extends StatefulWidget {
+class RootShell extends ConsumerWidget {
   const RootShell({super.key});
-
-  @override
-  State<RootShell> createState() => _RootShellState();
-}
-
-class _RootShellState extends State<RootShell> {
-  int _index = 0;
 
   static const _screens = [
     DashboardScreen(),
@@ -27,14 +23,15 @@ class _RootShellState extends State<RootShell> {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final index = ref.watch(selectedNavTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       extendBody: true,
       body: DecoratedBox(
         decoration: AppDecorations.pageGradient(context),
-        child: IndexedStack(index: _index, children: _screens),
+        child: IndexedStack(index: index, children: _screens),
       ),
       bottomNavigationBar: SafeArea(
         top: false,
@@ -63,10 +60,10 @@ class _RootShellState extends State<RootShell> {
                 height: 65,
                 backgroundColor: Colors.transparent,
                 indicatorColor: Colors.transparent,
-                selectedIndex: _index,
+                selectedIndex: index,
                 onDestinationSelected: (i) {
                   HapticFeedback.lightImpact();
-                  setState(() => _index = i);
+                  ref.read(selectedNavTabProvider.notifier).state = i;
                 },
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
                 destinations: const [

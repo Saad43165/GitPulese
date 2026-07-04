@@ -13,6 +13,8 @@ import '../../providers/core_providers.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/search_providers.dart';
 import '../../providers/zip_download_provider.dart';
+import '../../providers/settings_providers.dart';
+import '../../widgets/shimmer_skeletons.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
@@ -280,7 +282,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               AppSpacing.pageHorizontal,
                               0,
                               AppSpacing.pageHorizontal,
-                              AppSpacing.lg,
+                              24,
                             ),
                             itemCount: grouped.entries.length,
                             itemBuilder: (context, sectionIndex) {
@@ -477,7 +479,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           loading: () => const Column(
             children: [
               PageHeader(title: 'History Log', subtitle: 'Loading trace details...'),
-              Expanded(child: ShimmerList()),
+              Expanded(child: ShimmerListCards()),
             ],
           ),
           error: (e, _) => Column(
@@ -568,10 +570,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           HapticFeedback.mediumImpact();
           final parts = entry.query.split('/');
           if (parts.length == 2) {
+            final pat = ref.read(githubPatProvider);
             ref.read(zipDownloadProvider.notifier).startDownload(
               owner: parts[0],
               repoName: parts[1],
-              branch: 'main',
+              token: pat,
             );
           }
         },
@@ -614,7 +617,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           _ => SearchTab.repositories,
         };
         ref.read(searchTabProvider.notifier).state = tab;
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // Navigate to the Search tab (index 1) via the shared nav provider
+        ref.read(selectedNavTabProvider.notifier).state = 1;
     }
   }
 

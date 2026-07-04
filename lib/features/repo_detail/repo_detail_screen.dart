@@ -35,6 +35,7 @@ import 'widgets/star_history_chart.dart';
 import 'widgets/pull_requests_section.dart';
 import 'widgets/source_code_section.dart';
 import '../../widgets/expandable_section.dart';
+import '../../widgets/shimmer_skeletons.dart';
 
 class RepoDetailScreen extends ConsumerStatefulWidget {
   const RepoDetailScreen({super.key, required this.owner, required this.repoName});
@@ -293,7 +294,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
             ],
           );
         },
-        loading: () => const Center(child: GlowingIndicator()),
+        loading: () => const ShimmerRepoDetailPage(),
         error: (e, _) => ErrorStateView(
           message: e is GitHubApiException ? e.message : e.toString(),
           onRetry: () => ref.invalidate(repoDetailProvider(args)),
@@ -332,10 +333,12 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
         );
         return;
       }
+      final pat = ref.read(githubPatProvider);
       ref.read(zipDownloadProvider.notifier).startDownload(
         owner: widget.owner,
         repoName: widget.repoName,
         branch: widget.repo.defaultBranch ?? 'main',
+        token: pat,
       );
     }
   }

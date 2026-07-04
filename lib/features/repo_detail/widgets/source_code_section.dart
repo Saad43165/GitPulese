@@ -122,11 +122,19 @@ class _SourceCodeSectionState extends ConsumerState<SourceCodeSection> {
                             final fileName = item['name'] as String;
                             final ext = fileName.split('.').last.toLowerCase();
                             const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'];
-                            const binaryExts = ['zip', 'tar', 'gz', 'exe', 'dll', 'so', 'dylib', 'pdf', 'mp4', 'mp3'];
+                            // Binary/office formats: open in GitHub's browser viewer instead of trying to decode bytes as text
+                            const binaryExts = [
+                              'zip', 'tar', 'gz', 'exe', 'dll', 'so', 'dylib',
+                              'pdf', 'mp4', 'mp3', 'wav', 'ogg', 'avi', 'mov',
+                              'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+                              'odt', 'ods', 'odp', 'pages', 'numbers', 'key',
+                              'wasm', 'bin', 'dat', 'class', 'jar', 'apk', 'ipa',
+                            ];
                             
                             if (binaryExts.contains(ext)) {
-                              final rawUrl = Uri.parse('https://github.com/${widget.owner}/${widget.repoName}/raw/HEAD/${item['path']}');
-                              launchUrl(rawUrl, mode: LaunchMode.inAppBrowserView);
+                              // Open on GitHub.com — it has a built-in viewer for Office, PDF, etc.
+                              final ghUrl = Uri.parse('https://github.com/${widget.owner}/${widget.repoName}/blob/HEAD/${item['path']}');
+                              launchUrl(ghUrl, mode: LaunchMode.inAppBrowserView);
                               return;
                             }
 

@@ -16,6 +16,7 @@ import 'widgets/code_result_tile.dart';
 import 'widgets/filter_sheet.dart';
 import 'widgets/issue_tile.dart';
 import 'widgets/user_result_tile.dart';
+import '../../widgets/shimmer_skeletons.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -396,7 +397,7 @@ class _RepoResultsView extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const ShimmerList(),
+      loading: () => const ShimmerListCards(),
       error: (e, _) => ErrorStateView(
         message: e is GitHubApiException ? e.message : e.toString(),
         onRetry: () => ref.invalidate(repoSearchProvider),
@@ -443,7 +444,7 @@ class _CodeResultsView extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const ShimmerList(),
+      loading: () => const ShimmerListCards(),
       error: (e, _) => ErrorStateView(
         message: e is GitHubApiException ? e.message : e.toString(),
         onRetry: () => ref.invalidate(codeSearchProvider),
@@ -497,7 +498,7 @@ class _UserResultsView extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const ShimmerList(),
+      loading: () => const ShimmerListCards(),
       error: (e, _) => ErrorStateView(
         message: e is GitHubApiException ? e.message : e.toString(),
         onRetry: () => ref.invalidate(userSearchProvider),
@@ -544,7 +545,7 @@ class _IssueResultsView extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const ShimmerList(),
+      loading: () => const ShimmerListCards(),
       error: (e, _) => ErrorStateView(
         message: e is GitHubApiException ? e.message : e.toString(),
         onRetry: () => ref.invalidate(issueSearchProvider),

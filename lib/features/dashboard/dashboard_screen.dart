@@ -15,6 +15,7 @@ import '../../widgets/glowing_indicator.dart';
 import '../repo_detail/repo_detail_screen.dart';
 import '../user_detail/user_detail_screen.dart';
 import '../compare/compare_screen.dart';
+import '../../widgets/shimmer_skeletons.dart';
 
 class _Topic {
   const _Topic({required this.id, required this.label, required this.icon, required this.gradient});
@@ -450,7 +451,16 @@ class DashboardScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                  loading: () => const SizedBox(height: 175, child: GlowingIndicator()),
+                  loading: () => SizedBox(
+                    height: 125,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      itemCount: 5,
+                      separatorBuilder: (_, __) => const SizedBox(width: 16),
+                      itemBuilder: (_, __) => const ShimmerRepoCard(),
+                    ),
+                  ),
                   error: (e, _) => Padding(
                     padding: const EdgeInsets.all(24),
                     child: ErrorStateView(
@@ -509,7 +519,16 @@ class DashboardScreen extends ConsumerWidget {
                       },
                     ),
                   ),
-                  loading: () => const SizedBox(height: 140, child: GlowingIndicator()),
+                  loading: () => SizedBox(
+                    height: 160,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                      itemCount: 6,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (_, __) => const ShimmerDeveloperCard(),
+                    ),
+                  ),
                   error: (e, _) => Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text('Failed to load developers', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),

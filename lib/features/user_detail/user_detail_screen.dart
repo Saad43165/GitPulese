@@ -19,6 +19,7 @@ import '../../widgets/detail_section.dart';
 import '../../widgets/repo_card.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/glowing_indicator.dart';
+import '../../widgets/shimmer_skeletons.dart';
 import '../repo_detail/repo_detail_screen.dart';
 import 'developer_wrapped_screen.dart';
 import 'widgets/ai_developer_analyzer_card.dart';
@@ -256,15 +257,20 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                       ),
                     );
                   },
-                  loading: () => const SliverToBoxAdapter(
-                    child: Padding(padding: EdgeInsets.all(24), child: Center(child: GlowingIndicator(size: 32))),
+                  loading: () => SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                      child: Column(
+                        children: List.generate(4, (_) => const ShimmerListCard()),
+                      ),
+                    ),
                   ),
                   error: (e, _) => SliverToBoxAdapter(child: Text('Could not load repos: $e')),
                 ),
               ],
             );
           },
-          loading: () => const Center(child: GlowingIndicator(size: 40)),
+          loading: () => const ShimmerUserDetailPage(),
           error: (e, _) => ErrorStateView(
             message: e is GitHubApiException ? e.message : e.toString(),
             onRetry: () => ref.invalidate(_userDetailProvider(widget.username)),

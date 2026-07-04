@@ -56,7 +56,8 @@ class ZipDownloadNotifier extends StateNotifier<ZipDownloadState> {
   Future<void> startDownload({
     required String owner,
     required String repoName,
-    required String branch,
+    String? branch,
+    String? token,
   }) async {
     if (state.isDownloading) return;
 
@@ -71,17 +72,33 @@ class ZipDownloadNotifier extends StateNotifier<ZipDownloadState> {
     _cancelToken = CancelToken();
 
     try {
-      final zipUrl = 'https://github.com/$owner/$repoName/archive/refs/heads/$branch.zip';
+      // Use official GitHub API zipball URL. If branch is omitted, GitHub automatically uses default branch (main/master).
+      final zipUrl = (branch != null && branch.isNotEmpty)
+          ? 'https://api.github.com/repos/$owner/$repoName/zipball/$branch'
+          : 'https://api.github.com/repos/$owner/$repoName/zipball';
+
       final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/$repoName-$branch.zip';
+      final suffix = (branch != null && branch.isNotEmpty) ? '-$branch' : '';
+      final savePath = '${tempDir.path}/$repoName$suffix.zip';
 
       final startTime = DateTime.now();
 
       final dio = Dio();
+      
+      // Inject user's GitHub Personal Access Token if available to handle private repos and higher rate limits
+      final headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'GitPulse-App',
+      };
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
       await dio.download(
         zipUrl,
         savePath,
         cancelToken: _cancelToken,
+        options: Options(headers: headers),
         onReceiveProgress: (received, total) {
           final now = DateTime.now();
           final elapsedMs = now.difference(startTime).inMilliseconds;
@@ -126,10 +143,14 @@ class ZipDownloadNotifier extends StateNotifier<ZipDownloadState> {
       if (CancelToken.isCancel(e)) {
         state = ZipDownloadState(isDownloading: false, progress: 0.0, isCancelled: true);
       } else {
+        String errMsg = e.message ?? 'Download failed';
+        if (e.response?.statusCode == 404) {
+          errMsg = 'Repository branch not found (404).';
+        }
         state = ZipDownloadState(
           isDownloading: false,
           progress: 0.0,
-          error: e.message ?? 'Download failed',
+          error: errMsg,
         );
       }
     } catch (e) {

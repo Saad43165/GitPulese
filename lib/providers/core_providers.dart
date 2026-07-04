@@ -76,3 +76,7 @@ class RateLimitWatcher extends StateNotifier<RateLimitState> {
 
 final rateLimitProvider =
     StateNotifierProvider<RateLimitWatcher, RateLimitState>((ref) => RateLimitWatcher());
+
+/// Global provider that controls which bottom-nav tab is active.
+/// Write to this from any screen to switch tabs programmatically.
+final selectedNavTabProvider = StateProvider<int>((ref) => 0);

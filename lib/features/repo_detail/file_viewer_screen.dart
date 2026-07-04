@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/core_providers.dart';
@@ -73,7 +74,15 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
     final fileName = widget.filePath.split('/').last;
     final ext = fileName.split('.').last.toLowerCase();
     const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'];
+    const binaryExts = [
+      'zip', 'tar', 'gz', 'exe', 'dll', 'so', 'dylib',
+      'pdf', 'mp4', 'mp3', 'wav', 'ogg', 'avi', 'mov',
+      'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+      'odt', 'ods', 'odp', 'pages', 'numbers', 'key',
+      'wasm', 'bin', 'dat', 'class', 'jar', 'apk', 'ipa',
+    ];
     final isImage = imageExts.contains(ext);
+    final isBinary = binaryExts.contains(ext);
 
     final explanationHeight = MediaQuery.of(context).size.height * 0.55;
 
@@ -84,8 +93,8 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // Only show the AI button for non-image text files
-          if (!isImage && !_showAiExplanation)
+          // Only show the AI button for non-image, non-binary text files
+          if (!isImage && !isBinary && !_showAiExplanation)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
               child: Showcase(
@@ -132,7 +141,47 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
             ),
         ],
       ),
-      body: isImage
+      body: isBinary
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.insert_drive_file_outlined,
+                      size: 72,
+                      color: AppColors.accent.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      fileName,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This is a binary file and cannot be previewed in-app.',
+                      style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: () {
+                        final ghUrl = Uri.parse(
+                          'https://github.com/${widget.owner}/${widget.repoName}/blob/HEAD/${widget.filePath}',
+                        );
+                        launchUrl(ghUrl, mode: LaunchMode.inAppBrowserView);
+                      },
+                      icon: const Icon(Icons.open_in_browser_rounded),
+                      label: const Text('Open on GitHub'),
+                      style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : isImage
           ? ref.watch(fileBytesProvider((owner: widget.owner, repo: widget.repoName, path: widget.filePath))).when(
               data: (bytes) {
                 return Center(
