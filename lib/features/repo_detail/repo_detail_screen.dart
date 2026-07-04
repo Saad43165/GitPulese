@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,6 +17,7 @@ import '../../providers/notification_providers.dart';
 import '../../providers/ai_providers.dart';
 import '../../providers/repo_detail_providers.dart';
 import '../../providers/settings_providers.dart';
+import '../../providers/zip_download_provider.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/services/haptic_service.dart';
 import '../../widgets/glowing_indicator.dart';
@@ -99,13 +101,19 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                   ),
                   IconButton(
                     icon: Icon(AdaptiveIcons.share),
-                    onPressed: () => Share.share(repo.htmlUrl),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Share.share(repo.htmlUrl);
+                    },
                   ),
                   bookmarkedAsync.when(
                     data: (saved) => IconButton(
                       icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
                           color: saved ? AppColors.accent : null),
-                      onPressed: () => ref.read(bookmarkActionsProvider).toggle(repo),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        ref.read(bookmarkActionsProvider).toggle(repo);
+                      },
                     ),
                     loading: () => const SizedBox(width: 48),
                     error: (_, __) => const SizedBox(width: 48),
@@ -309,56 +317,34 @@ class _GlassmorphicActionBar extends ConsumerStatefulWidget {
 }
 
 class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> {
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
+  void _handleZipAction(ZipDownloadState downloadState) {
+    final isCurrentRepoDownloading = downloadState.isDownloading && downloadState.repoName == widget.repoName;
 
-  Future<void> _downloadZip() async {
-    if (_isDownloading) return;
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-    try {
-      final branch = widget.repo.defaultBranch ?? 'main';
-      final zipUrl = 'https://github.com/${widget.owner}/${widget.repoName}/archive/refs/heads/$branch.zip';
-      
-      final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/${widget.repoName}-$branch.zip';
-      
-      final dio = Dio();
-      await dio.download(
-        zipUrl,
-        savePath,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
-          }
-        },
-      );
-      
-      if (mounted) {
-        Share.shareXFiles([XFile(savePath)], text: '${widget.repoName} Source Code');
-      }
-    } catch (e) {
-      if (mounted) {
+    if (isCurrentRepoDownloading) {
+      ref.read(zipDownloadProvider.notifier).cancelDownload();
+    } else {
+      if (downloadState.isDownloading) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Already downloading ${downloadState.repoName}. Please wait or cancel it first.'),
+            backgroundColor: AppColors.danger,
+          ),
         );
+        return;
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isDownloading = false;
-          _downloadProgress = 0.0;
-        });
-      }
+      ref.read(zipDownloadProvider.notifier).startDownload(
+        owner: widget.owner,
+        repoName: widget.repoName,
+        branch: widget.repo.defaultBranch ?? 'main',
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final downloadState = ref.watch(zipDownloadProvider);
+    final isDownloadingCurrent = downloadState.isDownloading && downloadState.repoName == widget.repoName;
+
     final inCompare = ref.watch(compareListProvider).any((r) => r.id == widget.repo.id);
     final compareFull = ref.watch(compareListProvider).length >= 3;
     final trackedAsync = ref.watch(isTrackedProvider(widget.repo.id));
@@ -477,11 +463,11 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
             ),
           ],
           actionButton(
-            _isDownloading ? '${(_downloadProgress * 100).toInt()}%' : 'ZIP', 
-            Icons.folder_zip_rounded, 
-            _downloadZip,
-            isLoading: _isDownloading,
-            progress: _downloadProgress > 0 ? _downloadProgress : null,
+            isDownloadingCurrent ? 'Cancel' : 'ZIP', 
+            isDownloadingCurrent ? Icons.close_rounded : Icons.folder_zip_rounded, 
+            () => _handleZipAction(downloadState),
+            isLoading: isDownloadingCurrent,
+            progress: (isDownloadingCurrent && downloadState.progress >= 0) ? downloadState.progress : null,
           ),
           trackedAsync.when(
             data: (tracked) => actionButton(

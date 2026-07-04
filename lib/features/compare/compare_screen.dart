@@ -1,7 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
@@ -39,6 +42,20 @@ class CompareScreen extends ConsumerStatefulWidget {
 class _CompareScreenState extends ConsumerState<CompareScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final GlobalKey _arenaKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool('seen_arena_tutorial') ?? false;
+      if (!seen && mounted) {
+        ShowCaseWidget.of(context).startShowCase([_arenaKey]);
+        await prefs.setBool('seen_arena_tutorial', true);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -132,12 +149,15 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                     const SizedBox(height: AppSpacing.lg),
 
                     // Search Bar
-                    TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      onChanged: (val) {
-                        ref.read(_localSearchQueryProvider.notifier).state = val;
-                      },
+                    Showcase(
+                      key: _arenaKey,
+                      description: 'Search and add at least 2 repositories here to unlock an AI Battle Verdict!',
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        onChanged: (val) {
+                          ref.read(_localSearchQueryProvider.notifier).state = val;
+                        },
                       decoration: InputDecoration(
                         hintText: 'Search GitHub repos to add...',
                         prefixIcon: const Icon(Icons.search_rounded),
@@ -161,6 +181,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                             ? Colors.white.withValues(alpha: 0.05)
                             : Colors.black.withValues(alpha: 0.03),
                       ),
+                    ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     // Intelligent Search Suggestions
@@ -224,6 +245,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                               ),
                               child: ElevatedButton.icon(
                                 onPressed: () {
+                                  HapticFeedback.heavyImpact();
                                   ref.read(compareAiProvider.notifier).runComparison(repos);
                                 },
                                 icon: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
@@ -405,7 +427,10 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                                     onPressed: alreadyAdded || repos.length >= 3
                                         ? null
                                         : () {
+                                            HapticFeedback.lightImpact();
                                             ref.read(compareListProvider.notifier).add(repo);
+                                            // Reset AI verdict so the user can generate a new one with the newly added repo
+                                            ref.read(compareAiProvider.notifier).reset();
                                             // Reset search
                                             _searchController.clear();
                                             ref.read(_localSearchQueryProvider.notifier).state = '';
@@ -481,6 +506,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             top: 0,
             child: GestureDetector(
               onTap: () {
+                HapticFeedback.lightImpact();
                 ref.read(compareListProvider.notifier).remove(repo.id);
                 ref.read(compareAiProvider.notifier).reset();
               },

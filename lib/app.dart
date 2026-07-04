@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'core/theme/app_theme.dart';
 import 'features/splash/splash_screen.dart';
 import 'providers/core_providers.dart';
 import 'providers/settings_providers.dart';
+import 'widgets/global_zip_progress_overlay.dart';
 
 class GitPulseApp extends ConsumerWidget {
   const GitPulseApp({super.key});
@@ -22,6 +24,9 @@ class GitPulseApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      ),
+      builder: (context, child) => ShowCaseWidget(
+        builder: (context) => GlobalZipProgressOverlay(child: child!),
       ),
       home: const SplashScreen(),
     );

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import '../../core/constants/api_constants.dart';
 import '../../core/network/dio_client.dart';
@@ -530,6 +531,21 @@ class GitHubApiService {
         ),
       );
       return response.data.toString();
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<Uint8List> getFileRawBytes(String owner, String repo, String path) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/repos/$owner/$repo/contents/$path',
+        options: Options(
+          headers: {'Accept': 'application/vnd.github.v3.raw'},
+          responseType: ResponseType.bytes,
+        ),
+      );
+      return Uint8List.fromList(response.data!);
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }

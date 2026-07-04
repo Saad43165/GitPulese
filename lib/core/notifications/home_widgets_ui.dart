@@ -58,11 +58,11 @@ class WidgetUiBuilder {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
-                  const Icon(Icons.star_rounded, color: Colors.amber, size: 20),
-                  const SizedBox(width: 8),
-                  const Text('Top Repository', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
+                  Icon(Icons.star_rounded, color: Colors.amber, size: 20),
+                  SizedBox(width: 8),
+                  Text('Top Repository', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
                 ],
               ),
               const SizedBox(height: 12),

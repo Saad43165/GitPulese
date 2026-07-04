@@ -20,7 +20,7 @@ class BookmarksScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafePage(
         child: bookmarksAsync.when(
           data: (items) {

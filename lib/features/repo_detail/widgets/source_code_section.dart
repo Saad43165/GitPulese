@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../providers/repo_detail_providers.dart';
 import '../../../../widgets/app_surface.dart';
 import '../../../../widgets/glowing_indicator.dart';
+import '../file_viewer_screen.dart';
 
 class SourceCodeSection extends ConsumerStatefulWidget {
   const SourceCodeSection({super.key, required this.owner, required this.repoName});
@@ -116,9 +118,26 @@ class _SourceCodeSectionState extends ConsumerState<SourceCodeSection> {
                               _pathStack.add(item['path'] as String);
                             });
                           } else {
-                            // File tap handled optionally, maybe preview code
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('File preview not implemented for ${item['name']}')),
+                            // Handle files
+                            final fileName = item['name'] as String;
+                            final ext = fileName.split('.').last.toLowerCase();
+                            const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'];
+                            const binaryExts = ['zip', 'tar', 'gz', 'exe', 'dll', 'so', 'dylib', 'pdf', 'mp4', 'mp3'];
+                            
+                            if (binaryExts.contains(ext)) {
+                              final rawUrl = Uri.parse('https://github.com/${widget.owner}/${widget.repoName}/raw/HEAD/${item['path']}');
+                              launchUrl(rawUrl, mode: LaunchMode.inAppBrowserView);
+                              return;
+                            }
+
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => FileViewerScreen(
+                                  owner: widget.owner,
+                                  repoName: widget.repoName,
+                                  filePath: item['path'] as String,
+                                ),
+                              ),
                             );
                           }
                         },
