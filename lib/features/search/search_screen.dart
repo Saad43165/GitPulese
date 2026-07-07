@@ -2,10 +2,13 @@ import 'package:gitexplorer/core/network/dio_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/search_providers.dart';
+import '../../providers/core_providers.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/repo_card.dart';
 import '../../widgets/staggered_fade_item.dart';
@@ -29,10 +32,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
+  final GlobalKey _searchBarKey = GlobalKey();
+  final GlobalKey _filterButtonKey = GlobalKey();
+  final GlobalKey _searchTabsKey = GlobalKey();
+  bool _tutorialTriggered = false;
+
   @override
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
+  }
+
+  void _checkAndShowTutorial() async {
+    if (_tutorialTriggered) return;
+    _tutorialTriggered = true;
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('seen_search_tutorial') ?? false;
+    if (!seen && mounted) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) {
+        ShowCaseWidget.of(context).startShowCase([
+          _searchBarKey,
+          _filterButtonKey,
+          _searchTabsKey,
+        ]);
+        await prefs.setBool('seen_search_tutorial', true);
+      }
+    }
   }
 
   @override
@@ -60,6 +86,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tabIndex = ref.watch(selectedNavTabProvider);
+    if (tabIndex == 1) { // 1 is Search screen index
+      _checkAndShowTutorial();
+    }
+
     final tab = ref.watch(searchTabProvider);
     final filters = ref.watch(searchFiltersProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -80,45 +111,55 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: Container(
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-                        width: 1,
-                      ),
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: _submit,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Search GitHub...',
-                        hintStyle: TextStyle(
-                          color: isDark ? Colors.white54 : Colors.black54,
-                          fontWeight: FontWeight.w500,
+                  child: Showcase(
+                    key: _searchBarKey,
+                    title: 'Global Search Input',
+                    description: 'Search globally. Simply type keywords and tap Enter or search on your keyboard to request GitHub results.',
+                    titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                    descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                    tooltipBackgroundColor: const Color(0xFF1E293B),
+                    tooltipBorderRadius: BorderRadius.circular(12),
+                    blurValue: 2,
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                          width: 1,
                         ),
-                        prefixIcon: Icon(AdaptiveIcons.search, color: isDark ? Colors.white54 : Colors.black54, size: 20),
-                        suffixIcon: _controller.text.isNotEmpty
-                            ? IconButton(
-                                icon: Icon(Icons.close_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 18),
-                                onPressed: () {
-                                  _controller.clear();
-                                  ref.read(searchQueryProvider.notifier).state = '';
-                                  _focusNode.unfocus();
-                                },
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: _submit,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search GitHub...',
+                          hintStyle: TextStyle(
+                            color: isDark ? Colors.white54 : Colors.black54,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          prefixIcon: Icon(AdaptiveIcons.search, color: isDark ? Colors.white54 : Colors.black54, size: 20),
+                          suffixIcon: _controller.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.close_rounded, color: isDark ? Colors.white54 : Colors.black54, size: 18),
+                                  onPressed: () {
+                                    _controller.clear();
+                                    ref.read(searchQueryProvider.notifier).state = '';
+                                    _focusNode.unfocus();
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
                       ),
                     ),
                   ),
@@ -126,41 +167,51 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 const SizedBox(width: 12),
                 
                 // GLOWING FILTER BUTTON
-                GestureDetector(
-                  onTap: () => showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => const FilterSheet(),
-                  ),
-                  child: Container(
-                    height: 50,
-                    width: 50,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(8),
+                Showcase(
+                  key: _filterButtonKey,
+                  title: 'Search Filters',
+                  description: 'Narrow down repository queries by specifying primary language constraints, minimum stars count, or fork levels.',
+                  titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                  tooltipBackgroundColor: const Color(0xFF1E293B),
+                  tooltipBorderRadius: BorderRadius.circular(12),
+                  blurValue: 2,
+                  child: GestureDetector(
+                    onTap: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const FilterSheet(),
                     ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(AdaptiveIcons.filter, color: Colors.white, size: 20),
-                        if (filters.activeCount > 0)
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.redAccent,
-                                shape: BoxShape.circle,
+                    child: Container(
+                      height: 50,
+                      width: 50,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(AdaptiveIcons.filter, color: Colors.white, size: 20),
+                          if (filters.activeCount > 0)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '${filters.activeCount}',
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
                               ),
-                              child: Text(
-                                '${filters.activeCount}',
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                            ),
-                          )
-                      ],
+                            )
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -171,20 +222,30 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           const SizedBox(height: 24),
           
           // CUSTOM GLOWING PILL TABS
-          SizedBox(
-            height: 38,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
-              children: [
-                _buildTab(SearchTab.repositories, 'Repositories', Icons.folder_rounded, tab),
-                const SizedBox(width: 8),
-                _buildTab(SearchTab.users, 'Users', Icons.person_rounded, tab),
-                const SizedBox(width: 8),
-                _buildTab(SearchTab.code, 'Code', Icons.code_rounded, tab),
-                const SizedBox(width: 8),
-                _buildTab(SearchTab.issues, 'Issues', Icons.bug_report_rounded, tab),
-              ],
+          Showcase(
+            key: _searchTabsKey,
+            title: 'Search Category Scopes',
+            description: 'Quickly switch search scopes between Repositories, Users/Developers, specific Code blocks, or Issue tickets.',
+            titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+            descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+            tooltipBackgroundColor: const Color(0xFF1E293B),
+            tooltipBorderRadius: BorderRadius.circular(12),
+            blurValue: 2,
+            child: SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+                children: [
+                  _buildTab(SearchTab.repositories, 'Repositories', Icons.folder_rounded, tab),
+                  const SizedBox(width: 8),
+                  _buildTab(SearchTab.users, 'Users', Icons.person_rounded, tab),
+                  const SizedBox(width: 8),
+                  _buildTab(SearchTab.code, 'Code', Icons.code_rounded, tab),
+                  const SizedBox(width: 8),
+                  _buildTab(SearchTab.issues, 'Issues', Icons.bug_report_rounded, tab),
+                ],
+              ),
             ),
           ),
           

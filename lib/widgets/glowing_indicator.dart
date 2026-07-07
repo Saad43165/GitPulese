@@ -47,7 +47,7 @@ class _GlowingIndicatorState extends State<GlowingIndicator> with SingleTickerPr
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: color.withOpacity(0.15),
+                        color: color.withValues(alpha: 0.15),
                         width: widget.size * 0.05,
                       ),
                     ),
@@ -71,7 +71,7 @@ class _GlowingIndicatorState extends State<GlowingIndicator> with SingleTickerPr
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: color.withOpacity(0.1),
+                        color: color.withValues(alpha: 0.1),
                         width: widget.size * 0.05,
                       ),
                     ),

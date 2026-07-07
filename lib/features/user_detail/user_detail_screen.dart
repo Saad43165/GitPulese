@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
@@ -24,6 +26,7 @@ import '../repo_detail/repo_detail_screen.dart';
 import 'developer_wrapped_screen.dart';
 import 'widgets/ai_developer_analyzer_card.dart';
 import '../../core/notifications/widget_manager.dart';
+import '../../widgets/github_analytics_section.dart';
 
 final _userDetailProvider =
     FutureProvider.autoDispose.family((ref, String username) async {
@@ -31,11 +34,7 @@ final _userDetailProvider =
   return api.getUserDetail(username);
 });
 
-final _userReposProvider =
-    FutureProvider.autoDispose.family((ref, String username) async {
-  final api = ref.watch(githubApiServiceProvider);
-  return api.getUserRepos(username);
-});
+final _userReposProvider = userReposProvider;
 
 final _userFollowersProvider =
     FutureProvider.autoDispose.family((ref, String username) async {
@@ -59,6 +58,25 @@ class UserDetailScreen extends ConsumerStatefulWidget {
 
 class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
   bool _logged = false;
+  final GlobalKey _devCardKey = GlobalKey();
+  final GlobalKey _aiAnalyzerKey = GlobalKey();
+  final GlobalKey _analyticsSectionKey = GlobalKey();
+
+  void _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('seen_user_detail_tutorial') ?? false;
+    if (!seen && mounted) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) {
+        ShowCaseWidget.of(context).startShowCase([
+          _devCardKey,
+          _aiAnalyzerKey,
+          _analyticsSectionKey,
+        ]);
+        await prefs.setBool('seen_user_detail_tutorial', true);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,12 +112,15 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
           data: (user) {
             if (!_logged) {
               _logged = true;
-              Future.microtask(() => ref.read(historyActionsProvider).logViewed(
-                    type: 'viewed_user',
-                    name: user.login,
-                    subtitle: user.bio,
-                    avatarUrl: user.avatarUrl,
-                  ));
+              Future.microtask(() {
+                ref.read(historyActionsProvider).logViewed(
+                      type: 'viewed_user',
+                      name: user.login,
+                      subtitle: user.bio,
+                      avatarUrl: user.avatarUrl,
+                    );
+                _checkAndShowTutorial();
+              });
             }
 
             return CustomScrollView(
@@ -157,36 +178,46 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                           // Developer Card Generator Button
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF9333EA).withValues(alpha: 0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  )
-                                ],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
+                            child: Showcase(
+                              key: _devCardKey,
+                              title: 'Developer Card Generator',
+                              description: 'Generate a personalized developer summary card compiling your top languages and star accomplishments. Perfect for sharing on Twitter/LinkedIn.',
+                              titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                              descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                              tooltipBackgroundColor: const Color(0xFF1E293B),
+                              tooltipBorderRadius: BorderRadius.circular(12),
+                              blurValue: 2,
+                              child: Container(
+                                decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(16),
-                                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeveloperWrappedScreen(user: user, repos: repos))),
-                                  child: const Padding(
-                                    padding: EdgeInsets.all(20),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.auto_awesome_rounded, color: Colors.white),
-                                        SizedBox(width: 12),
-                                        Text('Generate Developer Card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                                      ],
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF9333EA).withValues(alpha: 0.3),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    )
+                                  ],
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeveloperWrappedScreen(user: user, repos: repos))),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(20),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.auto_awesome_rounded, color: Colors.white),
+                                          SizedBox(width: 12),
+                                          Text('Generate Developer Card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -198,7 +229,34 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                           // AI Analyzer
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
-                            child: AiDeveloperAnalyzerCard(user: user, repos: repos),
+                            child: Showcase(
+                              key: _aiAnalyzerKey,
+                              title: 'AI Developer Agent Analyzer',
+                              description: 'Trigger a deep AI review analyzing the repositories, commits, and languages of the developer. Evaluates strengths, coding styles, and offers recommendations.',
+                              titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                              descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                              tooltipBackgroundColor: const Color(0xFF1E293B),
+                              tooltipBorderRadius: BorderRadius.circular(12),
+                              blurValue: 2,
+                              child: AiDeveloperAnalyzerCard(user: user, repos: repos),
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+
+                          // GitPulse Analytics
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+                            child: Showcase(
+                              key: _analyticsSectionKey,
+                              title: 'GitHub Analytics Metrics',
+                              description: 'Visualize repository growth, star history tracking, active programming languages, and contribution trends.',
+                              titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                              descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                              tooltipBackgroundColor: const Color(0xFF1E293B),
+                              tooltipBorderRadius: BorderRadius.circular(12),
+                              blurValue: 2,
+                              child: GitHubAnalyticsSection(repos: repos),
+                            ),
                           ),
                           const SizedBox(height: AppSpacing.xl),
 

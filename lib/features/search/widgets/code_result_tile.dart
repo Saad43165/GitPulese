@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_theme.dart';
@@ -8,6 +7,7 @@ import '../../../data/models/user_and_search_models.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../widgets/app_surface.dart';
 import '../../../widgets/glowing_indicator.dart';
+import '../../../widgets/app_markdown.dart';
 
 class CodeResultTile extends ConsumerWidget {
   const CodeResultTile({super.key, required this.result});
@@ -136,13 +136,9 @@ class CodeResultTile extends ConsumerWidget {
                           if (explanation == null) return const SizedBox.shrink();
                           return SingleChildScrollView(
                             controller: scrollController,
-                            child: MarkdownBody(
+                            child: AppMarkdown(
                               data: explanation,
                               selectable: true,
-                              styleSheet: MarkdownStyleSheet(
-                                p: TextStyle(fontSize: 14, height: 1.6, color: isDark ? Colors.white70 : Colors.black87),
-                                code: TextStyle(backgroundColor: isDark ? Colors.black26 : Colors.black12, fontFamily: 'monospace'),
-                              ),
                             ),
                           );
                         },

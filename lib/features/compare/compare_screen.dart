@@ -13,6 +13,7 @@ import '../../providers/ai_providers.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/glowing_indicator.dart';
+import '../../widgets/app_markdown.dart';
 
 final _localSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 
@@ -51,8 +52,11 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       final prefs = await SharedPreferences.getInstance();
       final seen = prefs.getBool('seen_arena_tutorial') ?? false;
       if (!seen && mounted) {
-        ShowCaseWidget.of(context).startShowCase([_arenaKey]);
-        await prefs.setBool('seen_arena_tutorial', true);
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) {
+          ShowCaseWidget.of(context).startShowCase([_arenaKey]);
+          await prefs.setBool('seen_arena_tutorial', true);
+        }
       }
     });
   }
@@ -62,6 +66,67 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _showHelpDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.sports_martial_arts_rounded, color: AppColors.accent),
+            SizedBox(width: 8),
+            Text('AI Repo Arena'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'What is this feature?',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'This screen lets you compare up to 3 GitHub repositories side by side. It evaluates development velocity, community stats, and generates an LLM-powered verdict.',
+                style: TextStyle(fontSize: 12, height: 1.4),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Under the Hood:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '• Fetches and aggregates stars, forks, issues, and language stats.\n'
+                '• Feeds combined repository statistics to Groq Llama 3 to compile comparative strengths, weaknesses, and a recommendation verdict.',
+                style: TextStyle(fontSize: 12, height: 1.4),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'How to use:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              SizedBox(height: 4),
+              Text(
+                '1. Search for repositories to fill up to 3 arena slots.\n'
+                '2. Review side-by-side comparison charts automatically.\n'
+                '3. Click "Generate AI Battle Verdict" to see the AI analysis.',
+                style: TextStyle(fontSize: 12, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -97,6 +162,11 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                 icon: const Icon(Icons.clear_all_rounded),
                 label: const Text('Clear Arena'),
               ),
+            IconButton(
+              icon: const Icon(Icons.help_outline_rounded),
+              onPressed: () => _showHelpDialog(context),
+              tooltip: 'How to use this feature',
+            ),
           ],
         ),
         body: GestureDetector(
@@ -151,7 +221,13 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                     // Search Bar
                     Showcase(
                       key: _arenaKey,
-                      description: 'Search and add at least 2 repositories here to unlock an AI Battle Verdict!',
+                      title: 'AI Repo Arena Search',
+                      description: 'Search and select up to 3 repositories. Once added, you can initiate a live metrics showdown and request an AI Battle Verdict analysis.',
+                      titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                      descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                      tooltipBackgroundColor: const Color(0xFF1E293B),
+                      tooltipBorderRadius: BorderRadius.circular(12),
+                      blurValue: 2,
                       child: TextField(
                         controller: _searchController,
                         focusNode: _searchFocusNode,
@@ -373,7 +449,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -686,14 +762,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          MarkdownBody(
+          AppMarkdown(
             data: verdict,
-            styleSheet: MarkdownStyleSheet(
-              p: TextStyle(fontSize: 13, height: 1.5, color: isDark ? Colors.white70 : Colors.black87),
-              h1: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              h2: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              listBullet: const TextStyle(color: AppColors.accent),
-            ),
+            selectable: true,
           ),
         ],
       ),

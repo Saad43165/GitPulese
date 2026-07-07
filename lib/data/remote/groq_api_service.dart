@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -33,7 +34,15 @@ class GroqApiService {
         ),
       );
 
-      final summary = response.data['summary'] as String?;
+      final Map<String, dynamic> data;
+      if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data as Map);
+      } else if (response.data is String) {
+        data = Map<String, dynamic>.from(jsonDecode(response.data as String) as Map);
+      } else {
+        throw GroqApiException('Invalid response format.');
+      }
+      final summary = data['summary'] as String?;
       if (summary == null || summary.trim().isEmpty) {
         throw GroqApiException('Empty summary returned.');
       }
@@ -63,7 +72,15 @@ class GroqApiService {
         ),
       );
 
-      final analysis = response.data['analysis'] as String?;
+      final Map<String, dynamic> data;
+      if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data as Map);
+      } else if (response.data is String) {
+        data = Map<String, dynamic>.from(jsonDecode(response.data as String) as Map);
+      } else {
+        throw GroqApiException('Invalid response format.');
+      }
+      final analysis = data['analysis'] as String?;
       if (analysis == null || analysis.trim().isEmpty) {
         throw GroqApiException('Empty analysis returned.');
       }
@@ -91,7 +108,15 @@ class GroqApiService {
         ),
       );
 
-      final explanation = response.data['explanation'] as String?;
+      final Map<String, dynamic> data;
+      if (response.data is Map) {
+        data = Map<String, dynamic>.from(response.data as Map);
+      } else if (response.data is String) {
+        data = Map<String, dynamic>.from(jsonDecode(response.data as String) as Map);
+      } else {
+        throw GroqApiException('Invalid response format.');
+      }
+      final explanation = data['explanation'] as String?;
       if (explanation == null || explanation.trim().isEmpty) {
         throw GroqApiException('Empty explanation returned.');
       }

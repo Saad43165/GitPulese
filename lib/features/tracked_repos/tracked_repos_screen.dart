@@ -61,6 +61,7 @@ class _TrackedReposScreenState extends ConsumerState<TrackedReposScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const PageHeader(
+              showBackButton: false,
               title: 'Release Tracking',
               subtitle: 'Get notified when tracked repos ship new releases',
             ),

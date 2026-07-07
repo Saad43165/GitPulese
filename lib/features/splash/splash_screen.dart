@@ -2,7 +2,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../home/root_shell.dart';
+import '../onboarding/onboarding_screen.dart';
+import '../../core/constants/api_constants.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -77,11 +80,20 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Future<void> _navigateNext() async {
     await Future.delayed(const Duration(milliseconds: 3200));
     if (!mounted) return;
+
+    // Check if user has previously signed in or finished onboarding
+    final prefs = await SharedPreferences.getInstance();
+    final hasPat = (prefs.getString(ApiConstants.patStorageKey) ?? '').isNotEmpty;
+    final hasCompletedOnboarding = prefs.getBool('completed_onboarding') ?? false;
+
     HapticFeedback.mediumImpact();
+    if (!mounted) return;
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 800),
-        pageBuilder: (_, __, ___) => const RootShell(),
+        pageBuilder: (_, __, ___) =>
+            (hasPat || hasCompletedOnboarding) ? const RootShell() : const OnboardingScreen(),
         transitionsBuilder: (_, animation, __, child) {
           final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
           final scale = Tween<double>(begin: 1.04, end: 1.0)

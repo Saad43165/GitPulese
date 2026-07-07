@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../widgets/glowing_indicator.dart';
+import '../../../widgets/app_markdown.dart';
 
 class AiPrReaderScreen extends ConsumerStatefulWidget {
   final String owner;
@@ -97,23 +98,9 @@ class _AiPrReaderScreenState extends ConsumerState<AiPrReaderScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  MarkdownBody(
+                  AppMarkdown(
                     data: summary,
-                    styleSheet: MarkdownStyleSheet(
-                      h1: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w800, fontSize: 20),
-                      h2: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w700, fontSize: 18),
-                      p: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 16, height: 1.6),
-                      code: TextStyle(
-                        backgroundColor: isDark ? Colors.black45 : Colors.black12,
-                        fontFamily: 'monospace',
-                        color: AppColors.accent,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A) : Colors.black12,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
-                      ),
-                    ),
+                    selectable: true,
                   ),
                 ],
               ),

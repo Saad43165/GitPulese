@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_constants.dart';
 import '../core/network/dio_client.dart';
 import '../data/models/user_and_search_models.dart';
+import '../data/models/repo_model.dart';
 import '../providers/core_providers.dart';
 import '../providers/search_providers.dart';
 
@@ -123,4 +124,9 @@ final authenticatedUserProvider = FutureProvider<GhUser?>((ref) async {
   } catch (_) {
     return null;
   }
+});
+
+final userReposProvider = FutureProvider.family<List<GhRepo>, String>((ref, username) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getUserRepos(username);
 });

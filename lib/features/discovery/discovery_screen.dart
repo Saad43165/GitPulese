@@ -34,19 +34,26 @@ class DiscoveryScreen extends ConsumerStatefulWidget {
 class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   late PageController _pageController;
   final GlobalKey _swipeKey = GlobalKey();
+  bool _tutorialTriggered = false;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.95);
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final prefs = await SharedPreferences.getInstance();
-      final seen = prefs.getBool('seen_discovery_swipe') ?? false;
-      if (!seen && mounted) {
+  }
+
+  void _checkAndShowTutorial() async {
+    if (_tutorialTriggered) return;
+    _tutorialTriggered = true;
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('seen_discovery_swipe') ?? false;
+    if (!seen && mounted) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) {
         ShowCaseWidget.of(context).startShowCase([_swipeKey]);
         await prefs.setBool('seen_discovery_swipe', true);
       }
-    });
+    }
   }
 
   @override
@@ -57,6 +64,11 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tabIndex = ref.watch(selectedNavTabProvider);
+    if (tabIndex == 2) { // 2 is Discovery screen index
+      _checkAndShowTutorial();
+    }
+
     final feedAsync = ref.watch(discoveryFeedProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -157,7 +169,13 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
             right: 0,
             child: Showcase(
               key: _swipeKey,
-              description: 'Swipe up for infinite discovery!',
+              title: 'Infinite Discovery Swipe',
+              description: 'Swipe vertically (up/down) like a feed of reels/TikToks to discover trending, highly-starred repositories customized to your language interests.',
+              titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+              descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+              tooltipBackgroundColor: const Color(0xFF1E293B),
+              tooltipBorderRadius: BorderRadius.circular(12),
+              blurValue: 2,
               child: IgnorePointer(
                 child: Column(
                   children: [

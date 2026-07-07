@@ -123,6 +123,37 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return filtered;
   }
 
+  List<InlineSpan> _highlightText(String text, TextStyle baseStyle) {
+    if (_searchQuery.isEmpty) {
+      return [TextSpan(text: text, style: baseStyle)];
+    }
+    final List<InlineSpan> spans = [];
+    final lowerText = text.toLowerCase();
+    final lowerQuery = _searchQuery.toLowerCase();
+    int start = 0;
+    int index = lowerText.indexOf(lowerQuery, start);
+
+    while (index != -1) {
+      if (index > start) {
+        spans.add(TextSpan(text: text.substring(start, index), style: baseStyle));
+      }
+      spans.add(TextSpan(
+        text: text.substring(index, index + _searchQuery.length),
+        style: baseStyle.copyWith(
+          backgroundColor: Colors.yellow.withValues(alpha: 0.35),
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ));
+      start = index + _searchQuery.length;
+      index = lowerText.indexOf(lowerQuery, start);
+    }
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start), style: baseStyle));
+    }
+    return spans;
+  }
+
   @override
   Widget build(BuildContext context) {
     final historyAsync = ref.watch(historyListProvider);
@@ -211,13 +242,47 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                 width: 1.2,
                               ),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _buildStatPill('Total Events', totalCount.toString(), Icons.timeline_rounded, AppColors.accent, isDark),
-                                const SizedBox(width: 8),
-                                _buildStatPill('Searches', searchCount.toString(), Icons.search_rounded, const Color(0xFF9333EA), isDark),
-                                const SizedBox(width: 8),
-                                _buildStatPill('Visited', viewedCount.toString(), Icons.explore_rounded, AppColors.success, isDark),
+                                Row(
+                                  children: [
+                                    _buildStatPill('Total Events', totalCount.toString(), Icons.timeline_rounded, AppColors.accent, isDark),
+                                    const SizedBox(width: 8),
+                                    _buildStatPill('Searches', searchCount.toString(), Icons.search_rounded, const Color(0xFF9333EA), isDark),
+                                    const SizedBox(width: 8),
+                                    _buildStatPill('Visited', viewedCount.toString(), Icons.explore_rounded, AppColors.success, isDark),
+                                  ],
+                                ),
+                                if (totalCount > 0) ...[
+                                  const SizedBox(height: AppSpacing.md),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: SizedBox(
+                                      height: 6,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            flex: searchCount,
+                                            child: Container(color: const Color(0xFF9333EA)),
+                                          ),
+                                          Expanded(
+                                            flex: viewedCount,
+                                            child: Container(color: AppColors.success),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Searches Ratio', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                      Text('Views Ratio', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -361,10 +426,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                                         alignment: Alignment.topCenter,
                                                         children: [
                                                           // Vertical Connector Line
-                                                          if (!isLast)
+                                                          if (!isLast || index > 0)
                                                             Positioned(
-                                                              top: 24,
-                                                              bottom: 0,
+                                                              top: index == 0 ? 26 : 0,
+                                                              bottom: isLast ? null : 0,
+                                                              height: isLast ? 26 : null,
                                                               width: 1.8,
                                                               child: Container(
                                                                 color: isDark ? Colors.white12 : Colors.black12,
@@ -417,28 +483,36 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                                                         ),
                                                                         const SizedBox(width: 8),
                                                                         Expanded(
-                                                                          child: Text(
-                                                                            entry.query,
+                                                                          child: Text.rich(
+                                                                            TextSpan(
+                                                                              children: _highlightText(
+                                                                                entry.query,
+                                                                                const TextStyle(
+                                                                                  fontWeight: FontWeight.bold,
+                                                                                  fontSize: 13.5,
+                                                                                ),
+                                                                              ),
+                                                                            ),
                                                                             maxLines: 1,
                                                                             overflow: TextOverflow.ellipsis,
-                                                                            style: const TextStyle(
-                                                                              fontWeight: FontWeight.bold,
-                                                                              fontSize: 13.5,
-                                                                            ),
                                                                           ),
                                                                         ),
                                                                       ],
                                                                     ),
                                                                     if (entry.subtitle != null && entry.subtitle!.isNotEmpty) ...[
                                                                       const SizedBox(height: 4),
-                                                                      Text(
-                                                                        entry.subtitle!,
+                                                                      Text.rich(
+                                                                        TextSpan(
+                                                                          children: _highlightText(
+                                                                            entry.subtitle!,
+                                                                            TextStyle(
+                                                                              fontSize: 11,
+                                                                              color: isDark ? Colors.white60 : Colors.black54,
+                                                                            ),
+                                                                          ),
+                                                                        ),
                                                                         maxLines: 2,
                                                                         overflow: TextOverflow.ellipsis,
-                                                                        style: TextStyle(
-                                                                          fontSize: 11,
-                                                                          color: isDark ? Colors.white60 : Colors.black54,
-                                                                        ),
                                                                       ),
                                                                     ],
                                                                     const SizedBox(height: 4),

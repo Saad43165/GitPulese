@@ -398,3 +398,213 @@ Format your response cleanly:
 final compareAiProvider = StateNotifierProvider.autoDispose<CompareAiNotifier, AsyncValue<String?>>((ref) {
   return CompareAiNotifier(ref.watch(groqApiServiceProvider));
 });
+
+class PrReviewResult {
+  final String owner;
+  final String repo;
+  final int pullNumber;
+  final String title;
+  final String author;
+  final String reviewMarkdown;
+  final String branchName;
+  final String diff;
+
+  PrReviewResult({
+    required this.owner,
+    required this.repo,
+    required this.pullNumber,
+    required this.title,
+    required this.author,
+    required this.reviewMarkdown,
+    required this.branchName,
+    required this.diff,
+  });
+}
+
+class PrReviewNotifier extends StateNotifier<AsyncValue<PrReviewResult?>> {
+  final GroqApiService groq;
+  final GitHubApiService github;
+
+  PrReviewNotifier(this.groq, this.github) : super(const AsyncValue.data(null));
+
+  Future<void> reviewPullRequest(String url) async {
+    state = const AsyncValue.loading();
+    try {
+      final prRegex = RegExp(
+        r'github\.com/([^/]+)/([^/]+)/pull/(\d+)',
+        caseSensitive: false,
+      );
+      final match = prRegex.firstMatch(url);
+      if (match == null) {
+        state = AsyncValue.error('Invalid GitHub Pull Request URL. Please enter a valid PR link (e.g. github.com/owner/repo/pull/123).', StackTrace.current);
+        return;
+      }
+
+      final owner = match.group(1)!;
+      final repo = match.group(2)!;
+      final pullNumber = int.parse(match.group(3)!);
+
+      String title = 'Pull Request #$pullNumber';
+      String author = 'unknown';
+      String description = 'No description provided.';
+      String branchName = 'main';
+
+      try {
+        final details = await github.getPullRequestDetails(owner, repo, pullNumber);
+        if (details != null) {
+          title = details['title'] as String? ?? title;
+          author = (details['user'] as Map<String, dynamic>?)?['login'] as String? ?? author;
+          description = details['body'] as String? ?? description;
+          if (details['head'] != null && details['head']['ref'] != null) {
+            branchName = details['head']['ref'] as String;
+          }
+        }
+      } catch (_) {
+        // Fallback: Proceed even if details API fails
+      }
+
+      final diff = await github.getPullRequestDiff(owner, repo, pullNumber);
+      if (diff == null || diff.isEmpty) {
+        state = AsyncValue.error('Pull request has no code diff or the diff is empty. Make sure the repository is public and the PR number is correct.', StackTrace.current);
+        return;
+      }
+
+      // Truncate to keep within context window limitations
+      final truncatedDiff = diff.length > 4000 ? '${diff.substring(0, 4000)}\n\n...[Diff Truncated for length]' : diff;
+
+      final prompt = '''
+Please perform a thorough, professional, and structured Code Review of the following pull request.
+
+PR Title: $title
+PR Description: $description
+PR Author: $author
+
+You MUST structure your review into the following sections exactly:
+
+### 🐞 Bugs Found
+Identify any logic bugs, syntax errors, edge-case crashes, type mismatches, or incorrect behaviors in the diff. Be specific.
+
+### 🔒 Security Issues
+Identify any security flaws, hardcoded credentials/secrets, potential injection vulnerabilities, unsafe dependencies, or privilege issues.
+
+### 💡 Suggestions & Refactoring
+Provide actionable suggestions for performance optimization, clean code best practices, documentation, readability, and testing.
+
+Here is the pull request diff:
+```diff
+$truncatedDiff
+```
+''';
+
+      final reviewMarkdown = await groq.explainCode(
+        filename: 'Pull Request Review: #$pullNumber - $title',
+        code: prompt,
+      );
+
+      if (!mounted) return;
+      state = AsyncValue.data(
+        PrReviewResult(
+          owner: owner,
+          repo: repo,
+          pullNumber: pullNumber,
+          title: title,
+          author: author,
+          reviewMarkdown: reviewMarkdown,
+          branchName: branchName,
+          diff: diff,
+        ),
+      );
+    } catch (e, st) {
+      if (!mounted) return;
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  void reset() => state = const AsyncValue.data(null);
+}
+
+final prReviewProvider = StateNotifierProvider.autoDispose<PrReviewNotifier, AsyncValue<PrReviewResult?>>((ref) {
+  return PrReviewNotifier(ref.watch(groqApiServiceProvider), ref.watch(githubApiServiceProvider));
+});
+
+final repoPullRequestsProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, ({String owner, String repo})>((ref, args) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getPullRequests(args.owner, args.repo);
+});
+
+final prFilesProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, ({String owner, String repo, int pullNumber})>((ref, args) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getPullRequestFiles(args.owner, args.repo, args.pullNumber);
+});
+
+class PrPatchNotifier extends StateNotifier<AsyncValue<String?>> {
+  PrPatchNotifier(this.groq, this.github) : super(const AsyncValue.data(null));
+
+  final GroqApiService groq;
+  final GitHubApiService github;
+
+  Future<void> generatePatch({
+    required String owner,
+    required String repo,
+    required String path,
+    required String branch,
+    required String prDiff,
+    required String reviewComments,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final fileContent = await github.getFileRawContent(owner, repo, path);
+
+      final prompt = '''
+You are an expert AI code refactoring engine. Your task is to resolve code quality, bugs, or security recommendations in a file based on a code review and a PR diff.
+
+Target File Path: $path
+Original File Content:
+```
+$fileContent
+```
+
+Pull Request Diff:
+```diff
+$prDiff
+```
+
+Code Review / Quality Audit:
+```markdown
+$reviewComments
+```
+
+Please output ONLY the complete, correct, and modified content of the target file. 
+- Do NOT wrap your output in markdown code blocks like ```dart or ```.
+- Do NOT write any introduction or summary explanations. 
+- Output the raw code content exactly.
+''';
+
+      final patchedCode = await groq.explainCode(
+        filename: 'Auto Patch: $path',
+        code: prompt,
+      );
+
+      var cleanCode = patchedCode.trim();
+      if (cleanCode.startsWith('```')) {
+        final firstLineBreak = cleanCode.indexOf('\n');
+        if (firstLineBreak != -1) {
+          cleanCode = cleanCode.substring(firstLineBreak + 1);
+        }
+        if (cleanCode.endsWith('```')) {
+          cleanCode = cleanCode.substring(0, cleanCode.length - 3).trim();
+        }
+      }
+
+      state = AsyncValue.data(cleanCode);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  void reset() => state = const AsyncValue.data(null);
+}
+
+final prPatchProvider = StateNotifierProvider.autoDispose<PrPatchNotifier, AsyncValue<String?>>((ref) {
+  return PrPatchNotifier(ref.watch(groqApiServiceProvider), ref.watch(githubApiServiceProvider));
+});

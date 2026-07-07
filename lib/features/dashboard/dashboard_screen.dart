@@ -11,10 +11,16 @@ import '../../providers/settings_providers.dart';
 import '../../features/auth/auth_dialog.dart';
 import '../../widgets/repo_card.dart';
 import '../../widgets/state_views.dart';
-import '../../widgets/glowing_indicator.dart';
 import '../repo_detail/repo_detail_screen.dart';
+import '../repo_detail/ai_pr_review_screen.dart';
 import '../user_detail/user_detail_screen.dart';
 import '../compare/compare_screen.dart';
+import '../devops/devops_workflows_screen.dart';
+import '../editor/ai_code_editor_screen.dart';
+import '../architecture/architecture_visualizer_screen.dart';
+import '../portfolio/portfolio_generator_screen.dart';
+import '../vault/offline_codebase_vault_screen.dart';
+import '../help/developer_help_hub.dart';
 import '../../widgets/shimmer_skeletons.dart';
 
 class _Topic {
@@ -317,10 +323,10 @@ class DashboardScreen extends ConsumerWidget {
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
 
-              SliverToBoxAdapter(
+              const SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: _AiInsightCard(trending: trending),
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: _PremiumToolsCarousel(),
                 ),
               ),
 
@@ -738,99 +744,266 @@ class _DeveloperCard extends StatelessWidget {
   }
 }
 
-class _AiInsightCard extends StatefulWidget {
-  const _AiInsightCard({required this.trending});
-  final AsyncValue trending;
-
-  @override
-  State<_AiInsightCard> createState() => _AiInsightCardState();
-}
-
-class _AiInsightCardState extends State<_AiInsightCard> {
-  bool _isVisible = true;
+class _PremiumToolsCarousel extends StatelessWidget {
+  const _PremiumToolsCarousel();
 
   @override
   Widget build(BuildContext context) {
-    if (!_isVisible) return const SizedBox.shrink();
-    
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return widget.trending.maybeWhen(
-      data: (result) {
-        if (result.items.isEmpty) return const SizedBox.shrink();
-        
-        final Map<String, int> langs = {};
-        for (var r in result.items) {
-          if (r.language != null) {
-            langs[r.language] = (langs[r.language] ?? 0) + 1;
-          }
-        }
-        
-        String insight = "Today's open-source landscape is highly diverse with many rising tools.";
-        if (langs.isNotEmpty) {
-          final sorted = langs.entries.toList()..sort((a,b) => b.value.compareTo(a.value));
-          final top = sorted.first.key;
-          final pct = (sorted.first.value / result.items.length * 100).toInt();
-          insight = "The current trending landscape is heavily leaning towards $top, making up $pct% of today's top growing repositories.";
-        }
+    
+    final List<_PremiumFeature> features = [
+      _PremiumFeature(
+        title: 'Developer Help Hub',
+        subtitle: 'Interactive wizard, feature guides, and technical code walk-throughs.',
+        icon: Icons.help_center_rounded,
+        gradient: const [Color(0xFF6366F1), Color(0xFFEC4899)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DeveloperHelpHubScreen()),
+          );
+        },
+      ),
+      _PremiumFeature(
+        title: 'AI PR Reviewer',
+        subtitle: 'Audit Pull Requests for bugs, security holes, and code fixes.',
+        icon: Icons.rate_review_rounded,
+        gradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AiPrReviewScreen()),
+          );
+        },
+      ),
+      _PremiumFeature(
+        title: 'DevOps Control Center',
+        subtitle: 'Trigger workflows, stream live build logs, and monitor status.',
+        icon: Icons.rocket_launch_rounded,
+        gradient: const [Color(0xFF0EA5E9), Color(0xFF0284C7)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DevOpsWorkflowsScreen()),
+          );
+        },
+      ),
+      _PremiumFeature(
+        title: 'AI Code Editor',
+        subtitle: 'Refactor code files and commit patches directly using AI.',
+        icon: Icons.code_rounded,
+        gradient: const [Color(0xFF10B981), Color(0xFF059669)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AiCodeEditorScreen()),
+          );
+        },
+      ),
+      _PremiumFeature(
+        title: 'Codebase Visualizer',
+        subtitle: 'Visualize directory metrics, radial dependency maps, and complexity.',
+        icon: Icons.bubble_chart_rounded,
+        gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ArchitectureVisualizerScreen()),
+          );
+        },
+      ),
+      _PremiumFeature(
+        title: 'Portfolio Generator',
+        subtitle: 'Generate portfolio websites and badges, deploy with one click.',
+        icon: Icons.art_track_rounded,
+        gradient: const [Color(0xFFEC4899), Color(0xFFDB2777)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PortfolioGeneratorScreen()),
+          );
+        },
+      ),
+      _PremiumFeature(
+        title: 'Offline Code Vault',
+        subtitle: 'Download repositories for offline search and syntax highlighted views.',
+        icon: Icons.offline_pin_rounded,
+        gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const OfflineCodebaseVaultScreen()),
+          );
+        },
+      ),
+    ];
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF161B22) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.1),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              )
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Premium Developer Tools',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.help_outline_rounded, color: AppColors.accent, size: 20),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DeveloperHelpHubScreen()),
+                  );
+                },
+                tooltip: 'Developer Help Hub',
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 84,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            itemCount: features.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final f = features[index];
+              return Container(
+                width: 280,
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('AI Daily Insight', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.accent)),
-                        GestureDetector(
-                          onTap: () => setState(() => _isVisible = false),
-                          child: Icon(Icons.close_rounded, size: 18, color: isDark ? Colors.white54 : Colors.black54),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      insight,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark 
+                          ? Colors.black.withValues(alpha: 0.2) 
+                          : f.gradient.first.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
                   ],
                 ),
-              ),
-            ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: f.onTap,
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            right: -10,
+                            bottom: -10,
+                            child: Icon(
+                              f.icon,
+                              size: 60,
+                              color: f.gradient.first.withValues(alpha: 0.04),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: f.gradient,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: f.gradient.first.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      )
+                                    ],
+                                  ),
+                                  child: Icon(f.icon, color: Colors.white, size: 20),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        f.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                          letterSpacing: -0.2,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        f.subtitle,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          height: 1.2,
+                                          color: isDark ? Colors.white60 : Colors.black54,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 14,
+                                  color: isDark ? Colors.white30 : Colors.black26,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-        );
-      },
-      orElse: () => const SizedBox.shrink(),
+        ),
+      ],
     );
   }
+}
+
+class _PremiumFeature {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> gradient;
+  final VoidCallback onTap;
+
+  const _PremiumFeature({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.gradient,
+    required this.onTap,
+  });
 }

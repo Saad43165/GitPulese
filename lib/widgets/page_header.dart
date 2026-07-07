@@ -7,15 +7,18 @@ class PageHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
+    this.showBackButton,
   });
 
   final String title;
   final String? subtitle;
   final Widget? trailing;
+  final bool? showBackButton;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool shouldShowBack = showBackButton ?? Navigator.of(context).canPop();
 
     return SafeArea(
       bottom: false,
@@ -29,7 +32,7 @@ class PageHeader extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (Navigator.of(context).canPop()) ...[
+            if (shouldShowBack) ...[
               IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
                 onPressed: () => Navigator.of(context).pop(),
@@ -44,9 +47,9 @@ class PageHeader extends StatelessWidget {
                   Text(
                     title,
                     style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.8,
-                      height: 1.1,
+                       fontWeight: FontWeight.w800,
+                       letterSpacing: -0.8,
+                       height: 1.1,
                     ),
                   ),
                   if (subtitle != null) ...[

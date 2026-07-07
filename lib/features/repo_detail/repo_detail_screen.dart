@@ -4,6 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:showcaseview/showcaseview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -26,6 +28,7 @@ import '../../widgets/detail_section.dart';
 import '../../widgets/state_views.dart';
 import '../compare/compare_screen.dart';
 import '../user_detail/user_detail_screen.dart';
+import '../devops/devops_workflows_screen.dart';
 import 'widgets/ai_summary_card.dart';
 import 'widgets/recent_commits_section.dart';
 import 'widgets/risk_checker_card.dart';
@@ -36,6 +39,7 @@ import 'widgets/pull_requests_section.dart';
 import 'widgets/source_code_section.dart';
 import '../../widgets/expandable_section.dart';
 import '../../widgets/shimmer_skeletons.dart';
+import '../../widgets/app_markdown.dart';
 
 class RepoDetailScreen extends ConsumerStatefulWidget {
   const RepoDetailScreen({super.key, required this.owner, required this.repoName});
@@ -48,6 +52,25 @@ class RepoDetailScreen extends ConsumerStatefulWidget {
 
 class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
   bool _loggedView = false;
+  final GlobalKey _aiSummaryKey = GlobalKey();
+  final GlobalKey _riskKey = GlobalKey();
+  final GlobalKey _actionBarKey = GlobalKey();
+
+  void _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('seen_repo_detail_tutorial') ?? false;
+    if (!seen && mounted) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) {
+        ShowCaseWidget.of(context).startShowCase([
+          _aiSummaryKey,
+          _riskKey,
+          _actionBarKey,
+        ]);
+        await prefs.setBool('seen_repo_detail_tutorial', true);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,12 +87,15 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
         data: (repo) {
           if (!_loggedView) {
             _loggedView = true;
-            Future.microtask(() => ref.read(historyActionsProvider).logViewed(
-                  type: 'viewed_repo',
-                  name: repo.fullName,
-                  subtitle: repo.description,
-                  avatarUrl: repo.owner.avatarUrl,
-                ));
+            Future.microtask(() {
+              ref.read(historyActionsProvider).logViewed(
+                    type: 'viewed_repo',
+                    name: repo.fullName,
+                    subtitle: repo.description,
+                    avatarUrl: repo.owner.avatarUrl,
+                  );
+              _checkAndShowTutorial();
+            });
           }
           final bookmarkedAsync = ref.watch(isBookmarkedProvider(repo.id));
 
@@ -212,7 +238,17 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       const SizedBox(height: AppSpacing.lg),
                       _HealthCard(repo: repo),
                       const SizedBox(height: AppSpacing.lg),
-                      AiSummaryCard(repo: repo),
+                      Showcase(
+                        key: _aiSummaryKey,
+                        title: 'AI README Summary',
+                        description: 'Generate an instant, intelligent summary analyzing the features, use-cases, and design details based on the repository README documentation.',
+                        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                        descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                        tooltipBackgroundColor: const Color(0xFF1E293B),
+                        tooltipBorderRadius: BorderRadius.circular(12),
+                        blurValue: 2,
+                        child: AiSummaryCard(repo: repo),
+                      ),
                       const SizedBox(height: AppSpacing.lg),
                       DetailSection(
                         title: 'Star History',
@@ -228,10 +264,20 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                         wrapInSurface: false,
                         child: SimilarReposSection(repo: repo),
                       ),
-                      DetailSection(
-                        title: 'Dependency & License Risk',
-                        icon: Icons.policy_outlined,
-                        child: RiskCheckerCard(repo: repo),
+                      Showcase(
+                        key: _riskKey,
+                        title: 'License & Dependency Risk Advisor',
+                        description: 'Inspect file licenses, dependency versions, and software health scores. Flags legal compliance risks or deprecated libraries.',
+                        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                        descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                        tooltipBackgroundColor: const Color(0xFF1E293B),
+                        tooltipBorderRadius: BorderRadius.circular(12),
+                        blurValue: 2,
+                        child: DetailSection(
+                          title: 'Dependency & License Risk',
+                          icon: Icons.policy_outlined,
+                          child: RiskCheckerCard(repo: repo),
+                        ),
                       ),
                       DetailSection(
                         title: 'Security Advisories',
@@ -269,6 +315,51 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       DetailSection(
+                        title: 'DevOps CI/CD Workflows',
+                        subtitle: 'GitHub Actions workflow runs & triggers',
+                        icon: Icons.rocket_launch_rounded,
+                        wrapInSurface: true,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => DevOpsWorkflowsScreen(
+                                  owner: widget.owner,
+                                  repoName: widget.repoName,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.rocket_launch_rounded, color: AppColors.accent),
+                                const SizedBox(width: AppSpacing.md),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Launch DevOps Center',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        'Monitor workflows, view build logs, and trigger runs.',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(Icons.arrow_forward_rounded, color: AppColors.accent, size: 18),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      DetailSection(
                         title: 'Latest Releases',
                         icon: Icons.new_releases_outlined,
                         wrapInSurface: false,
@@ -289,7 +380,17 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                 bottom: 24,
                 left: 24,
                 right: 24,
-                child: _GlassmorphicActionBar(repo: repo, owner: widget.owner, repoName: widget.repoName),
+                child: Showcase(
+                  key: _actionBarKey,
+                  title: 'Unified Repository Actions',
+                  description: 'Perform essential actions: launch file browsers, copy repository source link, trigger downloads/stars, toggle offline tracking, or compare options.',
+                  titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                  descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                  tooltipBackgroundColor: const Color(0xFF1E293B),
+                  tooltipBorderRadius: BorderRadius.circular(12),
+                  blurValue: 2,
+                  child: _GlassmorphicActionBar(repo: repo, owner: widget.owner, repoName: widget.repoName),
+                ),
               ),
             ],
           );
@@ -755,7 +856,6 @@ class _ReadmeSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final readmeAsync = ref.watch(repoReadmeProvider((owner: owner, repo: repoName)));
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return readmeAsync.when(
       data: (readme) {
@@ -766,19 +866,9 @@ class _ReadmeSection extends ConsumerWidget {
           padding: const EdgeInsets.all(2),
           child: ExpandableSection(
             collapsedHeight: 300,
-            child: MarkdownBody(
+            child: AppMarkdown(
               data: readme,
               selectable: true,
-              styleSheet: MarkdownStyleSheet(
-                h1: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w800, fontSize: 24),
-                h2: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.w700, fontSize: 20),
-                p: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontSize: 14, height: 1.6),
-                code: TextStyle(backgroundColor: isDark ? Colors.black26 : Colors.black12, fontFamily: 'monospace'),
-                codeblockDecoration: BoxDecoration(color: isDark ? Colors.black45 : Colors.black12, borderRadius: BorderRadius.circular(12)),
-              ),
-              onTapLink: (text, href, title) {
-                if (href != null) launchUrl(Uri.parse(href), mode: LaunchMode.externalApplication);
-              },
             ),
           ),
         );

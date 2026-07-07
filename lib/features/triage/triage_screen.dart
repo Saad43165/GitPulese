@@ -49,6 +49,7 @@ class TriageScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const PageHeader(
+              showBackButton: false,
               title: 'Maintainer Triage',
               subtitle: 'Oldest open items first — spot what needs attention',
             ),

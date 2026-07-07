@@ -12,6 +12,7 @@ class AppSurface extends StatelessWidget {
     this.onTap,
     this.accentColor,
     this.showAccentStripe = false,
+    this.backgroundColor,
   });
 
   final Widget child;
@@ -20,6 +21,7 @@ class AppSurface extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? accentColor;
   final bool showAccentStripe;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,7 @@ class AppSurface extends StatelessWidget {
     Widget content = Container(
       margin: margin,
       decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        color: backgroundColor ?? (isDark ? AppColors.darkSurface : AppColors.lightSurface),
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
         border: Border.all(
           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
