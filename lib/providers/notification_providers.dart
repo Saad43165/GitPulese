@@ -5,6 +5,8 @@ import '../data/local/tracked_repos_table.dart';
 import '../data/models/repo_model.dart';
 import 'core_providers.dart';
 import 'settings_providers.dart';
+import '../data/remote/github_api_service.dart';
+import '../core/network/dio_client.dart' show GitHubApiException;
 
 final trackedReposProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
@@ -42,6 +44,10 @@ class TrackingActions {
           final tag = (releases.first as Map<String, dynamic>)['tag_name'] as String?;
           await TrackedReposTable.updateLastKnownRelease(db, repo.id, tag);
         }
+      } on GitHubApiException catch (e) {
+        if (e.statusCode != 404) {
+          rethrow;
+        }
       } catch (_) {
         // Non-fatal — first real check will just pick up the baseline then.
       }
@@ -74,3 +80,44 @@ class BackgroundCheckToggler {
 }
 
 final backgroundCheckTogglerProvider = Provider((ref) => BackgroundCheckToggler(ref));
+
+final trackedReleasesFeedProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  final tracked = await ref.watch(trackedReposProvider.future);
+  if (tracked.isEmpty) return [];
+
+  final api = ref.watch(githubApiServiceProvider);
+  final allReleases = <Map<String, dynamic>>[];
+
+  final futures = tracked.map((item) async {
+    final fullName = item['fullName'] as String;
+    final parts = fullName.split('/');
+    if (parts.length != 2) return;
+
+    try {
+      final releases = await api.getRepoReleases(parts[0], parts[1], perPage: 5);
+      for (final r in releases) {
+        if (r is Map<String, dynamic>) {
+          final copy = Map<String, dynamic>.from(r);
+          copy['repoFullName'] = fullName;
+          allReleases.add(copy);
+        }
+      }
+    } on GitHubApiException catch (e) {
+      if (e.statusCode != 404) {
+        rethrow;
+      }
+    } catch (_) {
+      // Fail silently for one repository to keep the rest working
+    }
+  });
+
+  await Future.wait(futures);
+
+  allReleases.sort((a, b) {
+    final aDate = DateTime.tryParse(a['published_at'] as String? ?? '') ?? DateTime(0);
+    final bDate = DateTime.tryParse(b['published_at'] as String? ?? '') ?? DateTime(0);
+    return bDate.compareTo(aDate);
+  });
+
+  return allReleases;
+});

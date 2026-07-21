@@ -46,9 +46,13 @@ class TrackedRepoChecker {
             await TrackedReposTable.updateLastKnownRelease(db, repoId, latestTag);
           }
         }
+      } on GitHubApiException catch (e) {
+        if (e.statusCode != 404) {
+          rethrow;
+        }
+        continue;
       } catch (_) {
-        // Skip this repo's check on error (rate limit, network, 404 after
-        // a repo was deleted, etc.) rather than aborting the whole batch.
+        // Skip this repo's check on error rather than aborting the whole batch.
         continue;
       }
     }

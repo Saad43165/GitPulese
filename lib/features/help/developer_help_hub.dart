@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../compare/compare_screen.dart';
@@ -10,6 +11,7 @@ import '../architecture/architecture_visualizer_screen.dart';
 import '../portfolio/portfolio_generator_screen.dart';
 import '../vault/offline_codebase_vault_screen.dart';
 import '../repo_detail/ai_pr_review_screen.dart';
+import '../../widgets/app_back_button.dart';
 
 class DeveloperHelpHubScreen extends ConsumerStatefulWidget {
   const DeveloperHelpHubScreen({super.key});
@@ -157,10 +159,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
           title: const Text('Developer Help Hub', style: TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
+          leading: const AppBackButton(),
         ),
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -168,7 +167,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
             // Welcome Header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -194,9 +193,9 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
             // Interactive Playground / Goal Wizard
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: AppSurface(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: AppSurface(
+                padding: EdgeInsets.all(AppSpacing.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -231,7 +230,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
             // Search & Category Filters
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Column(
                   children: [
                     TextField(
@@ -280,7 +279,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
                     ),
                   )
                 : SliverPadding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: EdgeInsets.all(AppSpacing.md),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -370,7 +369,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
     if (recommendedFeature == null) return const SizedBox.shrink();
 
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
@@ -464,7 +463,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
   ) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      margin: EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
         borderRadius: BorderRadius.circular(16),
@@ -486,7 +485,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
               });
             },
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

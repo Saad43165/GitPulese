@@ -4,6 +4,7 @@ import '../data/models/repo_model.dart';
 import '../data/remote/github_api_service.dart';
 import '../data/remote/groq_api_service.dart';
 import 'core_providers.dart';
+import 'settings_providers.dart';
 
 final groqApiServiceProvider = Provider<GroqApiService>((ref) => GroqApiService());
 
@@ -187,7 +188,55 @@ class StarNotifier extends StateNotifier<AsyncValue<bool>> {
   }
 }
 
+// ---------- Repository Forking ----------
+
+final repoForkProvider = StateNotifierProvider.family<ForkNotifier, AsyncValue<bool>, ({String owner, String repo})>((ref, args) {
+  return ForkNotifier(ref.watch(githubApiServiceProvider), args);
+});
+
+class ForkNotifier extends StateNotifier<AsyncValue<bool>> {
+  final GitHubApiService api;
+  final ({String owner, String repo}) args;
+
+  ForkNotifier(this.api, this.args) : super(const AsyncValue.loading()) {
+    _checkStatus();
+  }
+
+  Future<void> _checkStatus() async {
+    try {
+      final isForked = await api.checkFork(args.owner, args.repo);
+      if (mounted) state = AsyncValue.data(isForked);
+    } catch (_) {
+      if (mounted) state = const AsyncValue.data(false);
+    }
+  }
+
+  Future<void> fork() async {
+    final current = state.valueOrNull ?? false;
+    if (current) return; // Already forked — nothing to do
+    state = const AsyncValue.loading();
+    try {
+      await api.forkRepo(args.owner, args.repo);
+      
+      // Poll GitHub API until the fork is actually created and visible
+      bool isForked = false;
+      int attempts = 0;
+      while (attempts < 10 && !isForked) {
+        await Future.delayed(const Duration(seconds: 1));
+        isForked = await api.checkFork(args.owner, args.repo);
+        attempts++;
+      }
+      
+      if (mounted) state = AsyncValue.data(isForked);
+    } catch (e) {
+      if (mounted) state = const AsyncValue.data(false); // Revert on fail
+      rethrow;
+    }
+  }
+}
+
 // ---------- AI Developer Analyzer ----------
+
 
 class DeveloperAnalyzerNotifier extends StateNotifier<AsyncValue<String?>> {
   DeveloperAnalyzerNotifier(this.groq) : super(const AsyncValue.data(null));
@@ -278,77 +327,172 @@ class PrSummaryNotifier extends StateNotifier<AsyncValue<String?>> {
     required String title,
   }) async {
     state = const AsyncValue.loading();
+    Object? lastError;
+    StackTrace? lastStack;
+
+    // Strategy 1-3: Try diff-based summaries (progressive limits: 3000, 1500, 800)
     try {
       final diff = await github.getPullRequestDiff(owner, repo, pullNumber);
-      if (diff == null || diff.isEmpty) {
-        state = const AsyncValue.error('Pull request diff is empty or not found.', StackTrace.empty);
+      if (diff != null && diff.isNotEmpty) {
+        final limits = [3000, 1500, 800];
+
+        for (final limit in limits) {
+          final truncatedDiff = diff.length > limit
+              ? '${diff.substring(0, limit)}\n\n...[Diff truncated — showing first $limit chars]'
+              : diff;
+
+          try {
+            final explanation = await groq.explainCode(
+              filename: 'Pull Request #$pullNumber: $title',
+              code: truncatedDiff,
+            );
+            if (!mounted) return;
+            state = AsyncValue.data(explanation);
+            return; // success — stop retrying
+          } catch (e, st) {
+            final errStr = e.toString();
+            // Continue/retry on 500/rate-limit/429 errors
+            if (!errStr.contains('500') && !errStr.contains('rate') && !errStr.contains('429')) {
+              // Propagate if it's another error kind, but we will still fall back to metadata if retry fails
+            }
+            lastError = e;
+            lastStack = st;
+            await Future.delayed(const Duration(seconds: 2));
+          }
+        }
+      } else {
+        lastError = 'PR diff is empty or restricted';
+        lastStack = StackTrace.empty;
+      }
+    } catch (e, st) {
+      lastError = e;
+      lastStack = st;
+    }
+
+    // Strategy 4 Fallback: Summarize based on PR title, description, and list of files
+    if (!mounted) return;
+    try {
+      final prDetails = await github.getPullRequestDetails(owner, repo, pullNumber);
+      final prFiles = await github.getPullRequestFiles(owner, repo, pullNumber);
+      final body = prDetails?['body'] as String? ?? 'No description provided.';
+      
+      final fileSummary = prFiles.map((f) {
+        final filename = f['filename'] as String? ?? 'unknown';
+        final status = f['status'] as String? ?? 'modified';
+        final additions = f['additions'] as int? ?? 0;
+        final deletions = f['deletions'] as int? ?? 0;
+        return '- $filename ($status, +$additions -$deletions)';
+      }).join('\n');
+
+      final summaryPrompt = 'This Pull Request diff was unavailable or too large. Here is the metadata, description, and files changed:\n\n'
+          'Title: $title\n'
+          'Description:\n$body\n\n'
+          'Files Changed:\n$fileSummary';
+
+      final explanation = await groq.explainCode(
+        filename: 'Pull Request #$pullNumber: $title (Metadata Summary)',
+        code: summaryPrompt,
+      );
+      if (mounted) {
+        state = AsyncValue.data(explanation);
         return;
       }
-      
-      // Limit diff size to avoid token limit errors
-      final truncatedDiff = diff.length > 3000 ? '${diff.substring(0, 3000)}\n...[Diff Truncated]' : diff;
-      
-      // We can cleverly use the explain-code endpoint for PR diffs too
-      final explanation = await groq.explainCode(
-        filename: 'Pull Request: $title',
-        code: truncatedDiff,
-      );
-      if (!mounted) return;
-      state = AsyncValue.data(explanation);
     } catch (e, st) {
-      if (!mounted) return;
-      state = AsyncValue.error(e, st);
+      lastError = e;
+      lastStack = st;
     }
+
+    // All attempts failed
+    if (!mounted) return;
+    state = AsyncValue.error(lastError ?? 'Unknown error', lastStack ?? StackTrace.current);
   }
 }
 
 // ---------- User Following ----------
 
-final followingDeltaProvider = StateProvider<int>((ref) => 0);
+// Per-username accumulated delta for THIS session (resets when provider is disposed).
+// Stored as a map so multiple profiles can be tracked independently.
+final followDeltaMapProvider = StateProvider<Map<String, int>>((ref) => {});
 
-final userFollowProvider = StateNotifierProvider.family<FollowNotifier, AsyncValue<bool>, String>((ref, username) {
+/// Public helper: read the net follow-delta for a specific target username.
+/// Returns the change in the viewer's *own* following count caused by following/
+/// unfollowing [targetUsername] during this session.
+int followDeltaForUser(Map<String, int> map, String targetUsername) =>
+    map[targetUsername] ?? 0;
+
+final userFollowProvider =
+    StateNotifierProvider.family<FollowNotifier, AsyncValue<bool>, String>(
+        (ref, username) {
   return FollowNotifier(ref, ref.watch(githubApiServiceProvider), username);
 });
 
 class FollowNotifier extends StateNotifier<AsyncValue<bool>> {
-  final Ref ref;
-  final GitHubApiService api;
-  final String username;
-  bool? _initialFollowState;
-  
-  FollowNotifier(this.ref, this.api, this.username) : super(const AsyncValue.loading()) {
-    checkStatus();
+  final Ref _ref;
+  final GitHubApiService _api;
+  final String _username;
+
+  /// The confirmed server-side state after the last successful API call.
+  bool? _serverState;
+
+  FollowNotifier(this._ref, this._api, this._username)
+      : super(const AsyncValue.loading()) {
+    _checkStatus();
   }
 
-  Future<void> checkStatus() async {
+  Future<void> _checkStatus() async {
     try {
-      final isFollowing = await api.checkFollow(username);
-      _initialFollowState = isFollowing;
+      final isFollowing = await _api.checkFollow(_username);
+      _serverState = isFollowing;
       if (mounted) state = AsyncValue.data(isFollowing);
-    } catch (e) {
+    } catch (_) {
+      // Can't check (e.g. no PAT) — assume not following
       if (mounted) state = const AsyncValue.data(false);
     }
   }
 
+  /// +1 if auth user just followed this person, -1 if just unfollowed, 0 otherwise.
+  /// Used to show live follower count on the viewed profile.
   int get followersDelta {
-    if (_initialFollowState == null) return 0;
-    final current = state.valueOrNull ?? false;
-    if (_initialFollowState == false && current == true) return 1;
-    if (_initialFollowState == true && current == false) return -1;
+    if (_serverState == null) return 0;
+    final optimistic = state.valueOrNull;
+    if (optimistic == null) return 0;
+    if (!_serverState! && optimistic) return 1;  // was not following, now following
+    if (_serverState! && !optimistic) return -1; // was following, now unfollowed
     return 0;
   }
+
+  /// Net change to the authenticated user's OWN following count.
+  int get sessionDelta =>
+      _ref.read(followDeltaMapProvider)[_username] ?? 0;
 
   Future<void> toggleFollow() async {
     final current = state.valueOrNull ?? false;
     final next = !current;
-    state = AsyncValue.data(next); // Optimistic update
-    ref.read(followingDeltaProvider.notifier).state += (next ? 1 : -1);
-    
+
+    // 1. Optimistic UI update immediately
+    state = AsyncValue.data(next);
+
+    // 2. Track per-username delta
+    final map = Map<String, int>.from(_ref.read(followDeltaMapProvider));
+    map[_username] = (map[_username] ?? 0) + (next ? 1 : -1);
+    _ref.read(followDeltaMapProvider.notifier).state = map;
+
     try {
-      await api.followUser(username, follow: next);
+      await _api.followUser(_username, follow: next);
+      // Update confirmed server state
+      _serverState = next;
+
+      // 3. Invalidate the following list so it refreshes on next open
+      _ref.invalidate(userDetailProvider(_username));
     } catch (e) {
-      ref.read(followingDeltaProvider.notifier).state -= (next ? 1 : -1);
-      if (mounted) state = AsyncValue.data(current); // Revert on fail
+      // Revert optimistic update on failure
+      state = AsyncValue.data(current);
+
+      final revertMap = Map<String, int>.from(_ref.read(followDeltaMapProvider));
+      revertMap[_username] = (revertMap[_username] ?? 0) - (next ? 1 : -1);
+      _ref.read(followDeltaMapProvider.notifier).state = revertMap;
+
+      rethrow; // Let UI show the error
     }
   }
 }

@@ -1,17 +1,21 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../data/models/user_and_search_models.dart';
+import '../../../providers/settings_providers.dart';
 import '../../../widgets/app_surface.dart';
 
-class UserResultTile extends StatelessWidget {
+class UserResultTile extends ConsumerWidget {
   const UserResultTile({super.key, required this.user, required this.onTap});
   final GhUser user;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detailAsync = ref.watch(userDetailProvider(user.login));
+
     return AppSurface(
       onTap: onTap,
       child: Row(
@@ -35,11 +39,25 @@ class UserResultTile extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '${user.type} · ${formatCount(user.followers)} followers',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                detailAsync.when(
+                  data: (detailUser) => Text(
+                    '${user.type} · ${formatCount(detailUser.followers)} followers · ${detailUser.publicRepos} repos',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  loading: () => Text(
+                    '${user.type} · Loading stats...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  error: (_, __) => Text(
+                    user.type,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
                 ),
               ],
             ),

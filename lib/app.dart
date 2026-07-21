@@ -25,7 +25,10 @@ class GitPulseApp extends ConsumerWidget {
       scrollBehavior: const MaterialScrollBehavior().copyWith(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       ),
+      // ignore: deprecated_member_use
       builder: (context, child) => ShowCaseWidget(
+        enableAutoScroll: true,
+        // ignore: deprecated_member_use
         builder: (context) => GlobalZipProgressOverlay(child: child!),
       ),
       home: const SplashScreen(),

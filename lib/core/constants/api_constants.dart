@@ -5,7 +5,7 @@ class ApiConstants {
   /// URL of your deployed backend proxy (see /gitexplorer-backend README).
   /// Replace this with your real Render/Railway URL before shipping —
   /// leaving it as-is will make every network call fail.
-  static const String backendBaseUrl = 'https://gitexplorerbackend-production.up.railway.app';
+  static const String backendBaseUrl = 'https://gitpulse-ai.gitpulse-ai.workers.dev';
 
   static const String baseUrl = 'https://api.github.com';
 

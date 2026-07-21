@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_theme.dart';
@@ -135,6 +136,70 @@ class AppMarkdown extends StatelessWidget {
             mode: LaunchMode.externalApplication,
           );
         }
+      },
+      imageBuilder: (uri, title, alt) {
+        final urlString = uri.toString();
+        final isNetwork = urlString.startsWith('http');
+        if (!isNetwork) {
+          return const SizedBox.shrink();
+        }
+        return Builder(
+          builder: (context) {
+            return GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => Dialog(
+                    backgroundColor: Colors.black.withValues(alpha: 0.9),
+                    insetPadding: EdgeInsets.zero,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        InteractiveViewer(
+                          maxScale: 4.0,
+                          minScale: 0.5,
+                          child: CachedNetworkImage(
+                            imageUrl: urlString,
+                            placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                            errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.grey, size: 48),
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        Positioned(
+                          top: 40,
+                          right: 20,
+                          child: CircleAvatar(
+                            backgroundColor: Colors.black54,
+                            child: IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: urlString,
+                    placeholder: (context, url) => Container(
+                      height: 180,
+                      color: isDark ? Colors.white10 : Colors.black12,
+                      child: const Center(child: CircularProgressIndicator()),
+                    ),
+                    errorWidget: (context, url, error) => const SizedBox.shrink(),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            );
+          }
+        );
       },
     );
 

@@ -53,13 +53,14 @@ class ShimmerRepoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ShimmerWrapper(
       child: Container(
         width: width,
         height: 110,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -98,12 +99,13 @@ class ShimmerListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ShimmerWrapper(
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -152,13 +154,14 @@ class ShimmerDeveloperCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ShimmerWrapper(
       child: Container(
         width: 100,
         height: 150,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -176,18 +179,16 @@ class ShimmerDeveloperCard extends StatelessWidget {
   }
 }
 
-/// A shimmer list of [count] vertical cards, for search/history loading.
 class ShimmerListCards extends StatelessWidget {
   const ShimmerListCards({super.key, this.count = 6});
   final int count;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: List.generate(count, (_) => const ShimmerListCard()),
-      ),
+      itemCount: count,
+      itemBuilder: (context, index) => const ShimmerListCard(),
     );
   }
 }
@@ -212,7 +213,7 @@ class ShimmerRepoDetailPage extends StatelessWidget {
             // Fake SliverAppBar header area
             Container(
               height: 200,
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               padding: const EdgeInsets.fromLTRB(20, 70, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,6 +276,7 @@ class ShimmerUserDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final w = MediaQuery.of(context).size.width;
 
     return ShimmerWrapper(
@@ -285,7 +287,7 @@ class ShimmerUserDetailPage extends StatelessWidget {
             // Fake hero header
             Container(
               height: 280,
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -316,7 +318,7 @@ class ShimmerUserDetailPage extends StatelessWidget {
               child: Container(
                 height: 72,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(

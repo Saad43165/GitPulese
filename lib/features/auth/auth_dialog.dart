@@ -8,6 +8,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/settings_providers.dart';
 import '../../core/constants/api_constants.dart';
+import '../../core/network/dio_client.dart';
+import '../../widgets/glowing_indicator.dart';
 
 class AuthDialog extends ConsumerStatefulWidget {
   const AuthDialog({super.key});
@@ -94,7 +96,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
       _pollForToken();
     } catch (e) {
       setState(() {
-        _error = 'Failed to start login. Network error or client ID is invalid.';
+        _error = 'Failed to start login: ${e is DioException ? GitHubApiException.fromDioError(e).message : e.toString()}';
         _loading = false;
       });
     }
@@ -203,11 +205,9 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
         });
       }
     } on DioException catch (e) {
-      final msg = e.response?.data is Map 
-          ? (e.response?.data['message'] ?? e.message)
-          : e.message;
+      final apiException = GitHubApiException.fromDioError(e);
       setState(() {
-        _manualError = 'Validation failed: $msg';
+        _manualError = 'Validation failed: ${apiException.message}';
       });
     } catch (e) {
       setState(() {
@@ -229,11 +229,12 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
     return Dialog(
       backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
@@ -335,7 +336,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
               ),
               const SizedBox(height: 20),
               if (_validatingManual)
-                const Center(child: CircularProgressIndicator())
+                const Center(child: GlowingIndicator())
               else ...[
                 FilledButton.icon(
                   onPressed: _validateAndSaveManualToken,
@@ -359,7 +360,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                 ),
               ],
             ] else if (_loading)
-              const Center(child: CircularProgressIndicator())
+              const Center(child: GlowingIndicator())
             else if (_error != null) ...[
               Text(_error!, style: const TextStyle(color: AppColors.danger)),
               const SizedBox(height: 16),
@@ -451,7 +452,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                   const SizedBox(
                     width: 14,
                     height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
+                    child: GlowingIndicator(size: 14),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -480,6 +481,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

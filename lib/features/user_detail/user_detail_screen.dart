@@ -12,6 +12,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/repo_model.dart';
+import '../../data/models/user_and_search_models.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/settings_providers.dart';
@@ -22,17 +23,15 @@ import '../../widgets/repo_card.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/shimmer_skeletons.dart';
+import '../../widgets/app_back_button.dart';
 import '../repo_detail/repo_detail_screen.dart';
+import '../auth/auth_dialog.dart';
 import 'developer_wrapped_screen.dart';
 import 'widgets/ai_developer_analyzer_card.dart';
 import '../../core/notifications/widget_manager.dart';
 import '../../widgets/github_analytics_section.dart';
 
-final _userDetailProvider =
-    FutureProvider.autoDispose.family((ref, String username) async {
-  final api = ref.watch(githubApiServiceProvider);
-  return api.getUserDetail(username);
-});
+final _userDetailProvider = userDetailProvider;
 
 final _userReposProvider = userReposProvider;
 
@@ -68,7 +67,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _devCardKey,
           _aiAnalyzerKey,
           _analyticsSectionKey,
@@ -207,7 +206,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(16),
-                                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DeveloperWrappedScreen(user: user, repos: repos))),
+                                    onTap: () => Navigator.of(context).push(CardPageRoute(child: DeveloperWrappedScreen(user: user, repos: repos))),
                                     child: const Padding(
                                       padding: EdgeInsets.all(20),
                                       child: Row(
@@ -338,8 +337,9 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     );
   }
 
-  Widget _buildSliverAppBar(dynamic user, bool isDark) {
+  Widget _buildSliverAppBar(GhUser user, bool isDark) {
     return SliverAppBar(
+      leading: const AppBackButton(),
       expandedHeight: 280.0,
       floating: false,
       pinned: true,
@@ -480,7 +480,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     );
   }
 
-  Widget _buildActionButtons(dynamic user, {bool isOwnProfile = false}) {
+  Widget _buildActionButtons(GhUser user, {bool isOwnProfile = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -509,18 +509,46 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
           // ── Other user profile ── Follow
           Consumer(
             builder: (context, ref, _) {
+              final pat = ref.watch(githubPatProvider);
+              final isLoggedIn = pat != null && pat.isNotEmpty;
               final followState = ref.watch(userFollowProvider(user.login));
               return followState.when(
                 data: (isFollowing) => FilledButton.icon(
-                  onPressed: () => ref.read(userFollowProvider(user.login).notifier).toggleFollow(),
-                  icon: Icon(isFollowing ? Icons.person_remove_rounded : Icons.person_add_rounded, size: 18),
-                  label: Text(isFollowing ? 'Unfollow' : 'Follow'),
+                  onPressed: () async {
+                    if (!isLoggedIn) {
+                      showDialog(context: context, builder: (_) => const AuthDialog());
+                      return;
+                    }
+                    try {
+                      await ref.read(userFollowProvider(user.login).notifier).toggleFollow();
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(e is GitHubApiException ? e.message : e.toString()),
+                            backgroundColor: AppColors.danger,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: Icon(
+                    !isLoggedIn
+                        ? Icons.lock_outline_rounded
+                        : (isFollowing ? Icons.person_remove_rounded : Icons.person_add_rounded),
+                    size: 18,
+                  ),
+                  label: Text(!isLoggedIn ? 'Follow (Login)' : (isFollowing ? 'Unfollow' : 'Follow')),
                   style: FilledButton.styleFrom(
-                    backgroundColor: isFollowing ? AppColors.danger : Theme.of(context).colorScheme.primary,
+                    backgroundColor: !isLoggedIn
+                        ? Colors.grey.shade700
+                        : (isFollowing ? AppColors.danger : Theme.of(context).colorScheme.primary),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    elevation: 4,
-                    shadowColor: (isFollowing ? AppColors.danger : Theme.of(context).colorScheme.primary).withValues(alpha: 0.4),
+                    elevation: !isLoggedIn ? 0 : 4,
+                    shadowColor: !isLoggedIn
+                        ? Colors.transparent
+                        : (isFollowing ? AppColors.danger : Theme.of(context).colorScheme.primary).withValues(alpha: 0.4),
                   ),
                 ),
                 loading: () => const Center(child: GlowingIndicator(size: 24)),
@@ -542,17 +570,26 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     );
   }
 
-  Widget _buildStatsBox(dynamic user, {required bool isOwnProfile}) {
+  Widget _buildStatsBox(GhUser user, {required bool isOwnProfile}) {
     return Consumer(
       builder: (context, ref, _) {
-        final followState = ref.watch(userFollowProvider(user.login));
+        ref.watch(userFollowProvider(user.login)); // watch for rebuild when follow state changes
+
+        // Follower count: +1/-1 based on confirmed server state vs current optimistic state
         final notifier = ref.read(userFollowProvider(user.login).notifier);
         final followersDelta = notifier.followersDelta;
-        
-        final followingDelta = ref.watch(followingDeltaProvider);
 
-        final displayFollowers = (user.followers ?? 0) + followersDelta;
-        final displayFollowing = (user.following ?? 0) + (isOwnProfile ? followingDelta : 0);
+        // Following count: only apply delta on OWN profile, using per-target map
+        // Sum all per-target deltas that the owner triggered this session
+        final ownFollowingDelta = isOwnProfile
+            ? ref.watch(followDeltaMapProvider).values.fold(0, (a, b) => a + b)
+            : 0;
+
+        // Clamp so counts never go below 0
+        final displayFollowers =
+            (user.followers + followersDelta).clamp(0, double.maxFinite).toInt();
+        final displayFollowing =
+            (user.following + ownFollowingDelta).clamp(0, double.maxFinite).toInt();
 
         return AppSurface(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
@@ -561,21 +598,40 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
             children: [
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _showUsersList(context, 'Followers', _userFollowersProvider(user.login)),
+                  onTap: () => _showUsersList(
+                      context, ref, 'Followers', _userFollowersProvider, user.login),
                   behavior: HitTestBehavior.opaque,
-                  child: _StatLabel(value: formatCount(displayFollowers), label: 'Followers', icon: Icons.people_alt_rounded),
+                  child: _StatLabel(
+                      value: formatCount(displayFollowers),
+                      label: 'Followers',
+                      icon: Icons.people_alt_rounded),
                 ),
               ),
-              Container(width: 1, height: 48, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+              Container(
+                  width: 1,
+                  height: 48,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _showUsersList(context, 'Following', _userFollowingProvider(user.login)),
+                  onTap: () => _showUsersList(
+                      context, ref, 'Following', _userFollowingProvider, user.login),
                   behavior: HitTestBehavior.opaque,
-                  child: _StatLabel(value: formatCount(displayFollowing), label: 'Following', icon: Icons.person_add_alt_1_rounded),
+                  child: _StatLabel(
+                      value: formatCount(displayFollowing),
+                      label: 'Following',
+                      icon: Icons.person_add_alt_1_rounded),
                 ),
               ),
-              Container(width: 1, height: 48, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-              Expanded(child: _StatLabel(value: '${user.publicRepos}', label: 'Repos', icon: Icons.source_rounded)),
+              Container(
+                  width: 1,
+                  height: 48,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+              Expanded(
+                child: _StatLabel(
+                    value: formatCount(user.publicRepos),
+                    label: 'Repositories',
+                    icon: Icons.folder_open_rounded),
+              ),
             ],
           ),
         );
@@ -583,7 +639,8 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     );
   }
 
-  Widget _buildInfoChips(dynamic user) {
+
+  Widget _buildInfoChips(GhUser user) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Build list of info rows to show
@@ -617,10 +674,11 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
         onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
       ));
     }
-    if (user.createdAt != null) {
+    final createdAt = user.createdAt;
+    if (createdAt != null) {
       items.add(_InfoRow(
         icon: Icons.calendar_today_rounded,
-        text: 'Joined ${DateFormat('MMM yyyy').format(user.createdAt)}',
+        text: 'Joined ${DateFormat('MMM yyyy').format(createdAt)}',
       ));
     }
 
@@ -678,7 +736,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
     );
   }
 
-  Widget _buildTopLanguages(dynamic repos, BuildContext context) {
+  Widget _buildTopLanguages(List<GhRepo> repos, BuildContext context) {
     final langCounts = <String, int>{};
     for (final r in repos) {
       if (r.language != null) {
@@ -868,6 +926,228 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
       ),
     );
   }
+
+  void _showAvatarDialog(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).pop(),
+          child: InteractiveViewer(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showUsersList(
+    BuildContext context,
+    WidgetRef ref,
+    String title,
+    AutoDisposeFutureProviderFamily<List<GhUser>, String> providerFamily,
+    String targetUsername,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.08),
+                width: 1,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(title,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                    // Refresh button
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, size: 20),
+                      tooltip: 'Refresh list',
+                      onPressed: () {
+                        ref.invalidate(providerFamily(targetUsername));
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Consumer(
+                  builder: (context, innerRef, _) {
+                    // Watch the correct provider
+                    final asyncData = innerRef.watch(providerFamily(targetUsername));
+
+                    return asyncData.when(
+                      data: (users) {
+                        if (users.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.people_outline_rounded,
+                                    size: 48,
+                                    color: isDark ? Colors.white24 : Colors.black26),
+                                const SizedBox(height: 12),
+                                Text(
+                                  title == 'Following'
+                                      ? 'Not following anyone yet.'
+                                      : 'No followers yet.',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return ListView.builder(
+                          controller: controller,
+                          itemCount: users.length,
+                          itemBuilder: (context, index) {
+                            final user = users[index];
+                            final followState =
+                                innerRef.watch(userFollowProvider(user.login));
+
+                            return ListTile(
+                              leading: CircleAvatar(
+                                  backgroundImage:
+                                      CachedNetworkImageProvider(user.avatarUrl)),
+                              title: Text(user.login,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
+                              trailing: SizedBox(
+                                width: 90,
+                                height: 36,
+                                child: followState.when(
+                                  data: (isFollowing) => FilledButton(
+                                    onPressed: () async {
+                                      try {
+                                        await innerRef
+                                            .read(userFollowProvider(user.login)
+                                                .notifier)
+                                            .toggleFollow();
+                                        // Refresh the list after follow/unfollow
+                                        innerRef.invalidate(providerFamily(targetUsername));
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(e is GitHubApiException
+                                                  ? e.message
+                                                  : e.toString()),
+                                              backgroundColor: AppColors.danger,
+                                              duration:
+                                                  const Duration(seconds: 5),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: isFollowing
+                                          ? Colors.transparent
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                      foregroundColor: isFollowing
+                                          ? Theme.of(context).hintColor
+                                          : Colors.white,
+                                      side: isFollowing
+                                          ? BorderSide(
+                                              color: Theme.of(context)
+                                                  .dividerColor)
+                                          : null,
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(90, 36),
+                                      maximumSize: const Size(90, 36),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: Text(
+                                      isFollowing ? 'Unfollow' : 'Follow',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  loading: () => const Center(
+                                      child: SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2))),
+                                  error: (_, __) => const SizedBox.shrink(),
+                                ),
+                              ),
+                              onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                      builder: (_) => UserDetailScreen(
+                                          username: user.login))),
+                            );
+                          },
+                        );
+                      },
+                      loading: () => const Center(child: GlowingIndicator()),
+                      error: (e, _) => Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline_rounded,
+                                color: AppColors.danger, size: 40),
+                            const SizedBox(height: 12),
+                            Text('Error loading $title',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 8),
+                            TextButton.icon(
+                              onPressed: () =>
+                                  innerRef.invalidate(providerFamily(targetUsername)),
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _HeatBox extends StatelessWidget {
@@ -924,96 +1204,3 @@ class _InfoRow {
   final VoidCallback? onTap;
 }
 
-  void _showAvatarDialog(BuildContext context, String url) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: InteractiveViewer(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showUsersList(BuildContext context, String title, AutoDisposeFutureProvider<List<dynamic>> provider) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        builder: (_, controller) => Container(
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2))),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              Expanded(
-                child: Consumer(
-                  builder: (context, ref, _) {
-                    final asyncData = ref.watch(provider);
-                    return asyncData.when(
-                      data: (users) {
-                        if (users.isEmpty) {
-                          return const Center(child: Text('No users found.', style: TextStyle(color: Colors.grey)));
-                        }
-                        return ListView.builder(
-                          controller: controller,
-                          itemCount: users.length,
-                          itemBuilder: (context, index) {
-                            final user = users[index];
-                            final followState = ref.watch(userFollowProvider(user.login));
-                            
-                            return ListTile(
-                              leading: CircleAvatar(backgroundImage: CachedNetworkImageProvider(user.avatarUrl)),
-                              title: Text(user.login, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              trailing: followState.when(
-                                data: (isFollowing) => FilledButton(
-                                  onPressed: () => ref.read(userFollowProvider(user.login).notifier).toggleFollow(),
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: isFollowing ? Colors.transparent : Theme.of(context).colorScheme.primary,
-                                    foregroundColor: isFollowing ? Theme.of(context).hintColor : Colors.white,
-                                    side: isFollowing ? BorderSide(color: Theme.of(context).dividerColor) : null,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    minimumSize: const Size(0, 36),
-                                  ),
-                                  child: Text(isFollowing ? 'Unfollow' : 'Follow', style: const TextStyle(fontSize: 13)),
-                                ),
-                                loading: () => const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                                error: (_, __) => const SizedBox.shrink(),
-                              ),
-                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: user.login))),
-                            );
-                          },
-                        );
-                      },
-                      loading: () => const Center(child: CircularProgressIndicator()),
-                      error: (e, _) => Center(child: Text('Error: $e')),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }

@@ -61,6 +61,8 @@ class DioClient {
         baseUrl: '${ApiConstants.backendBaseUrl}/github',
         connectTimeout: ApiConstants.requestTimeout,
         receiveTimeout: ApiConstants.requestTimeout,
+        // Only accept successful status codes (including 204 No Content)
+        validateStatus: (status) => status != null && status >= 200 && status < 300,
         headers: {
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
@@ -76,12 +78,60 @@ class DioClient {
           if (info != null) RateLimitNotifier.instance.update(info);
           handler.next(response);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           final headers = error.response?.headers;
           if (headers != null) {
             final info = RateLimitInfo.fromHeaders(headers);
             if (info != null) RateLimitNotifier.instance.update(info);
           }
+
+          // Self-healing fallback: If the custom backend proxy fails or is down,
+          // automatically retry the request directly against the public GitHub API.
+          // IMPORTANT: We preserve the Authorization header so that authenticated
+          // endpoints like /user/following/* and /user/starred/* continue to work.
+          final requestOptions = error.requestOptions;
+          final statusCode = error.response?.statusCode;
+
+          // Retry on any proxy error (including 405 Method Not Allowed, 5xx, or 403 rate limits)
+          // by falling back directly to the public GitHub API on the user's IP.
+          final shouldRetry = requestOptions.baseUrl.startsWith(ApiConstants.backendBaseUrl);
+
+          if (shouldRetry) {
+            try {
+              final originalHeaders = Map<String, dynamic>.from(requestOptions.headers);
+              final fallbackDio = Dio(
+                BaseOptions(
+                  baseUrl: ApiConstants.baseUrl,
+                  connectTimeout: ApiConstants.requestTimeout,
+                  receiveTimeout: ApiConstants.requestTimeout,
+                  validateStatus: (status) => status != null && status >= 200 && status < 300,
+                  headers: {
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'User-Agent': 'GitExplorer-App',
+                  },
+                ),
+              );
+
+              final response = await fallbackDio.request(
+                requestOptions.path,
+                data: requestOptions.data,
+                queryParameters: requestOptions.queryParameters,
+                options: Options(
+                  method: requestOptions.method,
+                  // Preserve auth headers — do NOT strip Authorization
+                  headers: originalHeaders,
+                ),
+              );
+
+              return handler.resolve(response);
+            } catch (retryError) {
+              if (retryError is DioException) {
+                return handler.next(retryError);
+              }
+            }
+          }
+
           handler.next(error);
         },
       ),
@@ -163,8 +213,14 @@ class GitHubApiException implements Exception {
         );
       }
     }
+    if (status == 401) {
+      return GitHubApiException(
+        'Authentication required. Please add a valid GitHub Personal Access Token in Settings.',
+        statusCode: status,
+      );
+    }
     if (status == 404) {
-      return GitHubApiException('Not found.', statusCode: status);
+      return GitHubApiException('Resource not found.', statusCode: status);
     }
     if (status == 422) {
       return GitHubApiException('Invalid search query.', statusCode: status);

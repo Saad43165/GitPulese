@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../home/root_shell.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../../core/constants/api_constants.dart';
@@ -16,61 +17,89 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
   late final AnimationController _mainCtrl;
+  late final AnimationController _pulseCtrl;
+  late final AnimationController _orbitCtrl;
+  late final AnimationController _starCtrl;
 
-  late final Animation<double> _logoBg;
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoFade;
+  // Icon entry
+  late final Animation<double> _iconScale;
+  late final Animation<double> _iconFade;
+  // Text entry
   late final Animation<double> _titleFade;
   late final Animation<Offset> _titleSlide;
   late final Animation<double> _subtitleFade;
   late final Animation<Offset> _subtitleSlide;
-  late final Animation<double> _progressFade;
+  // Loader
+  late final Animation<double> _loaderFade;
   late final Animation<double> _progressValue;
-  late final Animation<double> _waveAnim;
+  // Pulse ring
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _pulseOpacity;
+  // Orbit
+  late final Animation<double> _orbit;
+  // Star twinkle
+  late final Animation<double> _star;
 
   @override
   void initState() {
     super.initState();
 
-    _mainCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3000),
+    _mainCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200));
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))
+      ..repeat(reverse: true);
+    _orbitCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 7))
+      ..repeat();
+    _starCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 5))
+      ..repeat();
+
+    // Icon
+    _iconFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.00, 0.28, curve: Curves.easeOut)),
+    );
+    _iconScale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.00, 0.38, curve: Curves.elasticOut)),
     );
 
-    _waveAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.0, 1.0, curve: Curves.linear)),
-    );
-
-    _logoBg = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.0, 0.25, curve: Curves.easeOut)),
-    );
-
-    _logoScale = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.05, 0.4, curve: Curves.elasticOut)),
-    );
-    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.05, 0.3, curve: Curves.easeOut)),
-    );
-
+    // Title
     _titleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.30, 0.55, curve: Curves.easeOut)),
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.32, 0.55, curve: Curves.easeOut)),
     );
-    _titleSlide = Tween<Offset>(begin: const Offset(0, 0.4), end: Offset.zero).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.30, 0.55, curve: Curves.easeOutCubic)),
+    _titleSlide = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.32, 0.55, curve: Curves.easeOutCubic)),
     );
 
+    // Subtitle
     _subtitleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.45, 0.65, curve: Curves.easeOut)),
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.48, 0.65, curve: Curves.easeOut)),
     );
     _subtitleSlide = Tween<Offset>(begin: const Offset(0, 0.5), end: Offset.zero).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.45, 0.65, curve: Curves.easeOutCubic)),
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.48, 0.65, curve: Curves.easeOutCubic)),
     );
 
-    _progressFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.55, 0.70, curve: Curves.easeOut)),
+    // Loader
+    _loaderFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.60, 0.75, curve: Curves.easeOut)),
     );
     _progressValue = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.55, 0.92, curve: Curves.easeInOut)),
+      CurvedAnimation(parent: _mainCtrl, curve: const Interval(0.62, 0.96, curve: Curves.easeInOut)),
+    );
+
+    // Pulse ring
+    _pulseScale = Tween<double>(begin: 1.0, end: 1.5).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeOut),
+    );
+    _pulseOpacity = Tween<double>(begin: 0.55, end: 0.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeOut),
+    );
+
+    // Orbit
+    _orbit = Tween<double>(begin: 0.0, end: 2 * pi).animate(
+      CurvedAnimation(parent: _orbitCtrl, curve: Curves.linear),
+    );
+
+    // Stars
+    _star = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _starCtrl, curve: Curves.linear),
     );
 
     _mainCtrl.forward();
@@ -78,12 +107,16 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 
   Future<void> _navigateNext() async {
-    await Future.delayed(const Duration(milliseconds: 3200));
+    await Future.delayed(const Duration(milliseconds: 3500));
     if (!mounted) return;
 
-    // Check if user has previously signed in or finished onboarding
     final prefs = await SharedPreferences.getInstance();
-    final hasPat = (prefs.getString(ApiConstants.patStorageKey) ?? '').isNotEmpty;
+    String? token;
+    try {
+      const secureStorage = FlutterSecureStorage();
+      token = await secureStorage.read(key: ApiConstants.patStorageKey);
+    } catch (_) {}
+    final hasPat = token != null && token.isNotEmpty;
     final hasCompletedOnboarding = prefs.getBool('completed_onboarding') ?? false;
 
     HapticFeedback.mediumImpact();
@@ -91,12 +124,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 800),
+        transitionDuration: const Duration(milliseconds: 900),
         pageBuilder: (_, __, ___) =>
             (hasPat || hasCompletedOnboarding) ? const RootShell() : const OnboardingScreen(),
         transitionsBuilder: (_, animation, __, child) {
           final fade = CurvedAnimation(parent: animation, curve: Curves.easeOut);
-          final scale = Tween<double>(begin: 1.04, end: 1.0)
+          final scale = Tween<double>(begin: 1.05, end: 1.0)
               .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
           return FadeTransition(opacity: fade, child: ScaleTransition(scale: scale, child: child));
         },
@@ -107,110 +140,189 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void dispose() {
     _mainCtrl.dispose();
+    _pulseCtrl.dispose();
+    _orbitCtrl.dispose();
+    _starCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF060414),
       body: AnimatedBuilder(
-        animation: _mainCtrl,
+        animation: Listenable.merge([_mainCtrl, _pulseCtrl, _orbitCtrl, _starCtrl]),
         builder: (context, _) {
           return Stack(
             fit: StackFit.expand,
             children: [
-              // Background wave mesh
+              // ── Starfield background ───────────────────────────────────────
+              CustomPaint(
+                size: Size(size.width, size.height),
+                painter: _StarfieldPainter(anim: _star),
+              ),
+
+              // ── Aurora top-left blob ───────────────────────────────────────
               Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: MediaQuery.of(context).size.height * 0.30,
-                child: CustomPaint(
-                  painter: _WaveMeshPainter(animation: _waveAnim),
+                top: -size.width * 0.35,
+                left: -size.width * 0.25,
+                child: _GlowBlob(
+                  diameter: size.width * 1.15,
+                  color: const Color(0xFF7C3AED),
+                  opacity: 0.18,
                 ),
               ),
 
-              // Center content — staggered entry
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+              // ── Aurora bottom-right blob ───────────────────────────────────
+              Positioned(
+                bottom: -size.width * 0.2,
+                right: -size.width * 0.2,
+                child: _GlowBlob(
+                  diameter: size.width * 0.9,
+                  color: const Color(0xFF2563EB),
+                  opacity: 0.13,
+                ),
+              ),
 
-                      // ── Logo icon with glow halo ──
-                      FadeTransition(
-                        opacity: _logoFade,
-                        child: ScaleTransition(
-                          scale: _logoScale,
+              // ── Pink accent blob center-right ──────────────────────────────
+              Positioned(
+                top: size.height * 0.3,
+                right: -size.width * 0.2,
+                child: _GlowBlob(
+                  diameter: size.width * 0.65,
+                  color: const Color(0xFFDB2777),
+                  opacity: 0.07,
+                ),
+              ),
+
+              // ── Main content ───────────────────────────────────────────────
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // App Icon
+                    FadeTransition(
+                      opacity: _iconFade,
+                      child: ScaleTransition(
+                        scale: _iconScale,
+                        child: SizedBox(
+                          width: 186,
+                          height: 186,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
+                              // Outer pulse ring
                               Opacity(
-                                opacity: _logoBg.value,
+                                opacity: _pulseOpacity.value,
                                 child: Container(
-                                  width: 160,
-                                  height: 160,
+                                  width: 150 * _pulseScale.value,
+                                  height: 150 * _pulseScale.value,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        const Color(0xFF8B5CF6).withValues(alpha: 0.5 * _logoBg.value),
-                                        Colors.transparent,
-                                      ],
+                                    border: Border.all(
+                                      color: const Color(0xFF8B5CF6),
+                                      width: 1.5,
                                     ),
                                   ),
                                 ),
                               ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(28),
+
+                              // Deep glow halo
+                              Container(
+                                width: 152,
+                                height: 152,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF7C3AED).withValues(alpha: 0.6),
+                                      blurRadius: 60,
+                                      spreadRadius: 10,
+                                    ),
+                                    BoxShadow(
+                                      color: const Color(0xFF3B82F6).withValues(alpha: 0.3),
+                                      blurRadius: 90,
+                                      spreadRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Outer glass ring
+                              Container(
+                                width: 144,
+                                height: 144,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.2),
+                                      Colors.white.withValues(alpha: 0.03),
+                                    ],
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+
+                              // App icon — perfectly circular, full bleed
+                              ClipOval(
                                 child: Image.asset(
                                   'assets/icons/app_icon.png',
-                                  width: 110,
-                                  height: 110,
+                                  width: 128,
+                                  height: 128,
                                   fit: BoxFit.cover,
                                 ),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
 
-                      const SizedBox(height: 28),
-
-                      // ── Title ──
-                      FadeTransition(
-                        opacity: _titleFade,
-                        child: SlideTransition(
-                          position: _titleSlide,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                'Git',
-                                style: GoogleFonts.outfit(
-                                  color: Colors.white,
-                                  fontSize: 46,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -1.5,
+                              // Orbiting accent dot 1 — purple
+                              Transform.translate(
+                                offset: Offset(
+                                  72 * cos(_orbit.value),
+                                  72 * sin(_orbit.value),
+                                ),
+                                child: Container(
+                                  width: 11,
+                                  height: 11,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFFA78BFA),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFA78BFA).withValues(alpha: 0.85),
+                                        blurRadius: 12,
+                                        spreadRadius: 3,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              ShaderMask(
-                                shaderCallback: (bounds) => const LinearGradient(
-                                  colors: [Color(0xFF60A5FA), Color(0xFF9333EA)],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ).createShader(bounds),
-                                child: Text(
-                                  'Pulse',
-                                  style: GoogleFonts.outfit(
-                                    color: Colors.white,
-                                    fontSize: 46,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -1.5,
+
+                              // Orbiting accent dot 2 — blue, opposite side
+                              Transform.translate(
+                                offset: Offset(
+                                  72 * cos(_orbit.value + pi),
+                                  72 * sin(_orbit.value + pi),
+                                ),
+                                child: Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF60A5FA),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF60A5FA).withValues(alpha: 0.8),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -218,48 +330,151 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           ),
                         ),
                       ),
+                    ),
 
-                      const SizedBox(height: 10),
+                    const SizedBox(height: 42),
 
-                      // ── Subtitle ──
-                      FadeTransition(
-                        opacity: _subtitleFade,
-                        child: SlideTransition(
-                          position: _subtitleSlide,
+                    // ── App Name ──────────────────────────────────────────────
+                    FadeTransition(
+                      opacity: _titleFade,
+                      child: SlideTransition(
+                        position: _titleSlide,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              'Git',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 52,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -2,
+                                height: 1,
+                              ),
+                            ),
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [Color(0xFF818CF8), Color(0xFFC084FC)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ).createShader(bounds),
+                              child: Text(
+                                'Pulse',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontSize: 52,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -2,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '.',
+                              style: GoogleFonts.outfit(
+                                color: const Color(0xFFC084FC),
+                                fontSize: 52,
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // ── Tagline ───────────────────────────────────────────────
+                    FadeTransition(
+                      opacity: _subtitleFade,
+                      child: SlideTransition(
+                        position: _subtitleSlide,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 44),
                           child: Text(
                             'All GitHub Insights. One Powerful Pulse.',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.inter(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: Colors.white.withValues(alpha: 0.45),
                               fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              height: 1.5,
+                              fontWeight: FontWeight.w400,
+                              height: 1.6,
                               letterSpacing: 0.1,
                             ),
                           ),
                         ),
                       ),
+                    ),
 
-                      const SizedBox(height: 36),
+                    const SizedBox(height: 60),
 
-                      // ── Progress bar ──
-                      FadeTransition(
-                        opacity: _progressFade,
-                        child: SizedBox(
-                          width: 120,
-                          height: 3,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: LinearProgressIndicator(
-                              value: _progressValue.value,
-                              backgroundColor: Colors.white.withValues(alpha: 0.1),
-                              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+                    // ── Progress ──────────────────────────────────────────────
+                    FadeTransition(
+                      opacity: _loaderFade,
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: 160,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(100),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    height: 3,
+                                    color: Colors.white.withValues(alpha: 0.07),
+                                  ),
+                                  FractionallySizedBox(
+                                    widthFactor: _progressValue.value,
+                                    child: Container(
+                                      height: 3,
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFF818CF8), Color(0xFFC084FC)],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 14),
+                          Text(
+                            'Loading experience...',
+                            style: GoogleFonts.inter(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                  ],
+                ),
+              ),
 
-                    ],
+              // ── Version label ─────────────────────────────────────────────
+              Positioned(
+                bottom: 36,
+                left: 0,
+                right: 0,
+                child: FadeTransition(
+                  opacity: _subtitleFade,
+                  child: Center(
+                    child: Text(
+                      'V E R S I O N   1 . 0 . 0',
+                      style: GoogleFonts.inter(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 3.5,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -271,76 +486,81 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 }
 
-// ─── Wave Mesh Painter ────────────────────────────────────────────────────────
+// ── Glow Blob ─────────────────────────────────────────────────────────────────
 
-class _WaveMeshPainter extends CustomPainter {
-  _WaveMeshPainter({required this.animation}) : super(repaint: animation);
-  final Animation<double> animation;
+class _GlowBlob extends StatelessWidget {
+  const _GlowBlob({
+    required this.diameter,
+    required this.color,
+    required this.opacity,
+  });
+  final double diameter;
+  final Color color;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: diameter,
+      height: diameter,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [
+            color.withValues(alpha: opacity),
+            color.withValues(alpha: opacity * 0.4),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.4, 1.0],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Starfield Painter ─────────────────────────────────────────────────────────
+
+class _StarfieldPainter extends CustomPainter {
+  _StarfieldPainter({required this.anim}) : super(repaint: anim);
+  final Animation<double> anim;
+
+  static final List<_Star> _stars = _gen();
+  static List<_Star> _gen() {
+    final rng = Random(99);
+    return List.generate(130, (_) => _Star(
+      x: rng.nextDouble(),
+      y: rng.nextDouble(),
+      r: 0.4 + rng.nextDouble() * 1.3,
+      base: 0.15 + rng.nextDouble() * 0.65,
+      phase: rng.nextDouble() * 2 * pi,
+    ));
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final bgRect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final bgPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          const Color(0xFF6B21A8).withValues(alpha: 0.12),
-          const Color(0xFF4C1D95).withValues(alpha: 0.35),
-        ],
-      ).createShader(bgRect);
-    canvas.drawRect(bgRect, bgPaint);
-
-    final wavePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.7;
-
-    for (int i = 0; i < 7; i++) {
-      final path = Path();
-      final offset = (animation.value * size.width * 0.5) + (i * 25.0);
-      path.moveTo(0, size.height * 0.5);
-
-      for (double x = 0; x <= size.width; x += 4) {
-        final y = size.height * 0.5
-            + sin((x + offset) * 0.016 + i * 0.7) * 10.0 * (1.0 + 0.08 * i)
-            + cos((x - offset * 0.6) * 0.011) * 6.0;
-        path.lineTo(x, y);
-      }
-
-      wavePaint.color = const Color(0xFF8B5CF6).withValues(alpha: 0.08 + (i * 0.018));
-      canvas.drawPath(path, wavePaint);
-    }
-
-    final spikePaint = Paint()..strokeWidth = 0.8;
-    const spikeCount = 22;
-    final spacing = size.width / (spikeCount + 1);
-
-    for (int i = 0; i < spikeCount; i++) {
-      final x = spacing * (i + 1);
-      final maxH = 12.0 + 10.0 * sin(i * pi / (spikeCount / 2));
-      final currentH = maxH * (0.55 + 0.45 * sin(animation.value * pi * 3 + i * 0.6));
-      final base = size.height * 0.5 + sin((x + animation.value * size.width * 0.5) * 0.016) * 10.0;
-
-      spikePaint.shader = LinearGradient(
-        begin: Alignment.bottomCenter,
-        end: Alignment.topCenter,
-        colors: [
-          const Color(0xFF9333EA).withValues(alpha: 0.7),
-          const Color(0xFFC084FC).withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromLTWH(x, base - currentH, 1.0, currentH));
-
-      canvas.drawLine(Offset(x, base), Offset(x, base - currentH), spikePaint);
-
+    final t = anim.value;
+    for (final s in _stars) {
+      final twinkle = 0.5 + 0.5 * sin(t * 2 * pi + s.phase);
+      final alpha = (s.base * (0.5 + 0.5 * twinkle)).clamp(0.0, 1.0);
       canvas.drawCircle(
-        Offset(x, base - currentH),
-        1.2,
-        Paint()..color = const Color(0xFFE879F9).withValues(alpha: 0.85),
+        Offset(s.x * size.width, s.y * size.height),
+        s.r,
+        Paint()..color = Colors.white.withValues(alpha: alpha),
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _WaveMeshPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _StarfieldPainter old) => true;
+}
+
+class _Star {
+  final double x, y, r, base, phase;
+  const _Star({
+    required this.x,
+    required this.y,
+    required this.r,
+    required this.base,
+    required this.phase,
+  });
 }

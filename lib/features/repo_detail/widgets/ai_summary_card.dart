@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../widgets/glowing_indicator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -72,9 +73,27 @@ class AiSummaryCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              text,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.55),
+            MarkdownBody(
+              data: text,
+              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                p: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
+                strong: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.6,
+                ),
+                h1: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                h2: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                h3: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                listBullet: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.6),
+                blockquoteDecoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border(
+                    left: BorderSide(color: AppColors.accent, width: 3),
+                  ),
+                ),
+              ),
+              shrinkWrap: true,
             ),
           ],
         ),

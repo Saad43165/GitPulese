@@ -10,11 +10,13 @@ class PremiumCodeViewer extends StatelessWidget {
     required this.code,
     this.language,
     this.showLineNumbers = true,
+    this.highlightLineNumber,
   });
 
   final String code;
   final String? language;
   final bool showLineNumbers;
+  final int? highlightLineNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,10 @@ class PremiumCodeViewer extends StatelessWidget {
 
     for (int i = 0; i < lines.length; i++) {
       final lineNum = i + 1;
+      final isHighlighted = highlightLineNumber != null && lineNum == highlightLineNumber;
+      final lineBg = isHighlighted 
+          ? (isDark ? Colors.yellow.withValues(alpha: 0.15) : Colors.yellow.withValues(alpha: 0.25))
+          : Colors.transparent;
       
       if (showLineNumbers) {
         lineWidgets.add(
@@ -37,11 +43,15 @@ class PremiumCodeViewer extends StatelessWidget {
             height: 20, // Fixed height per line for perfect vertical alignment
             padding: const EdgeInsets.only(left: 14, right: 12),
             alignment: Alignment.centerRight,
+            color: lineBg,
             child: Text(
               '$lineNum',
               style: GoogleFonts.spaceMono(
                 fontSize: 12,
-                color: lineNumberColor,
+                color: isHighlighted 
+                    ? (isDark ? Colors.yellowAccent : Colors.amber.shade900) 
+                    : lineNumberColor,
+                fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
                 height: 1.0,
               ),
             ),
@@ -53,6 +63,7 @@ class PremiumCodeViewer extends StatelessWidget {
         Container(
           height: 20, // Match the fixed height of line numbers
           alignment: Alignment.centerLeft,
+          color: lineBg,
           child: RichText(
             text: _highlightLine(lines[i], isDark),
             textScaler: TextScaler.noScaling,

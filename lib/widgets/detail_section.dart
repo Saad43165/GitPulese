@@ -37,8 +37,19 @@ class DetailSection extends StatelessWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        theme.colorScheme.primary.withValues(alpha: 0.20),
+                        theme.colorScheme.primary.withValues(alpha: 0.08),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
                   ),
                   child: Icon(icon, size: 16, color: theme.colorScheme.primary),
                 ),

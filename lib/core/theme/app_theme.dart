@@ -21,11 +21,11 @@ class AppColors {
   static const Color lightBg = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightSurfaceElevated = Color(0xFFF1F5F9);
-  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color lightBorder = Color(0xFFDDD6FE); // Premium light-purple border tint
   static const Color lightTextPrimary = Color(0xFF0F172A);
   static const Color lightTextSecondary = Color(0xFF64748B);
   static const Color lightTextTertiary = Color(0xFF94A3B8);
-
+  
   // Brand - Neon Purple/Blue
   static const Color accent = Color(0xFF8B5CF6); // Vibrant Purple
   static const Color accentDeep = Color(0xFF6D28D9); // Deep Purple
@@ -76,11 +76,11 @@ class AppDecorations {
                 AppColors.darkBg,
               ]
             : [
-                const Color(0xFFF3E8FF), // Subtle light purple glow at top
+                const Color(0xFFE0E7FF), // Soft Indigo lighting glow
+                const Color(0xFFF3E8FF), // Soft Purple ambient lighting glow
                 AppColors.lightBg, // Fade to clean white/light-grey
-                AppColors.lightBg,
               ],
-        stops: const [0.0, 0.4, 1.0],
+        stops: const [0.0, 0.35, 1.0],
       ),
     );
   }
@@ -98,6 +98,57 @@ class AppDecorations {
       ),
     );
   }
+}
+
+/// Glass design tokens — iOS 26-inspired frosted glass system.
+class GlassTokens {
+  GlassTokens._();
+
+  /// 1px gradient border for glass cards.
+  static LinearGradient borderGradient(bool isDark) => LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: isDark
+            ? [
+                Colors.white.withValues(alpha: 0.18),
+                Colors.white.withValues(alpha: 0.06),
+                AppColors.accent.withValues(alpha: 0.12),
+                Colors.white.withValues(alpha: 0.03),
+              ]
+            : [
+                Colors.white.withValues(alpha: 0.95),
+                AppColors.accent.withValues(alpha: 0.18),
+                Colors.white.withValues(alpha: 0.55),
+                Colors.white.withValues(alpha: 0.20),
+              ],
+        stops: const [0.0, 0.35, 0.65, 1.0],
+      );
+
+  /// Solid border color fallback (for places that can't use gradient borders).
+  static Color borderColor(bool isDark) => isDark
+      ? Colors.white.withValues(alpha: 0.12)
+      : AppColors.accent.withValues(alpha: 0.20);
+
+  /// Glass fill color.
+  static Color fill(bool isDark) => isDark
+      ? const Color(0xFF0D1117).withValues(alpha: 0.72)
+      : Colors.white.withValues(alpha: 0.78);
+
+  /// Subtle accent glow shadow.
+  static List<BoxShadow> glowShadow(bool isDark) => [
+        BoxShadow(
+          color: isDark
+              ? AppColors.accent.withValues(alpha: 0.06)
+              : AppColors.accent.withValues(alpha: 0.07),
+          blurRadius: 18,
+          offset: const Offset(0, 4),
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ];
 }
 
 class AppTheme {
@@ -154,13 +205,16 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+        color: isDark
+            ? const Color(0xFF0D1117).withValues(alpha: 0.72)
+            : Colors.white.withValues(alpha: 0.78),
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
           side: BorderSide(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            color: GlassTokens.borderColor(isDark),
+            width: 1,
           ),
         ),
       ),
@@ -170,8 +224,10 @@ class AppTheme {
         space: 1,
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurfaceElevated,
-        selectedColor: AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.15),
+        backgroundColor: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : AppColors.accent.withValues(alpha: 0.05),
+        selectedColor: AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.13),
         disabledColor: isDark ? AppColors.darkSurface : AppColors.lightSurfaceElevated,
         labelStyle: GoogleFonts.outfit(
           fontSize: 13,
@@ -183,15 +239,16 @@ class AppTheme {
           fontWeight: FontWeight.w700,
           color: AppColors.accentSoft,
         ),
-        side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+        side: BorderSide(color: GlassTokens.borderColor(isDark), width: 1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusXl)),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 70,
         elevation: 0,
-        backgroundColor: isDark ? const Color(0xFF030305) : AppColors.lightSurface,
-        indicatorColor: AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.15),
+        backgroundColor: Colors.transparent,
+        indicatorColor: AppColors.accent.withValues(alpha: isDark ? 0.22 : 0.13),
+        indicatorShape: const CircleBorder(),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return GoogleFonts.outfit(
@@ -296,16 +353,26 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightTextPrimary,
+        backgroundColor: isDark
+            ? const Color(0xFF1A1F2E).withValues(alpha: 0.92)
+            : Colors.white.withValues(alpha: 0.94),
         contentTextStyle: GoogleFonts.outfit(
-          color: isDark ? AppColors.darkTextPrimary : Colors.white,
+          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
           fontWeight: FontWeight.w500,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusMd)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          side: BorderSide(color: GlassTokens.borderColor(isDark), width: 1),
+        ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusLg)),
+        backgroundColor: isDark
+            ? const Color(0xFF0D1117).withValues(alpha: 0.90)
+            : Colors.white.withValues(alpha: 0.92),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+          side: BorderSide(color: GlassTokens.borderColor(isDark), width: 1),
+        ),
         titleTextStyle: GoogleFonts.outfit(
           fontSize: 18,
           fontWeight: FontWeight.w700,

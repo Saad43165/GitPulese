@@ -14,6 +14,8 @@ import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../data/models/user_and_search_models.dart';
 import '../../data/models/repo_model.dart';
+import '../../widgets/glowing_indicator.dart';
+import '../../widgets/app_back_button.dart';
 
 class AiCodeEditorScreen extends ConsumerStatefulWidget {
   const AiCodeEditorScreen({
@@ -93,7 +95,7 @@ void calculateSum() {
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _editorKey,
           _promptKey,
           _actionKey,
@@ -174,15 +176,14 @@ void calculateSum() {
         _showDiff = true;
       });
     } catch (e) {
-      // Fallback fallback mock if network/Groq rate limits or fails
-      setState(() {
-        _diffOutput = '''// Refactored Code (Dart-idiomatic)
-void calculateSum() {
-  final total = Iterable.generate(100).reduce((a, b) => a + b);
-  print(total);
-}''';
-        _showDiff = true;
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('AI Refactoring failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -277,6 +278,118 @@ void calculateSum() {
         _isLoading = false;
       });
     }
+  }
+
+  List<Widget> _buildDiffWidgets(String oldText, String newText) {
+    final oldLines = oldText.split('\n');
+    final newLines = newText.split('\n');
+    final List<Widget> widgets = [];
+
+    int i = 0;
+    int j = 0;
+
+    while (i < oldLines.length || j < newLines.length) {
+      if (i < oldLines.length && j < newLines.length) {
+        if (oldLines[i] == newLines[j]) {
+          widgets.add(Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 1.0),
+            child: Text(
+              '  ${oldLines[i]}',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                color: Colors.grey,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ));
+          i++;
+          j++;
+        } else {
+          int nextMatchInNew = -1;
+          for (int k = j; k < newLines.length; k++) {
+            if (newLines[k] == oldLines[i]) {
+              nextMatchInNew = k;
+              break;
+            }
+          }
+
+          if (nextMatchInNew != -1) {
+            for (int k = j; k < nextMatchInNew; k++) {
+              widgets.add(Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 1.0),
+                color: Colors.green.withValues(alpha: 0.15),
+                child: Text(
+                  '+ ${newLines[k]}',
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    color: Colors.greenAccent,
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ));
+            }
+            j = nextMatchInNew;
+          } else {
+            widgets.add(Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 1.0),
+              color: Colors.red.withValues(alpha: 0.15),
+              child: Text(
+                '- ${oldLines[i]}',
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  color: Colors.redAccent,
+                  fontSize: 12,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ));
+            i++;
+          }
+        }
+      } else if (i < oldLines.length) {
+        widgets.add(Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 1.0),
+          color: Colors.red.withValues(alpha: 0.15),
+          child: Text(
+            '- ${oldLines[i]}',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              color: Colors.redAccent,
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ));
+        i++;
+      } else if (j < newLines.length) {
+        widgets.add(Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 1.0),
+          color: Colors.green.withValues(alpha: 0.15),
+          child: Text(
+            '+ ${newLines[j]}',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              color: Colors.greenAccent,
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ));
+        j++;
+      }
+    }
+
+    return widgets;
   }
 
   void _showFileSelectorSheet(BuildContext context, String owner, String repo, bool isDark) {
@@ -423,7 +536,7 @@ void calculateSum() {
                           }).toList(),
                         );
                       },
-                      loading: () => const Center(child: Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: CircularProgressIndicator(strokeWidth: 2))),
+                      loading: () => const Center(child: Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: GlowingIndicator(size: 16))),
                       error: (_, __) => const SizedBox.shrink(),
                     );
                   },
@@ -504,9 +617,11 @@ void calculateSum() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SafePage(
+      useAurora: true,
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: const Text('AI Code Editor & Git Patch'),
           actions: [
             IconButton(
@@ -626,7 +741,7 @@ void calculateSum() {
               Showcase(
                 key: _editorKey,
                 title: 'High-Fidelity Code Editor',
-                description: 'View, edit, or paste your source code inside this full-fledged monospace environment. Supports syntax highlights and is deep-linked with the visualizer.',
+                description: 'View, edit, or paste your source code inside this full-fledged monospace environment. Supports syntax highlights and real-time editing.',
                 titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
                 descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
                 tooltipBackgroundColor: const Color(0xFF1E293B),
@@ -635,8 +750,10 @@ void calculateSum() {
                 child: AppSurface(
                   child: TextField(
                     controller: _codeController,
-                    maxLines: 8,
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                    minLines: 12,
+                    maxLines: 24,
+                    keyboardType: TextInputType.multiline,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.4),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -679,7 +796,7 @@ void calculateSum() {
                 child: FilledButton.icon(
                   onPressed: _isLoading ? null : _refactor,
                   icon: _isLoading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const GlowingIndicator(size: 18)
                       : const Icon(Icons.auto_awesome_rounded),
                   label: const Text('Analyze & Generate Patch'),
                 ),
@@ -717,20 +834,11 @@ void calculateSum() {
                       ),
                       const Divider(height: 24),
                       const Text(
-                        '@@ -1,8 +1,6 @@',
-                        style: TextStyle(fontFamily: 'monospace', color: Colors.grey, fontSize: 12),
+                        '@@ Inline Code Change Diff @@',
+                        style: TextStyle(fontFamily: 'monospace', color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 4),
-                      ..._codeController.text.split('\n').map((line) => Text(
-                            '- $line',
-                            style: const TextStyle(
-                                fontFamily: 'monospace', color: Colors.redAccent, fontSize: 12, height: 1.4),
-                          )),
-                      ..._diffOutput.split('\n').map((line) => Text(
-                            '+ $line',
-                            style: const TextStyle(
-                                fontFamily: 'monospace', color: Colors.greenAccent, fontSize: 12, height: 1.4),
-                          )),
+                      const SizedBox(height: 8),
+                      ..._buildDiffWidgets(_codeController.text, _diffOutput),
                     ],
                   ),
                 ),
@@ -868,7 +976,7 @@ class _FileSelectorDialogState extends ConsumerState<_FileSelectorDialog> {
                     },
                   );
                 },
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: GlowingIndicator()),
                 error: (e, _) => Center(child: Text('Failed to load files: $e', style: const TextStyle(color: Colors.redAccent))),
               ),
             ),

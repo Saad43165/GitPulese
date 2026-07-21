@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_spacing.dart';
+import 'app_back_button.dart';
 
 class PageHeader extends StatelessWidget {
   const PageHeader({
@@ -33,12 +34,8 @@ class PageHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (shouldShowBack) ...[
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                onPressed: () => Navigator.of(context).pop(),
-                padding: const EdgeInsets.only(right: 16),
-                constraints: const BoxConstraints(),
-              ),
+              const AppBackButton(),
+              const SizedBox(width: 12),
             ],
             Expanded(
               child: Column(

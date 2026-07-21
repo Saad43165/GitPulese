@@ -50,7 +50,7 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([_swipeKey]);
+        ShowcaseView.get().startShowCase([_swipeKey]);
         await prefs.setBool('seen_discovery_swipe', true);
       }
     }
@@ -72,8 +72,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
     final feedAsync = ref.watch(discoveryFeedProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      body: Stack(
+    return Material(
+      color: Colors.transparent,
+      child: Stack(
         children: [
           // Feed Body wrapped in AnimatedSwitcher for seamless cross-fading
           AnimatedSwitcher(
@@ -125,6 +126,12 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                               }
                             }
                             final opacity = Curves.easeOut.transform(value);
+                            if (opacity <= 0.01) {
+                              return const SizedBox.shrink();
+                            }
+                            if (opacity >= 0.99 && value >= 0.99) {
+                              return child!;
+                            }
                             return Opacity(
                               opacity: opacity,
                               child: Transform.scale(
@@ -134,7 +141,9 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                               ),
                             );
                           },
-                          child: _DiscoveryCard(repo: repo),
+                          child: RepaintBoundary(
+                            child: _DiscoveryCard(repo: repo),
+                          ),
                         );
                       },
                     ),
@@ -318,11 +327,7 @@ class _DiscoveryCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isBookmarked = ref.watch(bookmarksProvider).when(
-          data: (items) => items.any((r) => r['repoId'] == repo.id),
-          loading: () => false,
-          error: (_, __) => false,
-        );
+    final isBookmarked = ref.watch(isBookmarkedProvider(repo.id)).valueOrNull ?? false;
 
     final sizeStr = repo.size >= 1024 
         ? '${(repo.size / 1024).toStringAsFixed(1)} MB' 

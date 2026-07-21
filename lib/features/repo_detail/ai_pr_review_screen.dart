@@ -34,13 +34,14 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
   @override
   void initState() {
     super.initState();
+    _urlController.addListener(_onUrlChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final prefs = await SharedPreferences.getInstance();
       final seen = prefs.getBool('seen_pr_review_tutorial') ?? false;
       if (!seen && mounted) {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
-          ShowCaseWidget.of(context).startShowCase([
+          ShowcaseView.get().startShowCase([
             _prUrlKey,
             _prPasteKey,
             _prRunKey,
@@ -51,20 +52,51 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
     });
   }
 
+  void _onUrlChanged() {
+    setState(() {});
+  }
+
   @override
   void dispose() {
+    _urlController.removeListener(_onUrlChanged);
     _urlController.dispose();
     ref.invalidate(prReviewProvider);
     super.dispose();
   }
 
   Future<void> _handlePaste() async {
-    final data = await Clipboard.getData('text/plain');
-    if (data != null && data.text != null) {
-      setState(() {
-        _urlController.text = data.text!;
-      });
-      HapticFeedback.lightImpact();
+    try {
+      final data = await Clipboard.getData('text/plain');
+      if (data != null && data.text != null) {
+        final text = data.text!.trim();
+        setState(() {
+          _urlController.text = text;
+        });
+        HapticFeedback.lightImpact();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Pasted PR URL: $text'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Clipboard is empty or does not contain text')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Clipboard access error: $e'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
     }
   }
 
@@ -148,10 +180,11 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
     final reviewAsync = ref.watch(prReviewProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.grey[50],
-      body: SafePage(
-        child: SingleChildScrollView(
+    return SafePage(
+      useAurora: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -186,59 +219,74 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
                             ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Showcase(
-                                  key: _prUrlKey,
-                                  title: 'Pull Request URL',
-                                  description: 'Paste the direct URL link to the GitHub Pull Request (e.g. "https://github.com/owner/repo/pull/1") to fetch commit changes.',
-                                  titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                                  descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-                                  tooltipBackgroundColor: const Color(0xFF1E293B),
-                                  tooltipBorderRadius: BorderRadius.circular(12),
-                                  blurValue: 2,
-                                  child: TextField(
-                                    controller: _urlController,
-                                    decoration: InputDecoration(
-                                      hintText: 'https://github.com/owner/repo/pull/1',
-                                      hintStyle: TextStyle(
-                                        color: isDark ? Colors.white30 : Colors.black38,
-                                        fontSize: 13,
-                                      ),
-                                      prefixIcon: const Icon(Icons.link_rounded, size: 20),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                        borderSide: BorderSide(
-                                          color: isDark ? Colors.white10 : Colors.black12,
+                          Showcase(
+                            key: _prUrlKey,
+                            title: 'Pull Request URL',
+                            description: 'Paste the direct URL link to the GitHub Pull Request (e.g. "https://github.com/owner/repo/pull/1") to fetch commit changes.',
+                            titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                            descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                            tooltipBackgroundColor: const Color(0xFF1E293B),
+                            tooltipBorderRadius: BorderRadius.circular(12),
+                            blurValue: 2,
+                            child: TextField(
+                              controller: _urlController,
+                              decoration: InputDecoration(
+                                hintText: 'https://github.com/owner/repo/pull/1',
+                                hintStyle: TextStyle(
+                                  color: isDark ? Colors.white30 : Colors.black38,
+                                  fontSize: 13,
+                                ),
+                                prefixIcon: const Icon(Icons.link_rounded, size: 20),
+                                suffixIcon: _urlController.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear_rounded, size: 18),
+                                        onPressed: () {
+                                          setState(() {
+                                            _urlController.clear();
+                                          });
+                                          HapticFeedback.lightImpact();
+                                        },
+                                        tooltip: 'Clear input',
+                                      )
+                                    : Showcase(
+                                        key: _prPasteKey,
+                                        title: 'Paste Clipboard URL',
+                                        description: 'Instantly paste the link copied in your device clipboard directly into the URL input field.',
+                                        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                                        descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                                        tooltipBackgroundColor: const Color(0xFF1E293B),
+                                        tooltipBorderRadius: BorderRadius.circular(12),
+                                        blurValue: 2,
+                                        child: TextButton(
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                                            visualDensity: VisualDensity.compact,
+                                            foregroundColor: AppColors.accent,
+                                          ),
+                                          onPressed: _handlePaste,
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.paste_rounded, size: 14),
+                                              SizedBox(width: 4),
+                                              Text('Paste', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 10,
-                                      ),
-                                    ),
-                                    style: const TextStyle(fontSize: 13),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: isDark ? Colors.white10 : Colors.black12,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Showcase(
-                                key: _prPasteKey,
-                                title: 'Paste Clipboard URL',
-                                description: 'Instantly paste the link copied in your device clipboard directly into the URL input field.',
-                                titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                                descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-                                tooltipBackgroundColor: const Color(0xFF1E293B),
-                                tooltipBorderRadius: BorderRadius.circular(12),
-                                blurValue: 2,
-                                child: IconButton.filledTonal(
-                                  onPressed: _handlePaste,
-                                  icon: const Icon(Icons.paste_rounded, size: 20),
-                                  tooltip: 'Paste from clipboard',
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
                                 ),
                               ),
-                            ],
+                              style: const TextStyle(fontSize: 13),
+                            ),
                           ),
                           const SizedBox(height: AppSpacing.md),
                           Showcase(
@@ -449,9 +497,34 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Open Pull Requests in $owner/$repo',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+            Expanded(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  const Text(
+                    'Open Pull Requests in',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+                    ),
+                    child: Text(
+                      '$owner/$repo',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             IconButton(
               icon: const Icon(Icons.close_rounded, size: 18),
@@ -519,7 +592,7 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
           },
           loading: () => const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            child: Center(child: GlowingIndicator(size: 20)),
           ),
           error: (err, _) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -603,10 +676,13 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
-            color: AppColors.danger,
-            size: 40,
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.error_outline_rounded, color: AppColors.danger, size: 36),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -617,18 +693,42 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
+            style: TextStyle(
+              color: isDark ? Colors.white60 : Colors.black54,
+              fontSize: 12.5,
+              height: 1.5,
+            ),
           ),
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () => ref.read(prReviewProvider.notifier).reset(),
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Reset'),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () => ref.read(prReviewProvider.notifier).reset(),
+                icon: const Icon(Icons.close_rounded, size: 16),
+                label: const Text('Dismiss'),
+                style: TextButton.styleFrom(foregroundColor: Colors.grey),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () {
+                  ref.read(prReviewProvider.notifier).reset();
+                  Future.delayed(const Duration(milliseconds: 100), _runReview);
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Try Again', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
 
   Widget _buildReviewResult(PrReviewResult result, bool isDark) {
     return Column(
@@ -933,7 +1033,7 @@ class _PrAutoPatchSectionState extends ConsumerState<_PrAutoPatchSection> {
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: GlowingIndicator(size: 20),
                 ),
               ),
             ),
@@ -1005,7 +1105,7 @@ class _PrAutoPatchSectionState extends ConsumerState<_PrAutoPatchSection> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  child: GlowingIndicator(size: 16),
                                 )
                               : const Icon(Icons.check_circle_outline_rounded, size: 16),
                           label: Text(_isCommitting ? 'Committing...' : 'Commit & Push'),

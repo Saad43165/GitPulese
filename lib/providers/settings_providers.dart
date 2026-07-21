@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_constants.dart';
@@ -7,28 +8,32 @@ import '../data/models/repo_model.dart';
 import '../providers/core_providers.dart';
 import '../providers/search_providers.dart';
 
-/// Optional GitHub PAT — persisted locally, never sent anywhere except GitHub.
+/// Optional GitHub PAT — persisted securely, never sent anywhere except GitHub.
 class GithubPatNotifier extends StateNotifier<String?> {
+  final _secureStorage = const FlutterSecureStorage();
+
   GithubPatNotifier() : super(null) {
     _load();
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(ApiConstants.patStorageKey);
-    state = token;
-    DioClient.instance.applyPat(token);
+    try {
+      final token = await _secureStorage.read(key: ApiConstants.patStorageKey);
+      state = token;
+      DioClient.instance.applyPat(token);
+    } catch (_) {
+      // Gracefully handle secure storage read failure
+    }
   }
 
   Future<void> save(String? token) async {
     final trimmed = token?.trim();
-    final prefs = await SharedPreferences.getInstance();
     if (trimmed == null || trimmed.isEmpty) {
-      await prefs.remove(ApiConstants.patStorageKey);
+      await _secureStorage.delete(key: ApiConstants.patStorageKey);
       state = null;
       DioClient.instance.applyPat(null);
     } else {
-      await prefs.setString(ApiConstants.patStorageKey, trimmed);
+      await _secureStorage.write(key: ApiConstants.patStorageKey, value: trimmed);
       state = trimmed;
       DioClient.instance.applyPat(trimmed);
     }
@@ -39,6 +44,41 @@ class GithubPatNotifier extends StateNotifier<String?> {
 
 final githubPatProvider =
     StateNotifierProvider<GithubPatNotifier, String?>((ref) => GithubPatNotifier());
+
+/// Optional Groq API key — persisted securely. Used for all AI features.
+/// Get a free key at https://console.groq.com (no credit card required).
+class GroqApiKeyNotifier extends StateNotifier<String?> {
+  final _secureStorage = const FlutterSecureStorage();
+  static const _key = 'groq_api_key';
+
+  GroqApiKeyNotifier() : super(null) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final key = await _secureStorage.read(key: _key);
+      state = key;
+    } catch (_) {}
+  }
+
+  Future<void> save(String? key) async {
+    final trimmed = key?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      await _secureStorage.delete(key: _key);
+      state = null;
+    } else {
+      await _secureStorage.write(key: _key, value: trimmed);
+      state = trimmed;
+    }
+  }
+
+  bool get hasKey => state != null && state!.isNotEmpty;
+}
+
+final groqApiKeyProvider =
+    StateNotifierProvider<GroqApiKeyNotifier, String?>((ref) => GroqApiKeyNotifier());
+
 
 final backgroundChecksEnabledProvider = StateNotifierProvider<BackgroundChecksNotifier, bool>(
   (ref) => BackgroundChecksNotifier(),
@@ -112,21 +152,43 @@ class CompactCardsNotifier extends StateNotifier<bool> {
   }
 }
 
+final demoUsernameProvider = StateProvider<String?>((ref) => null);
+
 // ── Authenticated User ────────────────────────────────────────────────────────
 /// Fetches the signed-in GitHub user profile (/user) whenever a PAT is stored.
 /// Returns null when not authenticated. Auto-refreshes on sign-in/sign-out.
 final authenticatedUserProvider = FutureProvider<GhUser?>((ref) async {
   final pat = ref.watch(githubPatProvider);
-  if (pat == null || pat.isEmpty) return null;
-  try {
-    final api = ref.read(githubApiServiceProvider);
-    return await api.getAuthenticatedUser();
-  } catch (_) {
-    return null;
+  final demoUser = ref.watch(demoUsernameProvider);
+  final api = ref.read(githubApiServiceProvider);
+
+  if (pat != null && pat.isNotEmpty) {
+    try {
+      return await api.getAuthenticatedUser();
+    } catch (_) {
+      // Fallback to demo user if authentication fails
+    }
   }
+
+  if (demoUser != null && demoUser.isNotEmpty) {
+    try {
+      return await api.getUserDetail(demoUser);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  return null;
 });
 
 final userReposProvider = FutureProvider.family<List<GhRepo>, String>((ref, username) async {
   final api = ref.watch(githubApiServiceProvider);
   return api.getUserRepos(username);
 });
+
+final userDetailProvider = FutureProvider.autoDispose.family<GhUser, String>((ref, username) async {
+  final api = ref.watch(githubApiServiceProvider);
+  return api.getUserDetail(username);
+});
+
+

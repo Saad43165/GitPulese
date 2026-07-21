@@ -14,6 +14,9 @@ import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/premium_code_viewer.dart';
 import '../../widgets/app_markdown.dart';
+import '../../widgets/app_back_button.dart';
+import '../../widgets/safe_page.dart';
+import '../editor/ai_code_editor_screen.dart';
 
 final fileContentProvider = FutureProvider.autoDispose.family<String, ({String owner, String repo, String path})>((ref, args) async {
   final api = ref.watch(githubApiServiceProvider);
@@ -230,7 +233,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
       if (!seen && mounted) {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
-          ShowCaseWidget.of(context).startShowCase([_aiExplainKey]);
+          ShowcaseView.get().startShowCase([_aiExplainKey]);
           await prefs.setBool('seen_ai_explain', true);
         }
       }
@@ -262,9 +265,12 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
 
     final explanationHeight = MediaQuery.of(context).size.height * 0.55;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
+    return SafePage(
+      useAurora: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+        leading: const AppBackButton(),
         title: Text(fileName, style: const TextStyle(fontSize: 16)),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -320,6 +326,23 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
                   ),
                 ),
               ),
+            ),
+          if (!isImage && !isBinary)
+            IconButton(
+              icon: const Icon(Icons.edit_note_rounded),
+              tooltip: 'Edit & Patch with AI',
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AiCodeEditorScreen(
+                      initialOwner: widget.owner,
+                      initialRepo: widget.repoName,
+                      initialPath: widget.filePath,
+                    ),
+                  ),
+                );
+              },
             ),
         ],
       ),
@@ -574,6 +597,7 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
                 );
               },
             ),
+      ),
     );
   }
 }

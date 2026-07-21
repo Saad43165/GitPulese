@@ -72,7 +72,17 @@ class DatabaseHelper {
 
   Future<int> insertHistory(Map<String, dynamic> entry) async {
     final db = await database;
-    return db.insert(tableHistory, entry..remove('id'));
+    final id = await db.insert(tableHistory, entry..remove('id'));
+    // Keep only the latest 100 history items to prevent database bloat
+    await db.execute('''
+      DELETE FROM $tableHistory 
+      WHERE id NOT IN (
+        SELECT id FROM $tableHistory 
+        ORDER BY timestamp DESC 
+        LIMIT 100
+      )
+    ''');
+    return id;
   }
 
   Future<List<Map<String, dynamic>>> getHistory({int limit = 200}) async {

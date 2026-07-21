@@ -115,10 +115,15 @@ class GitHubApiService {
           'per_page': perPage,
         },
       );
-      final items = (response.data['items'] as List<dynamic>)
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw GitHubApiException('Invalid API response format.');
+      }
+      final itemsList = data['items'] as List<dynamic>? ?? [];
+      final items = itemsList
           .map((e) => GhRepo.fromJson(e as Map<String, dynamic>))
           .toList();
-      return SearchReposResult(items, response.data['total_count'] as int? ?? 0);
+      return SearchReposResult(items, data['total_count'] as int? ?? 0);
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
@@ -143,10 +148,15 @@ class GitHubApiService {
         ApiConstants.searchCode,
         queryParameters: {'q': q, 'page': page, 'per_page': perPage},
       );
-      final items = (response.data['items'] as List<dynamic>)
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw GitHubApiException('Invalid API response format.');
+      }
+      final itemsList = data['items'] as List<dynamic>? ?? [];
+      final items = itemsList
           .map((e) => GhCodeResult.fromJson(e as Map<String, dynamic>))
           .toList();
-      return SearchCodeResult(items, response.data['total_count'] as int? ?? 0);
+      return SearchCodeResult(items, data['total_count'] as int? ?? 0);
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
@@ -154,26 +164,38 @@ class GitHubApiService {
 
   Future<SearchUsersResult> searchUsers({
     required String query,
-    String type = 'user', // 'user' or 'org'
+    String? type, // 'user' or 'org' or null/all
+    String? sort, // 'followers', 'repositories', 'joined', or null/empty
+    String? language,
+    String? location,
     int page = 1,
     int perPage = ApiConstants.defaultPerPage,
   }) async {
-    final q = '${query.trim()} type:$type';
+    final qParts = <String>[query.trim()];
+    if (type != null && type.isNotEmpty && type != 'all') qParts.add('type:$type');
+    if (language != null && language.isNotEmpty) qParts.add('language:$language');
+    if (location != null && location.isNotEmpty) qParts.add('location:$location');
+    final q = qParts.where((e) => e.isNotEmpty).join(' ');
     try {
       final response = await _dio.get(
         ApiConstants.searchUsers,
         queryParameters: {
           'q': q,
-          'sort': 'followers',
+          if (sort != null && sort.isNotEmpty) 'sort': sort,
           'order': 'desc',
           'page': page,
           'per_page': perPage,
         },
       );
-      final items = (response.data['items'] as List<dynamic>)
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw GitHubApiException('Invalid API response format.');
+      }
+      final itemsList = data['items'] as List<dynamic>? ?? [];
+      final items = itemsList
           .map((e) => GhUser.fromJson(e as Map<String, dynamic>))
           .toList();
-      return SearchUsersResult(items, response.data['total_count'] as int? ?? 0);
+      return SearchUsersResult(items, data['total_count'] as int? ?? 0);
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
@@ -183,6 +205,7 @@ class GitHubApiService {
     required String query,
     bool pullRequestsOnly = false,
     String state = 'open',
+    String? sort, // 'comments', 'reactions', 'updated', 'created'
     int page = 1,
     int perPage = ApiConstants.defaultPerPage,
   }) async {
@@ -196,12 +219,23 @@ class GitHubApiService {
     try {
       final response = await _dio.get(
         ApiConstants.searchIssues,
-        queryParameters: {'q': q, 'page': page, 'per_page': perPage},
+        queryParameters: {
+          'q': q,
+          if (sort != null && sort.isNotEmpty) 'sort': sort,
+          'order': 'desc',
+          'page': page,
+          'per_page': perPage,
+        },
       );
-      final items = (response.data['items'] as List<dynamic>)
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw GitHubApiException('Invalid API response format.');
+      }
+      final itemsList = data['items'] as List<dynamic>? ?? [];
+      final items = itemsList
           .map((e) => GhIssue.fromJson(e as Map<String, dynamic>))
           .toList();
-      return SearchIssuesResult(items, response.data['total_count'] as int? ?? 0);
+      return SearchIssuesResult(items, data['total_count'] as int? ?? 0);
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
@@ -222,7 +256,7 @@ class GitHubApiService {
         ApiConstants.repoReadme(owner, repo),
         options: Options(headers: {'Accept': 'application/vnd.github.v3.raw'}),
       );
-      if (response.data is String) return response.data as String;
+      if (response.data is String) return response.data;
       // Fallback: base64 content field
       final content = response.data['content'] as String?;
       if (content == null) return null;
@@ -324,7 +358,9 @@ class GitHubApiService {
         ApiConstants.repoContributors(owner, repo),
         queryParameters: {'per_page': perPage},
       );
-      return (response.data as List<dynamic>)
+      final data = response.data;
+      if (data is! List) return [];
+      return data
           .map((e) => GhOwner.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -338,7 +374,9 @@ class GitHubApiService {
         '/users/$username/followers',
         queryParameters: {'per_page': perPage},
       );
-      return (response.data as List<dynamic>)
+      final data = response.data;
+      if (data is! List) return [];
+      return data
           .map((e) => GhUser.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -352,7 +390,9 @@ class GitHubApiService {
         '/users/$username/following',
         queryParameters: {'per_page': perPage},
       );
-      return (response.data as List<dynamic>)
+      final data = response.data;
+      if (data is! List) return [];
+      return data
           .map((e) => GhUser.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -366,7 +406,9 @@ class GitHubApiService {
         ApiConstants.repoReleases(owner, repo),
         queryParameters: {'per_page': perPage},
       );
-      return response.data as List<dynamic>;
+      final data = response.data;
+      if (data is! List) return [];
+      return data;
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
@@ -387,7 +429,9 @@ class GitHubApiService {
         ApiConstants.repoCommits(owner, repo),
         queryParameters: {'per_page': perPage},
       );
-      return (response.data as List<dynamic>)
+      final data = response.data;
+      if (data is! List) return [];
+      return data
           .map((e) => GhCommit.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -402,7 +446,9 @@ class GitHubApiService {
         ApiConstants.userRepos(username),
         queryParameters: {'sort': 'updated', 'per_page': perPage},
       );
-      return (response.data as List<dynamic>)
+      final data = response.data;
+      if (data is! List) return [];
+      return data
           .map((e) => GhRepo.fromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
@@ -441,9 +487,12 @@ class GitHubApiService {
           queryParameters: {'page': page, 'per_page': perPage},
           options: Options(headers: {'Accept': 'application/vnd.github.star+json'}),
         );
-        final list = response.data as List<dynamic>;
+        final rawData = response.data;
+        if (rawData is! List<dynamic>) continue; // e.g. error body is a Map — skip
+        final list = rawData;
         if (list.isEmpty) continue;
-        final first = list.first as Map<String, dynamic>;
+        final first = list.first;
+        if (first is! Map<String, dynamic>) continue;
         final starredAt = first['starred_at'] as String?;
         if (starredAt != null) {
           final date = DateTime.tryParse(starredAt);
@@ -542,7 +591,12 @@ class GitHubApiService {
           'per_page': perPage + 1,
         },
       );
-      final items = (response.data['items'] as List<dynamic>)
+      final data = response.data;
+      if (data is! Map<String, dynamic>) {
+        throw GitHubApiException('Invalid API response format.');
+      }
+      final itemsList = data['items'] as List<dynamic>? ?? [];
+      final items = itemsList
           .map((e) => GhRepo.fromJson(e as Map<String, dynamic>))
           .where((r) => r.id != source.id)
           .take(perPage)
@@ -555,12 +609,13 @@ class GitHubApiService {
 
   Future<bool> checkStar(String owner, String repo) async {
     try {
-      final response = await _dio.get(
-        '/user/starred/$owner/$repo',
-      );
+      final response = await _dio.get('/user/starred/$owner/$repo');
+      // 204 = starred, 404 = not starred
       return response.statusCode == 204;
-    } catch (e) {
-      return false; // 404 means not starred
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return false;
+      // For auth errors or other issues, return false silently
+      return false;
     }
   }
 
@@ -569,7 +624,11 @@ class GitHubApiService {
       if (star) {
         await _dio.put(
           '/user/starred/$owner/$repo',
-          data: {},
+          options: Options(
+            headers: {
+              'Content-Length': '0',
+            },
+          ),
         );
       } else {
         await _dio.delete('/user/starred/$owner/$repo');
@@ -641,32 +700,82 @@ class GitHubApiService {
   Future<bool> checkFollow(String username) async {
     try {
       final response = await _dio.get('/user/following/$username');
+      // 204 = following, 404 = not following
       return response.statusCode == 204;
-    } catch (e) {
-      return false; // 404 means not following
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return false;
+      // For auth errors or other issues, return false silently
+      return false;
     }
   }
 
   Future<void> followUser(String username, {required bool follow}) async {
     try {
       if (follow) {
-        await _dio.put(
+        final response = await _dio.put(
           '/user/following/$username',
-          data: {},
+          options: Options(headers: {'Content-Length': '0'}),
         );
+        // GitHub returns 404 when the PAT lacks the 'user:follow' scope
+        if (response.statusCode == 404) {
+          throw GitHubApiException(
+            'Cannot follow: your Personal Access Token is missing the "user:follow" scope.\n\n'
+            'Go to Settings → Regenerate PAT and enable the "user" scope, then save it again.',
+            statusCode: 404,
+          );
+        }
       } else {
-        await _dio.delete('/user/following/$username');
+        final response = await _dio.delete('/user/following/$username');
+        if (response.statusCode == 404) {
+          throw GitHubApiException(
+            'Cannot unfollow: your Personal Access Token is missing the "user:follow" scope.\n\n'
+            'Go to Settings → Regenerate PAT and enable the "user" scope.',
+            statusCode: 404,
+          );
+        }
       }
+    } on GitHubApiException {
+      rethrow;
     } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        throw GitHubApiException(
+          'Cannot follow user: your PAT is missing the "user:follow" scope.\n'
+          'Regenerate your PAT in GitHub Settings with the "user" scope enabled.',
+          statusCode: 404,
+        );
+      }
       throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<bool> checkFork(String owner, String repo) async {
+    try {
+      final authUserResponse = await _dio.get('/user');
+      final authLogin = (authUserResponse.data as Map<String, dynamic>)['login'] as String? ?? '';
+      if (authLogin.isEmpty) return false;
+      // Check if the authenticated user has a fork of this repo
+      final response = await _dio.get('/repos/$authLogin/$repo');
+      final data = response.data as Map<String, dynamic>?;
+      final isFork = data?['fork'] as bool? ?? false;
+      final parentName = (data?['parent'] as Map<String, dynamic>?)?['full_name'] as String?;
+      return isFork && parentName == '$owner/$repo';
+    } catch (_) {
+      return false;
     }
   }
 
   Future<void> forkRepo(String owner, String repo) async {
     try {
-      await _dio.post(
-        '/repos/$owner/$repo/forks',
-      );
+      final response = await _dio.post('/repos/$owner/$repo/forks');
+      // 202 Accepted is the success code for forking
+      if (response.statusCode != 202 && response.statusCode != 200) {
+        throw GitHubApiException(
+          'Fork failed. Ensure your PAT has the "repo" scope.',
+          statusCode: response.statusCode,
+        );
+      }
+    } on GitHubApiException {
+      rethrow;
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
     }
@@ -796,6 +905,35 @@ class GitHubApiService {
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  /// Enable/create GitHub Pages for a repository (POST /repos/{owner}/{repo}/pages)
+  Future<void> enablePages({
+    required String owner,
+    required String repo,
+    required String branch,
+  }) async {
+    try {
+      await _dio.post(
+        '/repos/$owner/$repo/pages',
+        data: {
+          'source': {
+            'branch': branch,
+            'path': '/',
+          },
+        },
+        options: Options(
+          headers: {
+            'accept': 'application/vnd.github+json',
+          },
+        ),
+      );
+    } on DioException catch (e) {
+      // 409 Conflict means pages is already enabled, we can safely ignore it
+      if (e.response?.statusCode != 409) {
+        throw GitHubApiException.fromDioError(e);
+      }
     }
   }
 

@@ -18,12 +18,17 @@ import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
 import '../auth/auth_dialog.dart';
 import '../tracked_repos/tracked_repos_screen.dart';
+import '../../data/models/repo_model.dart';
+import '../../widgets/repo_card.dart';
 import '../user_detail/user_detail_screen.dart';
 import '../bookmarks/bookmarks_screen.dart';
 import 'widgets_configuration_screen.dart';
+import 'secure_keychain_screen.dart';
 import '../../widgets/github_analytics_section.dart';
 import '../repo_detail/ai_pr_review_screen.dart';
 import '../devops/devops_workflows_screen.dart';
+import '../../widgets/aurora_background.dart';
+import '../../widgets/glowing_indicator.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -39,42 +44,93 @@ class SettingsScreen extends ConsumerWidget {
     final authUser = ref.watch(authenticatedUserProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafePage(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: AppSpacing.lg),
-          physics: const BouncingScrollPhysics(),
-          children: [
-            const PageHeader(
-              title: 'Settings',
-              subtitle: 'Configure accounts, premium AI tools, preferences, and data options',
-            ),
-            const SizedBox(height: AppSpacing.md),
+    final mockRepoForPreview = GhRepo(
+      id: 0,
+      name: 'gitpulse-app',
+      fullName: 'saad43165/gitpulse-app',
+      owner: GhOwner(
+        id: 0,
+        login: 'saad43165',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/14101776?v=4',
+        htmlUrl: '',
+        type: 'User',
+      ),
+      htmlUrl: '',
+      description: 'GitPulse is a premium local-first developer HUD client for tracking Git telemetry, managing release alerts, and auditing PRs with Groq AI.',
+      stargazersCount: 1337,
+      forksCount: 42,
+      watchersCount: 1337,
+      openIssuesCount: 0,
+      subscribersCount: 10,
+      size: 2048,
+      defaultBranch: 'main',
+      fork: false,
+      archived: false,
+      disabled: false,
+      language: 'Dart',
+      topics: const [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      pushedAt: DateTime.now(),
+    );
 
-            // SECTION 1: ACCOUNT & CORE INTEGRATIONS
-            _buildSectionHeader(context, 'Account & Integration'),
+    return AuroraBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafePage(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const PageHeader(
+                title: 'Settings',
+                subtitle: 'Configure accounts, premium AI tools, preferences, and data options',
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: AppSpacing.lg),
+                  physics: const BouncingScrollPhysics(),
+                  children: [
+                    // SECTION 1: ACCOUNT & CORE INTEGRATIONS
+                    _buildSectionHeader(context, 'Account & Integration'),
             const SizedBox(height: AppSpacing.xs),
-            if (hasPat)
-              authUser.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (_, __) => _SignedInErrorCard(onSignOut: () {
-                  ref.read(githubPatProvider.notifier).save(null);
-                }),
-                data: (user) {
-                  if (user == null) {
-                    return _SignedInErrorCard(onSignOut: () {
+            _buildSectionCard(
+              context,
+              children: [
+                if (hasPat)
+                  authUser.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: GlowingIndicator()),
+                    ),
+                    error: (_, __) => _SignedInErrorCard(onSignOut: () {
                       ref.read(githubPatProvider.notifier).save(null);
-                    });
-                  }
-                  return _ProfileCard(user: user, isDark: isDark, ref: ref, context: context);
-                },
-              )
-            else
-              _buildConnectCard(context),
+                    }),
+                    data: (user) {
+                      if (user == null) {
+                        return _SignedInErrorCard(onSignOut: () {
+                          ref.read(githubPatProvider.notifier).save(null);
+                        });
+                      }
+                      return _ProfileCard(user: user, isDark: isDark, ref: ref, context: context);
+                    },
+                  )
+                else
+                  _buildConnectCard(context),
+                _buildDivider(isDark),
+                _buildListTile(
+                  context,
+                  icon: Icons.vpn_key_outlined,
+                  iconColor: const Color(0xFF8B5CF6),
+                  title: 'Secure Token Keychain',
+                  subtitle: 'Store & apply Personal Access Tokens securely',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SecureKeychainScreen()),
+                    );
+                  },
+                ),
+              ],
+            ),
 
             const SizedBox(height: AppSpacing.lg),
 
@@ -144,6 +200,39 @@ class SettingsScreen extends ConsumerWidget {
                   value: compactCards,
                   onChanged: (v) => ref.read(compactCardsProvider.notifier).setCompact(v),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4.0, bottom: 8.0),
+                        child: Row(
+                          children: [
+                            Icon(Icons.preview_rounded, size: 14, color: isDark ? Colors.white30 : Colors.black38),
+                            const SizedBox(width: 6),
+                            Text(
+                              'LIVE PREVIEW',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white38 : Colors.black38,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IgnorePointer(
+                        child: RepoCard(
+                          repo: mockRepoForPreview,
+                          compact: compactCards,
+                          onTap: () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 _buildDivider(isDark),
                 _buildListTile(
                   context,
@@ -169,7 +258,7 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.sync_outlined,
                   iconColor: const Color(0xFF06B6D4),
                   title: 'Background Release Checks',
-                  subtitle: 'Check tracked repos in background for new releases',
+                  subtitle: 'Check tracked repos in background (best-effort on iOS)',
                   value: backgroundEnabled,
                   onChanged: (v) => ref.read(backgroundCheckTogglerProvider).setEnabled(v),
                 ),
@@ -290,6 +379,10 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 120),
           ],
         ),
+      ),
+    ],
+  ),
+),
       ),
     );
   }
@@ -569,15 +662,7 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildConnectCard(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-          width: 1,
-        ),
-      ),
+    return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1058,69 +1143,48 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext ctx) {
-    return AppSurface(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar + name row
           Row(
             children: [
-              Stack(
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.accent, width: 2),
-                    ),
-                    child: ClipOval(
-                      child: CachedNetworkImage(
-                        imageUrl: user.avatarUrl as String,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.accent, width: 1.5),
+                ),
+                child: ClipOval(
+                  child: CachedNetworkImage(
+                    imageUrl: user.avatarUrl as String,
+                    fit: BoxFit.cover,
                   ),
-                  Positioned(
-                    right: 1,
-                    bottom: 1,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF0B0F19) : Colors.white,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       user.name ?? user.login,
-                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                      style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
+                        letterSpacing: -0.2,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 1),
                     Text(
                       '@${user.login}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w600,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -1130,105 +1194,56 @@ class _ProfileCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.success.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6, height: 6,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    const Text(
-                      'Connected',
-                      style: TextStyle(
-                        color: AppColors.success,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
+                child: const Text(
+                  'Connected',
+                  style: TextStyle(
+                    color: AppColors.success,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
-
-          // Bio
-          if (user.bio != null && (user.bio as String).isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              user.bio as String,
-              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                height: 1.5,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-
-          const SizedBox(height: 14),
-
-          // Stats row
-          Row(
-            children: [
-              _StatBadge(label: 'Followers', value: user.followers as int),
-              const SizedBox(width: 8),
-              _StatBadge(label: 'Following', value: (user.following as int) + ref.watch(followingDeltaProvider)),
-              const SizedBox(width: 8),
-              _StatBadge(label: 'Repos', value: user.publicRepos as int),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
-
-          ref.watch(userReposProvider(user.login as String)).maybeWhen(
-                data: (repos) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: GitHubAnalyticsSection(repos: repos, compact: true),
-                ),
-                orElse: () => const SizedBox.shrink(),
-              ),
-
-          // Action buttons
+          const SizedBox(height: 12),
+          const Divider(height: 1, thickness: 0.5),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: FilledButton.icon(
+                child: TextButton.icon(
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => UserDetailScreen(username: user.login as String),
                     ),
                   ),
-                  icon: const Icon(Icons.person_rounded, size: 16),
+                  icon: const Icon(Icons.person_rounded, size: 14),
                   label: const Text('View Profile'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: () {
-                  ref.read(githubPatProvider.notifier).save(null);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Signed out successfully')),
-                  );
-                },
-                icon: const Icon(Icons.logout_rounded, size: 16, color: AppColors.danger),
-                label: const Text('Sign Out', style: TextStyle(color: AppColors.danger)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.danger, width: 1),
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: () {
+                    ref.read(githubPatProvider.notifier).save(null);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Signed out successfully')),
+                    );
+                  },
+                  icon: const Icon(Icons.logout_rounded, size: 14, color: AppColors.danger),
+                  label: const Text('Sign Out', style: TextStyle(color: AppColors.danger)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -1331,6 +1346,217 @@ class _BenefitRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _GroqApiKeyTile extends ConsumerStatefulWidget {
+  const _GroqApiKeyTile({
+    required this.isDark,
+    required this.hasGroqKey,
+    required this.groqKey,
+  });
+  final bool isDark;
+  final bool hasGroqKey;
+  final String? groqKey;
+
+  @override
+  ConsumerState<_GroqApiKeyTile> createState() => _GroqApiKeyTileState();
+}
+
+class _GroqApiKeyTileState extends ConsumerState<_GroqApiKeyTile> {
+  final _controller = TextEditingController();
+  bool _expanded = false;
+  bool _saving = false;
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final key = _controller.text.trim();
+    if (key.isEmpty) return;
+    setState(() => _saving = true);
+    await ref.read(groqApiKeyProvider.notifier).save(key);
+    if (mounted) {
+      setState(() {
+        _saving = false;
+        _expanded = false;
+        _controller.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Groq API key saved — AI features are now active!'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    }
+  }
+
+  Future<void> _remove() async {
+    await ref.read(groqApiKeyProvider.notifier).save(null);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Groq API key removed.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final hasKey = widget.hasGroqKey;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: hasKey
+                      ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                      : const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 18,
+                  color: hasKey ? const Color(0xFF10B981) : const Color(0xFF8B5CF6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Groq AI Engine',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      hasKey
+                          ? 'AI features active — key configured'
+                          : 'Required for PR Reviewer, Summarizer & more',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.white54 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasKey) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    'ACTIVE',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF10B981),
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.danger),
+                  onPressed: _remove,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Remove key',
+                ),
+              ] else
+                TextButton(
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF8B5CF6),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(_expanded ? 'Cancel' : 'Add Key'),
+                ),
+            ],
+          ),
+          if (_expanded && !hasKey) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF8B5CF6)),
+                      SizedBox(width: 6),
+                      Text(
+                        'Get your FREE Groq API key:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '1. Visit console.groq.com\n2. Sign up free (no credit card)\n3. Go to API Keys → Create key\n4. Paste it below',
+                    style: TextStyle(fontSize: 11, height: 1.5, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _controller,
+              obscureText: _obscure,
+              style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                hintText: 'gsk_...',
+                labelText: 'Groq API Key',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                prefixIcon: const Icon(Icons.key_rounded, size: 18),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                    ),
+                  ],
+                ),
+              ),
+              onSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.check_rounded, size: 16),
+              label: const Text('Save & Activate', style: TextStyle(fontWeight: FontWeight.bold)),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8B5CF6),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 42),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -12,6 +12,32 @@ import '../../../data/models/user_and_search_models.dart';
 import '../../../data/models/repo_model.dart';
 import '../../../core/utils/formatters.dart';
 
+import '../../../widgets/app_back_button.dart';
+
+class CardPageRoute<T> extends PageRouteBuilder<T> {
+  final Widget child;
+  CardPageRoute({required this.child})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => child,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final scaleAnimation = Tween<double>(begin: 0.88, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+            );
+            final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            );
+            return FadeTransition(
+              opacity: fadeAnimation,
+              child: ScaleTransition(
+                scale: scaleAnimation,
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 350),
+        );
+}
+
 class DeveloperWrappedScreen extends StatefulWidget {
   final GhUser user;
   final List<GhRepo> repos;
@@ -55,6 +81,7 @@ class _DeveloperWrappedScreenState extends State<DeveloperWrappedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: const Text('Developer Card'),
         actions: [
           if (!_isCapturing)

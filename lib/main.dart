@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'app.dart';
 import 'core/constants/api_constants.dart';
@@ -13,8 +14,13 @@ void main() async {
   timeago.setLocaleMessages('en', timeago.EnMessages());
 
   // Apply persisted GitHub PAT before any API call can fire.
-  final prefs = await SharedPreferences.getInstance();
-  DioClient.instance.applyPat(prefs.getString(ApiConstants.patStorageKey));
+  try {
+    const secureStorage = FlutterSecureStorage();
+    final token = await secureStorage.read(key: ApiConstants.patStorageKey);
+    DioClient.instance.applyPat(token);
+  } catch (_) {
+    DioClient.instance.applyPat(null);
+  }
 
   // Guard each init separately — a failure in one must NOT freeze the app.
   try {

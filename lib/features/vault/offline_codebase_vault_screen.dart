@@ -14,6 +14,9 @@ import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/premium_code_viewer.dart';
+import '../../core/services/vault_file_manager.dart';
+import '../../widgets/app_back_button.dart';
+import '../editor/ai_code_editor_screen.dart';
 
 class OfflineVaultRepo {
   final String name;
@@ -88,18 +91,8 @@ class OfflineVaultNotifier extends StateNotifier<List<OfflineVaultRepo>> {
     state = state.where((r) => !(r.owner.toLowerCase() == owner.toLowerCase() && r.name.toLowerCase() == name.toLowerCase())).toList();
     await _save();
     
-    // Clean up local cache for this repo
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('vault_tree:${owner}:${name}');
-    
-    // Remove all cached file contents
-    final keys = prefs.getKeys();
-    final prefix = 'vault_file:${owner}:${name}:';
-    for (final key in keys) {
-      if (key.startsWith(prefix)) {
-        await prefs.remove(key);
-      }
-    }
+    // Clean up local filesystem cache for this repo
+    await VaultFileManager.deleteRepo(owner, name);
   }
 
   Future<void> _save() async {
@@ -130,15 +123,98 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
   final GlobalKey _searchKey = GlobalKey();
   final GlobalKey _listKey = GlobalKey();
 
+  List<GrepSearchResult> _grepResults = [];
+  bool _isSearchingGrep = false;
+  int _searchTypeIndex = 0; // 0 for Codebases, 1 for Grep Code
+
   @override
   void initState() {
     super.initState();
     _searchController.addListener(() {
+      final query = _searchController.text.trim().toLowerCase();
       setState(() {
-        _searchQuery = _searchController.text.trim().toLowerCase();
+        _searchQuery = query;
       });
+      if (query.isNotEmpty) {
+        _runGrepSearch(query);
+      }
     });
     _checkAndShowTutorial();
+  }
+
+  Future<void> _runGrepSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _grepResults = [];
+        _isSearchingGrep = false;
+      });
+      return;
+    }
+    setState(() {
+      _isSearchingGrep = true;
+    });
+    
+    final repos = ref.read(offlineVaultProvider);
+    final allResults = <GrepSearchResult>[];
+    for (final repo in repos) {
+      final results = await VaultFileManager.grepSearch(
+        owner: repo.owner,
+        repo: repo.name,
+        query: query,
+      );
+      allResults.addAll(results);
+    }
+    
+    if (mounted && _searchController.text.trim().toLowerCase() == query) {
+      setState(() {
+        _grepResults = allResults;
+        _isSearchingGrep = false;
+      });
+    }
+  }
+
+  Widget _buildSearchTabButton(int index, String label, IconData icon, bool isDark) {
+    final isSelected = _searchTypeIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _searchTypeIndex = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected 
+                ? AppColors.accent.withValues(alpha: 0.15) 
+                : (isDark ? Colors.white.withValues(alpha: 0.03) : Colors.black.withValues(alpha: 0.03)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? AppColors.accent.withValues(alpha: 0.3) : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? AppColors.accent : (isDark ? Colors.white60 : Colors.black54),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? AppColors.accent : (isDark ? Colors.white70 : Colors.black54),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _checkAndShowTutorial() async {
@@ -147,7 +223,7 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _searchKey,
           _listKey,
         ]);
@@ -181,9 +257,8 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
       final treeData = await api.getGitTree(owner, repo);
       final treeList = treeData['tree'] as List<dynamic>? ?? [];
 
-      // 2. Save tree structure to SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('vault_tree:${owner}:${repo}', jsonEncode(treeList));
+      // 2. Save tree structure to Local Filesystem
+      await VaultFileManager.saveTree(owner, repo, treeList);
 
       // 3. Identify and pre-cache critical files in the background
       final criticalFiles = <String>[];
@@ -211,7 +286,7 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
       for (final filePath in criticalFiles.take(10)) {
         try {
           final fileContent = await api.getFileRawContent(owner, repo, filePath);
-          await prefs.setString('vault_file:${owner}:${repo}:${filePath}', fileContent);
+          await VaultFileManager.saveFile(owner, repo, filePath, fileContent);
           cachedFilesCount++;
         } catch (_) {}
       }
@@ -485,9 +560,11 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
     }
 
     return SafePage(
+      useAurora: true,
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: const Text('Offline Code Vault'),
           actions: [
             IconButton(
@@ -499,7 +576,7 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
               const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent)),
+                  child: GlowingIndicator(size: 20),
                 ),
               )
             else
@@ -515,95 +592,145 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
-                      : [const Color(0xFFEEF2FF), Colors.white],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1B194B).withValues(alpha: 0.85), const Color(0xFF0C0E26).withValues(alpha: 0.95)]
+                        : [const Color(0xFFEEF2FF), Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: isDark ? 0.15 : 0.05),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                ),
-              ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'VAULT CAPACITY',
-                              style: GoogleFonts.outfit(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.accent,
-                                letterSpacing: 1.5,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.accent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'VAULT ACTIVE',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.accent,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '${totalSizeMb.toStringAsFixed(1)} MB',
+                            style: GoogleFonts.outfit(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              color: isDark ? Colors.white : Colors.black87,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${totalSizeMb.toStringAsFixed(1)} MB Cached',
-                              style: GoogleFonts.outfit(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                color: isDark ? Colors.white : Colors.black87,
+                          ),
+                          Text(
+                            'Total Local Space Utilized',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white38 : Colors.black45,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              _buildStatusStat(
+                                'Codebases',
+                                '${vaultRepos.length}',
+                                Icons.folder_copy_rounded,
+                                isDark,
                               ),
+                              const SizedBox(width: 24),
+                              _buildStatusStat(
+                                'Files',
+                                '${vaultRepos.fold(0, (sum, r) => sum + r.filesCount)}',
+                                Icons.insert_drive_file_rounded,
+                                isDark,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Circular Capacity Progress Indicator with neon ring
+                    SizedBox(
+                      width: 90,
+                      height: 90,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Positioned.fill(
+                            child: CircularProgressIndicator(
+                              value: (vaultRepos.length / 10).clamp(0.0, 1.0),
+                              strokeWidth: 8,
+                              backgroundColor: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.04),
+                              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
                             ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.shield_rounded,
-                            color: AppColors.accent,
-                            size: 28,
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${((vaultRepos.length / 10).clamp(0.0, 1.0) * 100).toInt()}%',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                  height: 1.1,
+                                ),
+                              ),
+                              Text(
+                                'Capacity',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  color: isDark ? Colors.white38 : Colors.black38,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildStatusStat(
-                          'Codebases',
-                          '${vaultRepos.length}',
-                          Icons.folder_copy_rounded,
-                          isDark,
-                        ),
-                        _buildStatusStat(
-                          'Total Files',
-                          '${vaultRepos.fold(0, (sum, r) => sum + r.filesCount)}',
-                          Icons.insert_drive_file_rounded,
-                          isDark,
-                        ),
-                        _buildStatusStat(
-                          'Security',
-                          'Local Enc',
-                          Icons.lock_outline_rounded,
-                          isDark,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: (vaultRepos.length / 10).clamp(0.0, 1.0),
-                        backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
-                        minHeight: 6,
+                        ],
                       ),
                     ),
                   ],
@@ -622,145 +749,383 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
                 tooltipBackgroundColor: const Color(0xFF1E293B),
                 tooltipBorderRadius: BorderRadius.circular(12),
                 blurValue: 2,
-                child: AppSurface(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF131127) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
                   child: TextField(
                     controller: _searchController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: 'Search offline files or codebases...',
-                      prefixIcon: Icon(Icons.search_rounded),
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.white38 : Colors.black38,
+                        fontSize: 13,
+                      ),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.accent),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                            )
+                          : null,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
-                      fillColor: Colors.transparent,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 12),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF131127) : Colors.grey[200],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    _buildSearchTabButton(0, 'Codebases', Icons.folder_copy_rounded, isDark),
+                    _buildSearchTabButton(1, 'Grep Code', Icons.code_rounded, isDark),
+                  ],
+                ),
+              ),
+            ),
             Expanded(
-              child: Showcase(
-                key: _listKey,
-                title: 'Offline Repositories Vault',
-                description: 'Explore all successfully cloned and compiled repositories. Tap any entry to traverse its local directories, inspect source files, or execute local queries.',
-                titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-                tooltipBackgroundColor: const Color(0xFF1E293B),
-                tooltipBorderRadius: BorderRadius.circular(12),
-                blurValue: 2,
-                child: filtered.isEmpty
-                    ? const Center(child: Text('No offline codebases match your search.'))
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-                        itemBuilder: (context, index) {
-                          final repo = filtered[index];
-                          return Dismissible(
-                            key: Key('${repo.owner}/${repo.name}'),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              decoration: BoxDecoration(
-                                color: Colors.redAccent,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.delete_forever_rounded, color: Colors.white),
-                            ),
-                            onDismissed: (_) {
-                              ref.read(offlineVaultProvider.notifier).removeRepo(repo.owner, repo.name);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Removed ${repo.name} from Offline Vault.')),
-                              );
-                            },
-                            child: AppSurface(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => OfflineCodebaseReaderScreen(
-                                      owner: repo.owner,
-                                      repoName: repo.name,
+              child: _searchTypeIndex == 0
+                  ? Showcase(
+                      key: _listKey,
+                      title: 'Offline Repositories Vault',
+                      description: 'Explore all successfully cloned and compiled repositories. Tap any entry to traverse its local directories, inspect source files, or execute local queries.',
+                      titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+                      descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+                      tooltipBackgroundColor: const Color(0xFF1E293B),
+                      tooltipBorderRadius: BorderRadius.circular(12),
+                      blurValue: 2,
+                      child: filtered.isEmpty
+                          ? const Center(child: Text('No offline codebases match your search.'))
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                final repo = filtered[index];
+                                return Dismissible(
+                                  key: Key('${repo.owner}/${repo.name}'),
+                                  direction: DismissDirection.endToStart,
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.only(right: 20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withValues(alpha: 0.9),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: const Icon(Icons.delete_forever_rounded, color: Colors.white, size: 28),
+                                  ),
+                                  onDismissed: (_) {
+                                    ref.read(offlineVaultProvider.notifier).removeRepo(repo.owner, repo.name);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Removed ${repo.name} from Offline Vault.')),
+                                    );
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: isDark
+                                            ? [const Color(0xFF1D1B3C), const Color(0xFF0F0D21)]
+                                            : [Colors.white, const Color(0xFFF9FAFB)],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
+                                        width: 1.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        onTap: () {
+                                          Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              builder: (_) => OfflineCodebaseReaderScreen(
+                                                owner: repo.owner,
+                                                repoName: repo.name,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Row(
+                                            children: [
+                                              // Owner Initials Avatar Widget with gradient background
+                                              Container(
+                                                width: 44,
+                                                height: 44,
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(
+                                                    colors: [AppColors.accent, AppColors.accentSoft],
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: AppColors.accent.withValues(alpha: 0.3),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(0, 2),
+                                                    ),
+                                                  ],
+                                                ),
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  repo.owner.substring(0, repo.owner.length >= 2 ? 2 : 1).toUpperCase(),
+                                                  style: GoogleFonts.outfit(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: AppSpacing.md),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      repo.name,
+                                                      style: GoogleFonts.outfit(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 16,
+                                                        color: isDark ? Colors.white : Colors.black87,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Row(
+                                                      children: [
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                          ),
+                                                          child: Row(
+                                                            children: [
+                                                              Icon(Icons.folder_outlined, size: 12, color: isDark ? Colors.white38 : Colors.black45),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                '${repo.filesCount} files',
+                                                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 8),
+                                                        Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
+                                                            borderRadius: BorderRadius.circular(8),
+                                                          ),
+                                                          child: Row(
+                                                            children: [
+                                                              Icon(Icons.sd_storage_outlined, size: 12, color: isDark ? Colors.white38 : Colors.black45),
+                                                              const SizedBox(width: 4),
+                                                              Text(
+                                                                repo.size,
+                                                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.sync_rounded, size: 20),
+                                                color: isDark ? Colors.white54 : Colors.black54,
+                                                tooltip: 'Update Cache',
+                                                onPressed: () {
+                                                  _downloadRepoToVault(repo.owner, repo.name);
+                                                },
+                                              ),
+                                              const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 );
                               },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                child: Row(
-                                  children: [
-                                    // Owner Initials Avatar Widget
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppColors.accent.withValues(alpha: 0.3),
-                                          width: 1.5,
-                                        ),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        repo.owner.substring(0, repo.owner.length >= 2 ? 2 : 1).toUpperCase(),
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.accentSoft,
-                                        ),
-                                      ),
+                            ),
+                    )
+                  : _isSearchingGrep
+                      ? const Center(child: GlowingIndicator())
+                      : _grepResults.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off_rounded, size: 48, color: isDark ? Colors.white38 : Colors.black38),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _searchQuery.isEmpty ? 'Type code query to search vault' : 'No matches found offline',
+                                    style: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              itemCount: _grepResults.length,
+                              itemBuilder: (context, index) {
+                                final res = _grepResults[index];
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: isDark
+                                          ? [const Color(0xFF1D1B3C), const Color(0xFF0F0D21)]
+                                          : [Colors.white, const Color(0xFFF9FAFB)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
                                     ),
-                                    const SizedBox(width: AppSpacing.md),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            repo.name,
-                                            style: GoogleFonts.outfit(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                              color: isDark ? Colors.white : Colors.black87,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => OfflineFileViewerScreen(
+                                              owner: res.owner,
+                                              repoName: res.repoName,
+                                              filePath: res.filePath,
+                                              initialHighlightLine: res.lineNumber,
                                             ),
                                           ),
-                                          const SizedBox(height: 3),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.folder_outlined, size: 12, color: isDark ? Colors.white38 : Colors.black38),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '${repo.filesCount} files',
-                                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(6),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.accent.withValues(alpha: 0.12),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(Icons.code_rounded, size: 14, color: AppColors.accent),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${res.owner}/${res.repoName} • ${res.filePath}',
+                                                    style: GoogleFonts.outfit(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                      color: isDark ? Colors.white70 : Colors.black87,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.accent.withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    'Line ${res.lineNumber}',
+                                                    style: GoogleFonts.outfit(
+                                                      fontSize: 10,
+                                                      color: AppColors.accent,
+                                                      fontWeight: FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Container(
+                                              width: double.infinity,
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? Colors.black38 : Colors.black.withValues(alpha: 0.03),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.04),
+                                                ),
                                               ),
-                                              const SizedBox(width: 8),
-                                              Icon(Icons.sd_storage_outlined, size: 12, color: isDark ? Colors.white38 : Colors.black38),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                repo.size,
-                                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
+                                              child: Text(
+                                                res.lineContent.trim(),
+                                                style: GoogleFonts.firaCode(
+                                                  fontSize: 11,
+                                                  color: isDark ? Colors.white70 : Colors.black87,
+                                                  height: 1.3,
+                                                ),
+                                                maxLines: 3,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                            ],
-                                          ),
-                                        ],
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.sync_rounded, size: 18),
-                                      color: isDark ? Colors.white38 : Colors.black38,
-                                      tooltip: 'Update Cache',
-                                      onPressed: () {
-                                        _downloadRepoToVault(repo.owner, repo.name);
-                                      },
-                                    ),
-                                    const Icon(Icons.chevron_right_rounded, color: Colors.grey),
-                                  ],
-                                ),
-                              ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-              ),
             ),
           ],
         ),
@@ -784,19 +1149,16 @@ class OfflineCodebaseReaderScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SafePage(
+      useAurora: true,
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: Text('$owner/$repoName (Offline)'),
         ),
-        body: SingleChildScrollView(
+        body: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              OfflineSourceCodeSection(owner: owner, repoName: repoName),
-            ],
-          ),
+          child: OfflineSourceCodeSection(owner: owner, repoName: repoName),
         ),
       ),
     );
@@ -814,26 +1176,36 @@ class OfflineSourceCodeSection extends ConsumerStatefulWidget {
 
 class _OfflineSourceCodeSectionState extends ConsumerState<OfflineSourceCodeSection> {
   final List<String> _pathStack = ['']; // Empty string for root
+  final _localSearchController = TextEditingController();
+  String _localSearchQuery = '';
   List<dynamic> _treeList = [];
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _localSearchController.addListener(() {
+      setState(() {
+        _localSearchQuery = _localSearchController.text.trim().toLowerCase();
+      });
+    });
     _loadCachedTree();
   }
 
+  @override
+  void dispose() {
+    _localSearchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadCachedTree() async {
-    final prefs = await SharedPreferences.getInstance();
-    final treeJson = prefs.getString('vault_tree:${widget.owner}:${widget.repoName}');
-    if (treeJson != null) {
-      try {
-        setState(() {
-          _treeList = jsonDecode(treeJson) as List<dynamic>;
-          _loading = false;
-        });
-        return;
-      } catch (_) {}
+    final treeList = await VaultFileManager.loadTree(widget.owner, widget.repoName);
+    if (treeList != null) {
+      setState(() {
+        _treeList = treeList;
+        _loading = false;
+      });
+      return;
     }
     setState(() {
       _loading = false;
@@ -877,7 +1249,13 @@ class _OfflineSourceCodeSectionState extends ConsumerState<OfflineSourceCodeSect
       );
     }
 
-    final items = _getDirectoryContents(currentPath);
+    final allItems = _getDirectoryContents(currentPath);
+
+    // Filter items by local search query
+    final items = allItems.where((item) {
+      if (_localSearchQuery.isEmpty) return true;
+      return (item['name'] as String).toLowerCase().contains(_localSearchQuery);
+    }).toList();
 
     // Sort directories first, then files
     items.sort((a, b) {
@@ -907,6 +1285,7 @@ class _OfflineSourceCodeSectionState extends ConsumerState<OfflineSourceCodeSect
                     constraints: const BoxConstraints(),
                     onPressed: () {
                       setState(() {
+                        _localSearchController.clear();
                         _pathStack.removeLast();
                       });
                     },
@@ -928,55 +1307,91 @@ class _OfflineSourceCodeSectionState extends ConsumerState<OfflineSourceCodeSect
             ),
           ),
 
-          if (items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(AppSpacing.lg),
-              child: Center(child: Text('Empty directory')),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                final isDir = item['type'] == 'dir';
-                return ListTile(
-                  dense: true,
-                  leading: Icon(
-                    isDir ? Icons.folder_rounded : Icons.insert_drive_file_outlined,
-                    color: isDir ? AppColors.accent : (isDark ? Colors.white54 : Colors.black54),
-                    size: 20,
-                  ),
-                  title: Text(
-                    item['name'] as String,
-                    style: TextStyle(
-                      fontWeight: isDir ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 13,
+          // Local Directory Search Filter Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white.withValues(alpha: 0.02) : Colors.black.withValues(alpha: 0.02),
+              border: Border(bottom: BorderSide(color: isDark ? Colors.white10 : Colors.black12)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search_rounded, size: 16, color: isDark ? Colors.white38 : Colors.black38),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _localSearchController,
+                    style: const TextStyle(fontSize: 12),
+                    decoration: InputDecoration(
+                      hintText: 'Filter files in ${currentPath.isEmpty ? 'root' : currentPath.split('/').last}...',
+                      hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                   ),
-                  trailing: isDir ? const Icon(Icons.chevron_right_rounded, size: 20) : null,
-                  onTap: () {
-                    if (isDir) {
-                      setState(() {
-                        _pathStack.add(item['path'] as String);
-                      });
-                    } else {
-                      final filePath = item['path'] as String;
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => OfflineFileViewerScreen(
-                            owner: widget.owner,
-                            repoName: widget.repoName,
-                            filePath: filePath,
+                ),
+                if (_localSearchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => _localSearchController.clear(),
+                    child: Icon(Icons.close_rounded, size: 16, color: isDark ? Colors.white38 : Colors.black38),
+                  ),
+              ],
+            ),
+          ),
+
+          if (items.isEmpty)
+            const Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.lg),
+                child: Center(child: Text('No matching items in directory')),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.separated(
+                itemCount: items.length,
+                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final isDir = item['type'] == 'dir';
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      isDir ? Icons.folder_rounded : Icons.insert_drive_file_outlined,
+                      color: isDir ? AppColors.accent : (isDark ? Colors.white54 : Colors.black54),
+                      size: 20,
+                    ),
+                    title: Text(
+                      item['name'] as String,
+                      style: TextStyle(
+                        fontWeight: isDir ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                    ),
+                    trailing: isDir ? const Icon(Icons.chevron_right_rounded, size: 20) : null,
+                    onTap: () {
+                      if (isDir) {
+                        setState(() {
+                          _localSearchController.clear();
+                          _pathStack.add(item['path'] as String);
+                        });
+                      } else {
+                        final filePath = item['path'] as String;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => OfflineFileViewerScreen(
+                              owner: widget.owner,
+                              repoName: widget.repoName,
+                              filePath: filePath,
+                            ),
                           ),
-                        ),
-                      );
-                    }
-                  },
-                );
-              },
+                        );
+                      }
+                    },
+                  );
+                },
+              ),
             ),
         ],
       ),
@@ -990,11 +1405,13 @@ class OfflineFileViewerScreen extends ConsumerStatefulWidget {
     required this.owner,
     required this.repoName,
     required this.filePath,
+    this.initialHighlightLine,
   });
 
   final String owner;
   final String repoName;
   final String filePath;
+  final int? initialHighlightLine;
 
   @override
   ConsumerState<OfflineFileViewerScreen> createState() => _OfflineFileViewerScreenState();
@@ -1012,9 +1429,7 @@ class _OfflineFileViewerScreenState extends ConsumerState<OfflineFileViewerScree
   }
 
   Future<void> _loadFile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final cacheKey = 'vault_file:${widget.owner}:${widget.repoName}:${widget.filePath}';
-    final cached = prefs.getString(cacheKey);
+    final cached = await VaultFileManager.loadFile(widget.owner, widget.repoName, widget.filePath);
 
     if (cached != null) {
       setState(() {
@@ -1030,7 +1445,7 @@ class _OfflineFileViewerScreenState extends ConsumerState<OfflineFileViewerScree
       final rawContent = await api.getFileRawContent(widget.owner, widget.repoName, widget.filePath);
       
       // Save to cache automatically for future offline use
-      await prefs.setString(cacheKey, rawContent);
+      await VaultFileManager.saveFile(widget.owner, widget.repoName, widget.filePath, rawContent);
 
       setState(() {
         _content = rawContent;
@@ -1050,10 +1465,30 @@ class _OfflineFileViewerScreenState extends ConsumerState<OfflineFileViewerScree
     final fileName = widget.filePath.split('/').last;
 
     return SafePage(
+      useAurora: true,
       child: Scaffold(
-        backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: Text(fileName, style: const TextStyle(fontSize: 16)),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_note_rounded),
+              tooltip: 'Edit & Patch with AI',
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AiCodeEditorScreen(
+                      initialOwner: widget.owner,
+                      initialRepo: widget.repoName,
+                      initialPath: widget.filePath,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         body: _loading
             ? const Center(child: GlowingIndicator(size: 32))
@@ -1086,6 +1521,7 @@ class _OfflineFileViewerScreenState extends ConsumerState<OfflineFileViewerScree
                     child: PremiumCodeViewer(
                       code: _content ?? '',
                       language: widget.filePath.split('.').lastOrNull ?? '',
+                      highlightLineNumber: widget.initialHighlightLine,
                     ),
                   ),
       ),

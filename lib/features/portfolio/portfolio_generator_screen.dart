@@ -15,6 +15,7 @@ import '../../data/models/repo_model.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../widgets/glowing_indicator.dart';
+import '../../widgets/app_back_button.dart';
 
 class PortfolioGeneratorScreen extends ConsumerStatefulWidget {
   const PortfolioGeneratorScreen({super.key});
@@ -25,10 +26,12 @@ class PortfolioGeneratorScreen extends ConsumerStatefulWidget {
 
 class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScreen> {
   int _selectedTheme = 0; // 0: Sleek Dark, 1: CLI Terminal, 2: Glassmorphic
+  int _customizeSectionIndex = 0; // 0: Identity, 1: Tech Stack, 2: Links
   bool _isDeploying = false;
   String _deployStep = '';
   String? _deployedUrl;
   bool _hasCopiedCode = false;
+  final ScrollController _repoListScrollController = ScrollController();
 
   // Customization Controllers
   final _nameController = TextEditingController();
@@ -61,7 +64,7 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _themeKey,
           _customizeKey,
           _deployKey,
@@ -82,6 +85,7 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
     _twitterController.dispose();
     _websiteController.dispose();
     _emailController.dispose();
+    _repoListScrollController.dispose();
     super.dispose();
   }
 
@@ -160,11 +164,24 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
       );
 
       setState(() => _deployStep = 'Finalizing static file routing...');
+      try {
+        await api.enablePages(owner: owner, repo: repo, branch: branch);
+      } catch (_) {
+        // Safe to ignore if pages already configured or temporarily failing, 
+        // since the static files are already committed.
+      }
       await Future.delayed(const Duration(milliseconds: 800));
+
+      final lowerOwner = owner.toLowerCase();
+      final lowerRepo = repo.toLowerCase();
 
       setState(() {
         _isDeploying = false;
-        _deployedUrl = 'https://${owner.toLowerCase()}.github.io/$repo/';
+        if (lowerRepo == '$lowerOwner.github.io') {
+          _deployedUrl = 'https://$lowerOwner.github.io/';
+        } else {
+          _deployedUrl = 'https://$lowerOwner.github.io/$repo/';
+        }
       });
 
       if (mounted) {
@@ -744,45 +761,203 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
   }
 
   void _showHtmlPreview(BuildContext context, GhUser? user, List<GhRepo>? repos) {
-    // Filter repos chosen by the user
     final featuredRepos = repos?.where((r) => _selectedRepoNames.contains(r.fullName)).toList() ?? [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final username = user?.login ?? 'guest';
 
-    showDialog(
+    showGeneralDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Portfolio Live Preview'),
-          content: Container(
-            width: double.maxFinite,
-            height: 500,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _PortfolioVisualPreview(
-                themeIndex: _selectedTheme,
-                username: user?.login ?? 'Guest',
-                name: _nameController.text.trim(),
-                bio: _roleController.text.trim(),
-                avatarUrl: user?.avatarUrl,
-                location: _locationController.text.trim(),
-                repos: featuredRepos,
-                skills: _skillsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
-                website: _websiteController.text.trim(),
-                linkedin: _linkedinController.text.trim(),
-                twitter: _twitterController.text.trim(),
-                email: _emailController.text.trim(),
+      barrierDismissible: true,
+      barrierLabel: 'Close Preview',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return const SizedBox.shrink();
+      },
+      transitionBuilder: (context, anim1, anim2, child) {
+        final scale = 0.92 + (anim1.value * 0.08);
+        final opacity = anim1.value;
+        return Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: scale,
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 800),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.25),
+                      blurRadius: 40,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // --- MOCK BROWSER HEADER ---
+                    Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.grey[100],
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(22),
+                          topRight: Radius.circular(22),
+                        ),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // macOS Dots
+                          Row(
+                            children: [
+                              Container(width: 10, height: 10, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF5F56))),
+                              const SizedBox(width: 6),
+                              Container(width: 10, height: 10, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFFBD2E))),
+                              const SizedBox(width: 6),
+                              Container(width: 10, height: 10, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF27C93F))),
+                            ],
+                          ),
+                          const SizedBox(width: 24),
+                          // Address Bar
+                          Expanded(
+                            child: Container(
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.lock_rounded, size: 12, color: Colors.green[400]),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'https://$username.github.io/portfolio',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? Colors.white60 : Colors.black54,
+                                        fontFamily: 'monospace',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  const Icon(Icons.refresh_rounded, size: 12, color: Colors.grey),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          // Close Action
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                              ),
+                              child: Icon(Icons.close_rounded, size: 16, color: isDark ? Colors.white70 : Colors.black87),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- LIVE PREVIEW CONTAINER ---
+                    Flexible(
+                      child: Container(
+                        height: 520,
+                        color: isDark ? const Color(0xFF020617) : Colors.grey[50],
+                        child: ClipRRect(
+                          child: _PortfolioVisualPreview(
+                            themeIndex: _selectedTheme,
+                            username: user?.login ?? 'Guest',
+                            name: _nameController.text.trim(),
+                            bio: _roleController.text.trim(),
+                            avatarUrl: user?.avatarUrl,
+                            location: _locationController.text.trim(),
+                            repos: featuredRepos,
+                            skills: _skillsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+                            website: _websiteController.text.trim(),
+                            linkedin: _linkedinController.text.trim(),
+                            twitter: _twitterController.text.trim(),
+                            email: _emailController.text.trim(),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // --- BOTTOM STATUS & EXPORT OPTIONS ---
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(22),
+                          bottomRight: Radius.circular(22),
+                        ),
+                        border: Border.all(
+                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.green),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Live Simulated Rendering',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white60 : Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded, size: 16),
+                            label: const Text('Exit Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close Preview'),
-            ),
-          ],
         );
       },
     );
@@ -860,6 +1035,7 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
       child: Scaffold(
         backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: const Text('Portfolio Builder'),
           actions: [
             IconButton(
@@ -927,45 +1103,68 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
                     child: AppSurface(
                       child: Column(
                         children: [
-                          TextField(
-                            controller: _nameController,
-                            decoration: const InputDecoration(labelText: 'Display Name', prefixIcon: Icon(Icons.person_rounded)),
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : Colors.black.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                _buildSectionTab(0, 'Identity', Icons.person_outline_rounded),
+                                _buildSectionTab(1, 'Tech Stack', Icons.bolt_rounded),
+                                _buildSectionTab(2, 'Social Links', Icons.link_rounded),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _roleController,
-                            decoration: const InputDecoration(labelText: 'Role / Bio Headline', prefixIcon: Icon(Icons.work_rounded)),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _locationController,
-                            decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_rounded)),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _skillsController,
-                            decoration: const InputDecoration(labelText: 'Skills & Tech Stack (Comma separated)', prefixIcon: Icon(Icons.bolt_rounded)),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _emailController,
-                            decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_rounded)),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _websiteController,
-                            decoration: const InputDecoration(labelText: 'Personal Website URL', prefixIcon: Icon(Icons.language_rounded)),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _linkedinController,
-                            decoration: const InputDecoration(labelText: 'LinkedIn URL', prefixIcon: Icon(Icons.link_rounded)),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _twitterController,
-                            decoration: const InputDecoration(labelText: 'Twitter/X URL', prefixIcon: Icon(Icons.alternate_email_rounded)),
-                          ),
+                          if (_customizeSectionIndex == 0) ...[
+                            TextField(
+                              controller: _nameController,
+                              decoration: const InputDecoration(labelText: 'Display Name', prefixIcon: Icon(Icons.person_rounded)),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _roleController,
+                              decoration: const InputDecoration(labelText: 'Role / Bio Headline', prefixIcon: Icon(Icons.work_rounded)),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _locationController,
+                              decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_rounded)),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _emailController,
+                              decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_rounded)),
+                            ),
+                          ] else if (_customizeSectionIndex == 1) ...[
+                            TextField(
+                              controller: _skillsController,
+                              maxLines: 4,
+                              decoration: const InputDecoration(
+                                labelText: 'Skills & Tech Stack (Comma separated)',
+                                hintText: 'e.g. Flutter, Dart, Go, SQLite, Firebase, Python',
+                                prefixIcon: Icon(Icons.bolt_rounded),
+                                alignLabelWithHint: true,
+                              ),
+                            ),
+                          ] else ...[
+                            TextField(
+                              controller: _websiteController,
+                              decoration: const InputDecoration(labelText: 'Personal Website URL', prefixIcon: Icon(Icons.language_rounded)),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _linkedinController,
+                              decoration: const InputDecoration(labelText: 'LinkedIn URL', prefixIcon: Icon(Icons.link_rounded)),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _twitterController,
+                              decoration: const InputDecoration(labelText: 'Twitter/X URL', prefixIcon: Icon(Icons.alternate_email_rounded)),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -983,36 +1182,63 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
                         ? const Padding(padding: EdgeInsets.all(20), child: Center(child: GlowingIndicator(size: 24)))
                         : Container(
                             constraints: const BoxConstraints(maxHeight: 250),
-                            child: ListView.separated(
-                              shrinkWrap: true,
-                              itemCount: repos.length,
-                              separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
-                              itemBuilder: (context, index) {
-                                final repo = repos[index];
-                                final isSelected = _selectedRepoNames.contains(repo.fullName);
-                                return CheckboxListTile(
-                                  dense: true,
-                                  title: Text(repo.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(repo.language ?? 'No Primary Language', style: const TextStyle(fontSize: 11)),
-                                  value: isSelected,
-                                  activeColor: AppColors.accent,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      if (val == true) {
-                                        if (_selectedRepoNames.length < 6) {
-                                          _selectedRepoNames.add(repo.fullName);
+                            child: RawScrollbar(
+                              controller: _repoListScrollController,
+                              thumbVisibility: true,
+                              thumbColor: AppColors.accent.withValues(alpha: 0.6),
+                              radius: const Radius.circular(4),
+                              thickness: 4,
+                              child: ListView.separated(
+                                controller: _repoListScrollController,
+                                shrinkWrap: true,
+                                itemCount: repos.length,
+                                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
+                                itemBuilder: (context, index) {
+                                  final repo = repos[index];
+                                  final isSelected = _selectedRepoNames.contains(repo.fullName);
+                                  return CheckboxListTile(
+                                    dense: true,
+                                    title: Text(repo.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Row(
+                                      children: [
+                                        if (repo.language != null) ...[
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: _getLanguageColor(repo.language),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(repo.language!, style: const TextStyle(fontSize: 11)),
+                                          const SizedBox(width: 12),
+                                        ],
+                                        const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                                        const SizedBox(width: 2),
+                                        Text('${repo.stargazersCount}', style: const TextStyle(fontSize: 11)),
+                                      ],
+                                    ),
+                                    value: isSelected,
+                                    activeColor: AppColors.accent,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) {
+                                          if (_selectedRepoNames.length < 6) {
+                                            _selectedRepoNames.add(repo.fullName);
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('You can showcase up to 6 repositories.')),
+                                            );
+                                          }
                                         } else {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('You can showcase up to 6 repositories.')),
-                                          );
+                                          _selectedRepoNames.remove(repo.fullName);
                                         }
-                                      } else {
-                                        _selectedRepoNames.remove(repo.fullName);
-                                      }
-                                    });
-                                  },
-                                );
-                              },
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
                             ),
                           ),
                   ),
@@ -1105,11 +1331,7 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
                       padding: const EdgeInsets.all(AppSpacing.md),
                       child: Row(
                         children: [
-                          const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
+                          const GlowingIndicator(size: 24),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
                             child: Text(
@@ -1129,20 +1351,71 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
                         children: [
                           const Icon(Icons.check_circle_rounded, color: Colors.green, size: 36),
                           const SizedBox(height: 8),
-                          const Text('Deployment Successful!', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text('Code Committed Successfully!', style: TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 6),
                           SelectableText(
                             _deployedUrl!,
                             style: const TextStyle(color: Colors.greenAccent, fontSize: 13, decoration: TextDecoration.underline),
                           ),
                           const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              launchUrl(Uri.parse(_deployedUrl!), mode: LaunchMode.externalApplication);
-                            },
-                            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                            label: const Text('View Live Website'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                          // Alert/Info Box
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            margin: const EdgeInsets.only(bottom: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded, color: Colors.blueAccent, size: 18),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'GitHub Pages takes 1-2 minutes to compile. If you open it immediately, you may see a temporary 404 or search redirect.',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    launchUrl(Uri.parse(_deployedUrl!.trim()), mode: LaunchMode.externalApplication);
+                                  },
+                                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                                  label: const Text('View Live Site', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    if (_targetDeployRepo != null) {
+                                      final owner = _targetDeployRepo!.owner.login;
+                                      final repo = _targetDeployRepo!.name;
+                                      launchUrl(
+                                        Uri.parse('https://github.com/$owner/$repo/actions'),
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.analytics_outlined, size: 16),
+                                  label: const Text('Track Build Progress', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1221,6 +1494,65 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
     final selected = _selectedTheme == idx;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    BoxDecoration themeDecor;
+    Color iconColor;
+    Color textColor;
+
+    if (idx == 0) {
+      // Sleek Dark
+      themeDecor = BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: selected
+            ? const LinearGradient(
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: isDark
+                    ? [const Color(0xFF0F172A), const Color(0xFF020617)]
+                    : [Colors.grey[100]!, Colors.grey[200]!],
+              ),
+      );
+      iconColor = selected ? const Color(0xFF8B5CF6) : Colors.grey;
+      textColor = selected 
+          ? const Color(0xFF8B5CF6) 
+          : (isDark ? Colors.white70 : Colors.black87);
+    } else if (idx == 1) {
+      // CLI Terminal
+      themeDecor = BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: selected ? Colors.black : (isDark ? const Color(0xFF0F172A) : Colors.grey[200]),
+      );
+      iconColor = selected ? const Color(0xFF10B981) : Colors.grey;
+      textColor = selected 
+          ? const Color(0xFF10B981) 
+          : (isDark ? Colors.white70 : Colors.black87);
+    } else {
+      // Glassmorphism
+      themeDecor = BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: selected
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                  const Color(0xFF0EA5E9).withValues(alpha: 0.25)
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : LinearGradient(
+                colors: isDark
+                    ? [Colors.white.withValues(alpha: 0.05), Colors.white.withValues(alpha: 0.02)]
+                    : [Colors.black.withValues(alpha: 0.05), Colors.black.withValues(alpha: 0.02)],
+              ),
+      );
+      iconColor = selected ? const Color(0xFF0EA5E9) : Colors.grey;
+      textColor = selected 
+          ? const Color(0xFF0EA5E9) 
+          : (isDark ? Colors.white70 : Colors.black87);
+    }
+
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -1228,22 +1560,40 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
             _selectedTheme = idx;
           });
         },
-        child: AppSurface(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          backgroundColor: selected
-              ? AppColors.accent.withValues(alpha: isDark ? 0.25 : 0.15)
-              : (isDark ? AppColors.darkSurfaceElevated : Colors.white),
+        child: Container(
+          height: 85,
+          decoration: themeDecor.copyWith(
+            border: Border.all(
+              color: selected
+                  ? iconColor
+                  : (isDark ? Colors.white10 : Colors.black12),
+              width: selected ? 2.0 : 1.0,
+            ),
+            boxShadow: selected ? [
+              BoxShadow(
+                color: iconColor.withValues(alpha: 0.35),
+                blurRadius: 10,
+                spreadRadius: 1,
+              )
+            ] : null,
+          ),
+          padding: const EdgeInsets.all(10),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: selected ? AppColors.accent : Colors.grey, size: 24),
-              const SizedBox(height: 6),
+              Icon(
+                icon,
+                color: iconColor,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
               Text(
                 name,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                  color: selected ? AppColors.accent : (isDark ? Colors.white : Colors.black),
+                  color: textColor,
+                  fontFamily: idx == 1 ? 'monospace' : null,
                 ),
               ),
             ],
@@ -1251,6 +1601,58 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
         ),
       ),
     );
+  }
+
+  Widget _buildSectionTab(int index, String label, IconData icon) {
+    final selected = _customizeSectionIndex == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _customizeSectionIndex = index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected 
+                ? (isDark ? const Color(0xFF1E293B) : Colors.white) 
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: selected && !isDark ? [
+              const BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))
+            ] : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: selected ? AppColors.accent : Colors.grey),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  color: selected ? (isDark ? Colors.white : Colors.black) : Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getLanguageColor(String? lang) {
+    if (lang == null) return Colors.grey;
+    switch (lang.toLowerCase()) {
+      case 'dart': return Colors.blueAccent;
+      case 'java': case 'kotlin': return Colors.orangeAccent;
+      case 'javascript': case 'typescript': return Colors.yellowAccent;
+      case 'python': return Colors.blue;
+      case 'html': case 'css': return Colors.cyanAccent;
+      case 'go': return Colors.tealAccent;
+      case 'rust': return Colors.redAccent;
+      case 'swift': return Colors.deepOrangeAccent;
+      default: return Colors.blueGrey;
+    }
   }
 }
 
@@ -1288,190 +1690,491 @@ class _PortfolioVisualPreview extends StatelessWidget {
     final avatar = avatarUrl ?? 'https://github.com/identicons/$username.png';
 
     if (themeIndex == 1) {
-      // CLI Terminal Theme
+      // -------------------------------------------------------------
+      // 1. PREMIUM RETRO CLI TERMINAL DESIGN
+      // -------------------------------------------------------------
       return Container(
-        color: Colors.black,
-        padding: const EdgeInsets.all(16),
+        color: const Color(0xFF030303),
+        padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Mock Terminal Top Status Info
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.red)),
-                  const SizedBox(width: 4),
-                  Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.amber)),
-                  const SizedBox(width: 4),
-                  Container(width: 8, height: 8, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.green)),
-                ],
-              ),
-              const Divider(color: Colors.white24, height: 16),
-              const Text('\$ whoami', style: TextStyle(color: Colors.greenAccent, fontFamily: 'monospace')),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  ClipOval(
-                    child: Image.network(
-                      avatar, 
-                      width: 40, 
-                      height: 40, 
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
-                    ),
+                  const Text(
+                    'SYS_ADMIN@GITPULSE-VIRTUAL-OS:~',
+                    style: TextStyle(color: Colors.white24, fontFamily: 'monospace', fontSize: 10),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, fontFamily: 'monospace')),
-                        Text(bio, style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
-                      ],
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF10B981)),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'ONLINE',
+                        style: TextStyle(color: Colors.white24, fontFamily: 'monospace', fontSize: 9),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text('Location: $location | Featured Projects: ${repos.length}', style: const TextStyle(color: Colors.white54, fontSize: 10, fontFamily: 'monospace')),
-              if (skills.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('\$ cat skills.txt', style: TextStyle(color: Colors.greenAccent, fontFamily: 'monospace')),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: skills.map((s) => Text('[skill] $s', style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace'))).toList(),
-                ),
-              ],
-              if (email.isNotEmpty || website.isNotEmpty || linkedin.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('\$ cat contact.txt', style: TextStyle(color: Colors.greenAccent, fontFamily: 'monospace')),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 12,
-                  children: [
-                    if (email.isNotEmpty) Text('email: $email', style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
-                    if (website.isNotEmpty) Text('site: $website', style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
-                    if (linkedin.isNotEmpty) Text('linkedin: $linkedin', style: const TextStyle(color: Colors.white70, fontSize: 10, fontFamily: 'monospace')),
-                  ],
-                ),
-              ],
+              const Divider(color: Colors.white12, height: 16),
+              
+              // Terminal Welcome Message
+              const Text(
+                'Initializing secure SSL connection to GitPulse API... [OK]',
+                style: TextStyle(color: Colors.white54, fontFamily: 'monospace', fontSize: 10),
+              ),
+              const Text(
+                'Fetching live credentials and repository nodes... [OK]',
+                style: TextStyle(color: Colors.white54, fontFamily: 'monospace', fontSize: 10),
+              ),
               const SizedBox(height: 16),
-              const Text('\$ ls --projects', style: TextStyle(color: Colors.greenAccent, fontFamily: 'monospace')),
+              
+              // Command 1: whoami
+              const Text('\$ whoami', style: TextStyle(color: Color(0xFFFBBF24), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 8),
-              ...repos.map((r) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white24),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('[r] ${r.name}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace')),
-                    const SizedBox(height: 2),
-                    Text(r.description ?? '', style: const TextStyle(color: Colors.white70, fontSize: 9, fontFamily: 'monospace')),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Lang: ${r.language ?? "None"}', style: const TextStyle(color: Colors.white30, fontSize: 8, fontFamily: 'monospace')),
-                        Text('★ ${r.stargazersCount}', style: const TextStyle(color: Colors.amberAccent, fontSize: 8, fontFamily: 'monospace')),
-                      ],
-                    ),
-                  ],
-                ),
-              )),
-            ],
-          ),
-        ),
-      );
-    } else if (themeIndex == 0) {
-      // Sleek Dark Theme
-      return Container(
-        color: const Color(0xFF0F172A),
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              
+              // Profile Layout
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipOval(
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    padding: const EdgeInsets.all(2),
                     child: Image.network(
                       avatar, 
                       width: 48, 
                       height: 48, 
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF10B981)),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                        Text(bio, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                        Text(
+                          name, 
+                          style: const TextStyle(
+                            color: Color(0xFF10B981), 
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 15, 
+                            fontFamily: 'monospace',
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          bio, 
+                          style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 11, fontFamily: 'monospace', height: 1.4),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
+              
+              Text(
+                'Location : $location\nIdentity : github.com/$username',
+                style: const TextStyle(color: Colors.white38, fontSize: 10, fontFamily: 'monospace', height: 1.4),
+              ),
+              
+              // Command 2: cat skills.txt
+              if (skills.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Text('\$ cat skills.txt', style: TextStyle(color: Color(0xFFFBBF24), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: skills.map((s) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4), width: 1),
+                      borderRadius: BorderRadius.circular(4),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.05),
+                    ),
+                    child: Text(
+                      s, 
+                      style: const TextStyle(color: Color(0xFF10B981), fontSize: 10, fontFamily: 'monospace'),
+                    ),
+                  )).toList(),
+                ),
+              ],
+
+              // Command 3: cat contact.txt
+              if (email.isNotEmpty || website.isNotEmpty || linkedin.isNotEmpty || twitter.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Text('\$ cat contact.txt', style: TextStyle(color: Color(0xFFFBBF24), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (email.isNotEmpty)
+                        Text('📧 email : $email', style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 10, fontFamily: 'monospace', height: 1.5)),
+                      if (website.isNotEmpty)
+                        Text('🌐 site  : $website', style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 10, fontFamily: 'monospace', height: 1.5)),
+                      if (linkedin.isNotEmpty)
+                        Text('💼 linkedin : $linkedin', style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 10, fontFamily: 'monospace', height: 1.5)),
+                      if (twitter.isNotEmpty)
+                        Text('🐦 twitter : $twitter', style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 10, fontFamily: 'monospace', height: 1.5)),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Command 4: ls --show-projects
+              const SizedBox(height: 24),
+              const Text('\$ ls --projects', style: TextStyle(color: Color(0xFFFBBF24), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 10),
+              
+              if (repos.isEmpty)
+                const Text('total 0 items', style: TextStyle(color: Colors.white30, fontFamily: 'monospace', fontSize: 10))
+              else
+                ...repos.map((r) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                    borderRadius: BorderRadius.circular(4),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.02),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('📁 ${r.name}', style: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'monospace')),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 12, color: Colors.amberAccent),
+                              const SizedBox(width: 2),
+                              Text('${r.stargazersCount}', style: const TextStyle(color: Colors.amberAccent, fontSize: 10, fontFamily: 'monospace')),
+                            ],
+                          ),
+                        ],
+                      ),
+                      if (r.description != null && r.description!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          r.description!, 
+                          style: const TextStyle(color: Color(0xFFA7F3D0), fontSize: 10, fontFamily: 'monospace', height: 1.4),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Language: ${r.language ?? "None"}', style: const TextStyle(color: Colors.white38, fontSize: 8, fontFamily: 'monospace')),
+                          if (r.forksCount > 0)
+                            Text('Forks: ${r.forksCount}', style: const TextStyle(color: Colors.white38, fontSize: 8, fontFamily: 'monospace')),
+                        ],
+                      ),
+                    ],
+                  ),
+                )),
+              
+              // Blinking Command Input Mockup
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text('\$ ', style: TextStyle(color: Color(0xFFFBBF24), fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(width: 4),
+                  const _BlinkingCursor(),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      );
+    } else if (themeIndex == 0) {
+      // -------------------------------------------------------------
+      // 2. ULTRA-PREMIUM MODERN SLEEK DARK DESIGN
+      // -------------------------------------------------------------
+      return Container(
+        color: const Color(0xFF0F172A),
+        padding: const EdgeInsets.all(20),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Verification Ribbon
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_user_rounded, color: Color(0xFF8B5CF6), size: 14),
+                    SizedBox(width: 6),
+                    Text(
+                      'VERIFIED DEVELOPER PROFILE PORTFOLIO',
+                      style: TextStyle(
+                        color: Color(0xFFA78BFA),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Hero Panel
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF8B5CF6), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                          blurRadius: 12,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.network(
+                        avatar,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name, 
+                          style: const TextStyle(
+                            color: Colors.white, 
+                            fontWeight: FontWeight.w900, 
+                            fontSize: 18,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          bio, 
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.4),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              // Location / Metadata Pills
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
                   _buildMockBadge('📍 $location', const Color(0xFF1E293B)),
-                  _buildMockBadge('👥 ${repos.length} Repos', const Color(0xFF1E293B)),
+                  _buildMockBadge('🌐 github.com/$username', const Color(0xFF1E293B)),
+                  if (email.isNotEmpty) _buildMockBadge('✉️ $email', const Color(0xFF1E293B)),
                 ],
               ),
+              
+              // Technologies Tag List
               if (skills.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('Skills & Tech Stack', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 24),
+                const Text(
+                  'Expertise & Technologies', 
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.2),
+                ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: skills.map((s) => _buildMockBadge(s, const Color(0x208B5CF6))).toList(),
+                  children: skills.map((s) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                      border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.2)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      s,
+                      style: const TextStyle(color: Color(0xFFDDD6FE), fontSize: 10, fontWeight: FontWeight.w600),
+                    ),
+                  )).toList(),
                 ),
               ],
-              const SizedBox(height: 16),
-              const Text('Featured Projects', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 8),
-              ...repos.map((r) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF334155)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(r.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(r.description ?? '', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(r.language ?? '', style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 10, fontWeight: FontWeight.bold)),
-                        Text('★ ${r.stargazersCount}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+
+              // Featured Repositories Section
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Featured Repositories', 
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.2),
+                  ),
+                  Text(
+                    '${repos.length} Pinned', 
+                    style: const TextStyle(color: Color(0xFF8B5CF6), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              
+              if (repos.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: const Center(
+                    child: Text('No repositories selected as featured.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                  ),
+                )
+              else
+                ...repos.map((r) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              r.name, 
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, overflow: TextOverflow.ellipsis),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black26,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                                const SizedBox(width: 2),
+                                Text('${r.stargazersCount}', style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (r.description != null && r.description!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          r.description!, 
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.4),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
-                    ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          if (r.language != null)
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _getLanguageColor(r.language),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(r.language!, style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            )
+                          else
+                            const SizedBox.shrink(),
+                          if (r.forksCount > 0)
+                            Text('🍴 ${r.forksCount} forks', style: const TextStyle(color: Colors.white30, fontSize: 10)),
+                        ],
+                      ),
+                    ],
+                  ),
+                )),
+              
+              // Social & Footer row
+              if (linkedin.isNotEmpty || twitter.isNotEmpty || website.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                const Divider(color: Colors.white10),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (website.isNotEmpty)
+                      _buildSocialLinkIcon(Icons.language_rounded, 'Site'),
+                    if (linkedin.isNotEmpty)
+                      _buildSocialLinkIcon(Icons.business_center_rounded, 'LinkedIn'),
+                    if (twitter.isNotEmpty)
+                      _buildSocialLinkIcon(Icons.alternate_email_rounded, 'Twitter'),
                   ],
                 ),
-              )),
+              ],
+              const SizedBox(height: 20),
             ],
           ),
         ),
       );
     } else {
-      // Glassmorphic Theme
+      // -------------------------------------------------------------
+      // 3. PREMIUM NEON-BLURRED GLASSMORPHISM DESIGN
+      // -------------------------------------------------------------
       return Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
@@ -1480,91 +2183,193 @@ class _PortfolioVisualPreview extends StatelessWidget {
             radius: 1.2,
           ),
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Glass Header Card
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.03),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF8B5CF6).withValues(alpha: 0.05),
+                      blurRadius: 15,
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
-                    ClipOval(
-                      child: Image.network(
-                        avatar, 
-                        width: 44, 
-                        height: 44, 
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white30, width: 1.5),
+                      ),
+                      child: ClipOval(
+                        child: Image.network(
+                          avatar,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.white),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(colors: [Color(0xFFC084FC), Color(0xFF6366F1)]).createShader(bounds),
-                            child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Color(0xFFC084FC), Color(0xFF6366F1)],
+                            ).createShader(bounds),
+                            child: Text(
+                              name, 
+                              style: const TextStyle(
+                                color: Colors.white, 
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 16,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
                           ),
-                          Text(bio, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 10)),
+                          const SizedBox(height: 2),
+                          Text(
+                            bio, 
+                            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, height: 1.3),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // Location / Metadata Pills
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildGlassBadge('📍 $location'),
+                  _buildGlassBadge('👥 github.com/$username'),
+                ],
+              ),
+
+              // Glass Tech Stack
               if (skills.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text('Tech Stack', style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold, fontSize: 12)),
-                const SizedBox(height: 6),
+                const SizedBox(height: 24),
+                const Text(
+                  'Tech Stack', 
+                  style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5),
+                ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
                   children: skills.map((s) => Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.04),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      color: Colors.white.withValues(alpha: 0.02),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(s, style: const TextStyle(color: Colors.white70, fontSize: 9)),
+                    child: Text(
+                      s, 
+                      style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.w600),
+                    ),
                   )).toList(),
                 ),
               ],
-              const SizedBox(height: 16),
-              const Text('Featured Works', style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold, fontSize: 13)),
-              const SizedBox(height: 8),
-              ...repos.map((r) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.02),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(r.name, style: const TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Text(r.description ?? '', style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 10), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(r.language ?? '', style: const TextStyle(color: Colors.white54, fontSize: 10)),
-                        Text('★ ${r.stargazersCount}', style: const TextStyle(color: Colors.amberAccent, fontSize: 10)),
+
+              // Glass Pinned Projects
+              const SizedBox(height: 24),
+              const Text(
+                'Featured Works', 
+                style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 10),
+              
+              if (repos.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.02),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  ),
+                  child: const Center(
+                    child: Text('No featured repositories selected.', style: TextStyle(color: Colors.white30, fontSize: 11)),
+                  ),
+                )
+              else
+                ...repos.map((r) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.02),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.02),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              r.name, 
+                              style: const TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.bold, fontSize: 12, overflow: TextOverflow.ellipsis),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, size: 12, color: Colors.amberAccent),
+                              const SizedBox(width: 2),
+                              Text('${r.stargazersCount}', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      if (r.description != null && r.description!.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          r.description!, 
+                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 10, height: 1.4),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
-                    ),
-                  ],
-                ),
-              )),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            r.language ?? 'Text', 
+                            style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.w600),
+                          ),
+                          if (r.forksCount > 0)
+                            Text('🍴 ${r.forksCount}', style: const TextStyle(color: Colors.white24, fontSize: 9)),
+                        ],
+                      ),
+                    ],
+                  ),
+                )),
+              
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -1577,10 +2382,92 @@ class _PortfolioVisualPreview extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
-      child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+      child: Text(label, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w500)),
+    );
+  }
+
+  Widget _buildGlassBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Text(label, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 10)),
+    );
+  }
+
+  Widget _buildSocialLinkIcon(IconData icon, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF8B5CF6)),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Color _getLanguageColor(String? lang) {
+    if (lang == null) return Colors.grey;
+    switch (lang.toLowerCase()) {
+      case 'dart': return Colors.blueAccent;
+      case 'java': case 'kotlin': return Colors.orangeAccent;
+      case 'javascript': case 'typescript': return Colors.yellowAccent;
+      case 'python': return Colors.blue;
+      case 'html': case 'css': return Colors.cyanAccent;
+      case 'go': return Colors.tealAccent;
+      case 'rust': return Colors.redAccent;
+      case 'swift': return Colors.deepOrangeAccent;
+      default: return Colors.blueGrey;
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// Interactive Blinking Cursor for Terminal Mock
+// -------------------------------------------------------------
+class _BlinkingCursor extends StatefulWidget {
+  const _BlinkingCursor();
+
+  @override
+  State<_BlinkingCursor> createState() => _BlinkingCursorState();
+}
+
+class _BlinkingCursorState extends State<_BlinkingCursor> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this, 
+      duration: const Duration(milliseconds: 500),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _controller,
+      child: Container(
+        width: 8,
+        height: 15,
+        color: const Color(0xFF10B981),
+      ),
     );
   }
 }

@@ -1,545 +1,412 @@
+import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/dashboard_providers.dart';
 import '../../providers/settings_providers.dart';
-import '../../features/auth/auth_dialog.dart';
-import '../../widgets/repo_card.dart';
-import '../../widgets/state_views.dart';
+import '../../providers/core_providers.dart';
 import '../repo_detail/repo_detail_screen.dart';
-import '../repo_detail/ai_pr_review_screen.dart';
 import '../user_detail/user_detail_screen.dart';
-import '../compare/compare_screen.dart';
-import '../devops/devops_workflows_screen.dart';
-import '../editor/ai_code_editor_screen.dart';
-import '../architecture/architecture_visualizer_screen.dart';
-import '../portfolio/portfolio_generator_screen.dart';
-import '../vault/offline_codebase_vault_screen.dart';
-import '../help/developer_help_hub.dart';
+import '../auth/auth_dialog.dart';
+import '../../widgets/glowing_indicator.dart';
 import '../../widgets/shimmer_skeletons.dart';
+import '../../widgets/state_views.dart';
+import '../../widgets/app_drawer.dart';
+import '../repo_detail/ai_pr_review_screen.dart';
+import '../vault/offline_codebase_vault_screen.dart';
+import '../bookmarks/bookmarks_screen.dart';
+import '../tracked_repos/tracked_repos_screen.dart';
+import '../settings/settings_screen.dart';
+import '../editor/ai_code_editor_screen.dart';
+import '../compare/compare_screen.dart';
 
-class _Topic {
-  const _Topic({required this.id, required this.label, required this.icon, required this.gradient});
-  final String id;
+// --- Quick Feature Hub ---
+class _FeatureAction {
   final String label;
   final IconData icon;
   final List<Color> gradient;
+  final WidgetBuilder destination;
+  final bool requiresGroqKey;
+  const _FeatureAction(this.label, this.icon, this.gradient, this.destination, {this.requiresGroqKey = false});
 }
 
-const List<_Topic> _curatedTopics = [
-  _Topic(id: 'All', label: 'Trending All', icon: Icons.explore_rounded, gradient: [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
-  _Topic(id: 'Python', label: 'AI & ML', icon: Icons.psychology_rounded, gradient: [Color(0xFF8B5CF6), Color(0xFF6D28D9)]),
-  _Topic(id: 'JavaScript', label: 'Web & UI', icon: Icons.web_rounded, gradient: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-  _Topic(id: 'Dart', label: 'Mobile Dev', icon: Icons.phone_android_rounded, gradient: [Color(0xFF10B981), Color(0xFF047857)]),
-  _Topic(id: 'Go', label: 'Backend', icon: Icons.dns_rounded, gradient: [Color(0xFFEC4899), Color(0xFFBE185D)]),
-  _Topic(id: 'Rust', label: 'Systems', icon: Icons.settings_suggest_rounded, gradient: [Color(0xFF6B7280), Color(0xFF374151)]),
+final List<_FeatureAction> _features = [
+  _FeatureAction('Offline Vault', Icons.offline_pin_rounded, const [Color(0xFF10B981), Color(0xFF059669)], (_) => const OfflineCodebaseVaultScreen()),
+  _FeatureAction('Saved Items', Icons.bookmark_rounded, const [Color(0xFF3B82F6), Color(0xFF1D4ED8)], (_) => const BookmarksScreen()),
+  _FeatureAction('AI Code Editor', Icons.code_rounded, const [Color(0xFFEC4899), Color(0xFFDB2777)], (_) => const AiCodeEditorScreen()),
+  _FeatureAction('AI PR Review', Icons.rate_review_rounded, const [Color(0xFF8B5CF6), Color(0xFF6D28D9)], (_) => const AiPrReviewScreen()),
+  _FeatureAction('Tracked Releases', Icons.radar_rounded, const [Color(0xFF14B8A6), Color(0xFF0F766E)], (_) => const TrackedReposScreen()),
+  _FeatureAction('App Settings', Icons.settings_rounded, const [Color(0xFF6B7280), Color(0xFF4B5563)], (_) => const SettingsScreen()),
 ];
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  @override
+  Widget build(BuildContext context) {
     final trending = ref.watch(trendingReposProvider);
     final topUsers = ref.watch(topUsersProvider);
-    final period = ref.watch(trendingPeriodProvider);
-    final language = ref.watch(trendingLanguageProvider);
+    final authUser = ref.watch(authenticatedUserProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final textColor = isDark ? Colors.white : Colors.black87;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(trendingReposProvider);
             ref.invalidate(topUsersProvider);
           },
-          edgeOffset: 120,
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-              SliverAppBar(
-                expandedHeight: 140,
-                pinned: true,
-                stretch: true,
-                // Collapsed bg: use standard scaffold color, no hardcoded GitHub colors
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                scrolledUnderElevation: 1,
-                shadowColor: isDark
-                    ? Colors.black.withValues(alpha: 0.6)
-                    : Colors.black.withValues(alpha: 0.12),
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4.0),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const CompareScreen()),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.accent.withValues(alpha: 0.5)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.sports_martial_arts_rounded, color: AppColors.accent, size: 18),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Arena', 
-                              style: TextStyle(
-                                color: isDark ? Colors.white : Colors.black, 
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final authUser = ref.watch(authenticatedUserProvider);
-                      return authUser.when(
-                        data: (user) {
-                          if (user == null) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 12.0),
-                              child: FilledButton.icon(
-                                onPressed: () => showDialog(
-                                  context: context,
-                                  builder: (_) => const AuthDialog(),
-                                ),
-                                icon: const Icon(Icons.login_rounded, size: 15),
-                                label: const Text('Sign In'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: isDark ? Colors.white : Colors.black,
-                                  foregroundColor: isDark ? Colors.black : Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            );
-                          }
-                          final firstName = (user.name ?? user.login).split(' ').first;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12.0),
-                            child: GestureDetector(
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => UserDetailScreen(username: user.login),
-                                ),
-                              ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.08)
-                                      : Colors.black.withValues(alpha: 0.06),
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: AppColors.accent.withValues(alpha: 0.45),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 26,
-                                      height: 26,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: AppColors.accent, width: 1.5),
-                                      ),
-                                      child: ClipOval(
-                                        child: CachedNetworkImage(
-                                          imageUrl: user.avatarUrl,
-                                          fit: BoxFit.cover,
-                                          placeholder: (_, __) => Container(
-                                            color: AppColors.accent.withValues(alpha: 0.2),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 7),
-                                    Text(
-                                      firstName,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark ? Colors.white : Colors.black,
-                                        letterSpacing: -0.2,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 2),
-                                    Icon(
-                                      Icons.keyboard_arrow_down_rounded,
-                                      size: 16,
-                                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.45),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        loading: () => const Padding(
-                          padding: EdgeInsets.only(right: 16),
-                          child: SizedBox(
-                            width: 22, height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.accent,
-                            ),
-                          ),
-                        ),
-                        error: (_, __) => const SizedBox.shrink(),
-                      );
-                    },
-                  ),
-                ],
-                flexibleSpace: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final collapsedHeight = MediaQuery.of(context).padding.top + kToolbarHeight;
-                    final expandedH = constraints.biggest.height;
-                    // 0.0 = fully expanded, 1.0 = fully collapsed
-                    final t = ((expandedH - collapsedHeight) / (140 - collapsedHeight))
-                        .clamp(0.0, 1.0);
-                    final collapseProgress = 1.0 - t;
-                    final bgOpacity = (t > 0.3 ? (t - 0.3) / 0.7 : 0.0).clamp(0.0, 1.0);
-                    final titleOpacity = (collapseProgress > 0.5 ? (collapseProgress - 0.5) / 0.5 : 0.0).clamp(0.0, 1.0);
-
-                    return Container(
-                      decoration: BoxDecoration(
-                        // Expanded: fully transparent to show gradient; Collapsed: solid surface
-                        color: Theme.of(context).scaffoldBackgroundColor.withOpacity(collapseProgress),
-                        border: collapseProgress > 0.85
-                            ? Border(
-                                bottom: BorderSide(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.08)
-                                      : Colors.black.withValues(alpha: 0.08),
-                                  width: 0.5,
-                                ),
-                              )
-                            : null,
-                      ),
-                      child: FlexibleSpaceBar(
-                        titlePadding: const EdgeInsets.only(left: 24, bottom: 14, right: 160),
-                        centerTitle: false,
-                        title: Opacity(
-                          opacity: titleOpacity,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.rocket_launch_rounded,
-                                size: 15,
-                                color: isDark ? Colors.white : Colors.black,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Explore',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                  fontSize: 17,
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        background: Padding(
-                          padding: EdgeInsets.only(
-                            top: MediaQuery.of(context).padding.top + kToolbarHeight - 10,
-                            left: 24,
-                            right: 24,
-                            bottom: 10,
-                          ),
-                          child: Opacity(
-                            opacity: bgOpacity,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.rocket_launch_rounded,
-                                      size: 22,
-                                      color: AppColors.accent,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Explore',
-                                      style: TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -1.0,
-                                        color: isDark ? Colors.white : Colors.black,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Trending repos & top developers',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: isDark
-                                        ? Colors.white.withValues(alpha: 0.55)
-                                        : Colors.black.withValues(alpha: 0.5),
-                                    letterSpacing: 0.1,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-
-              const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: _PremiumToolsCarousel(),
-                ),
-              ),
-
+              // Header Row
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Curated Topics',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: isDark ? Colors.white : Colors.black,
+                      Builder(
+                        builder: (innerContext) => GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            innerContext.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.grid_view_rounded, color: isDark ? Colors.white : Colors.black87, size: 22),
+                          ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildMiniPeriod(TrendingPeriod.daily, '1D', period, ref),
-                            _buildMiniPeriod(TrendingPeriod.weekly, '1W', period, ref),
-                            _buildMiniPeriod(TrendingPeriod.monthly, '1M', period, ref),
-                          ],
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompareScreen()));
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.compare_arrows_rounded, color: Colors.white, size: 16),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'Arena',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          authUser.when(
+                            data: (user) {
+                              if (user == null) {
+                                return GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    showDialog(context: context, builder: (_) => const AuthDialog());
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.05),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/github.png',
+                                          height: 16,
+                                          width: 16,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Sign In',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? Colors.white : Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              return GestureDetector(
+                                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: user.login))),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 12,
+                                        backgroundImage: CachedNetworkImageProvider(user.avatarUrl),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        user.login,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            loading: () => const SizedBox.shrink(),
+                            error: (_, __) => const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
 
+              // Title
               SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: _curatedTopics.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) {
-                      final topic = _curatedTopics[i];
-                      final selected = (language == null && topic.id == 'All') || language == topic.id;
-                      return _buildTopicChip(topic, selected, ref, context);
-                    },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    'Explore',
+                    style: TextStyle(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: textColor,
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
+              // 1. Feature Hub (Replacing Search Bar)
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.trending_up_rounded, color: isDark ? Colors.white : Colors.black, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Trending Repositories',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: isDark ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ],
+                child: SizedBox(
+                  height: 104,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: _features.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 16),
+                    itemBuilder: (context, i) {
+                      final f = _features[i];
+                      return _buildFeatureHubCard(f, isDark, context);
+                    },
                   ),
                 ),
               ),
 
-              SliverToBoxAdapter(
-                child: trending.when(
-                  data: (result) => result.items.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: EmptyStateView(
-                            icon: Icons.search_off_rounded,
-                            title: 'No trending repos',
-                            subtitle: 'Try a different language or time period',
-                          ),
-                        )
-                      : SizedBox(
-                          height: 125,
-                          child: AnimationLimiter(
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                              itemCount: result.items.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 16),
-                              itemBuilder: (context, i) {
-                                final repo = result.items[i];
-                                return AnimationConfiguration.staggeredList(
-                                  position: i,
-                                  duration: const Duration(milliseconds: 375),
-                                  child: SlideAnimation(
-                                    horizontalOffset: 50.0,
-                                    child: FadeInAnimation(
-                                      child: Align(
-                                        alignment: Alignment.topCenter,
-                                        child: SizedBox(
-                                          width: 280,
-                                          child: RepoCard(
-                                            repo: repo,
-                                            compact: true,
-                                            onTap: () => Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder: (_) => RepoDetailScreen(
-                                                  owner: repo.owner.login,
-                                                  repoName: repo.name,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                  loading: () => SizedBox(
-                    height: 125,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                      itemCount: 5,
-                      separatorBuilder: (_, __) => const SizedBox(width: 16),
-                      itemBuilder: (_, __) => const ShimmerRepoCard(),
-                    ),
-                  ),
-                  error: (e, _) => Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: ErrorStateView(
-                      message: e.toString(),
-                      onRetry: () => ref.invalidate(trendingReposProvider),
-                    ),
-                  ),
-                ),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 16)), // Reduced gap significantly
-
+              // 2. Top Developers Section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
-                      Icon(Icons.people_alt_rounded, color: isDark ? Colors.white : Colors.black, size: 18),
+                      Icon(Icons.military_tech_rounded, color: AppColors.accent, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Top Developers',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: isDark ? Colors.white : Colors.black,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
               SliverToBoxAdapter(
-                child: topUsers.when(
-                  data: (result) => SizedBox(
-                    height: 160,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                      itemCount: result.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, i) {
-                        final user = result.items[i];
-                        return _DeveloperCard(
-                          avatarUrl: user.avatarUrl,
-                          login: user.login,
-                          followers: user.followers,
-                          publicRepos: user.publicRepos,
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => UserDetailScreen(username: user.login),
+                child: SizedBox(
+                  height: 100,
+                  child: topUsers.when(
+                    data: (result) {
+                      if (result.items.isEmpty) return const SizedBox.shrink();
+                      return ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: result.items.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        itemBuilder: (context, i) {
+                          final user = result.items[i];
+                          return GestureDetector(
+                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: user.login))),
+                            child: SizedBox(
+                              width: 76,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)]),
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 32,
+                                      backgroundImage: CachedNetworkImageProvider(user.avatarUrl),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    user.login,
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  loading: () => SizedBox(
-                    height: 160,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                      itemCount: 6,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (_, __) => const ShimmerDeveloperCard(),
-                    ),
-                  ),
-                  error: (e, _) => Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text('Failed to load developers', style: TextStyle(color: isDark ? Colors.white54 : Colors.black54)),
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: GlowingIndicator()),
+                    error: (_, __) => const SizedBox.shrink(),
                   ),
                 ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+
+              // 3. Trending Repositories Grid
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Icon(Icons.local_fire_department_rounded, color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Trending Repositories',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              
+              trending.when(
+                data: (result) {
+                  if (result.items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    sliver: SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.8,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                          final repo = result.items[i];
+                          return AnimationConfiguration.staggeredGrid(
+                            position: i,
+                            columnCount: 2,
+                            duration: const Duration(milliseconds: 375),
+                            child: ScaleAnimation(
+                              child: FadeInAnimation(
+                                child: _buildGridRepoCard(repo, context, isDark),
+                              ),
+                            ),
+                          );
+                        },
+                        childCount: result.items.length > 10 ? 10 : result.items.length,
+                      ),
+                    ),
+                  );
+                },
+                loading: () => SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.8,
+                      ),
+                      itemCount: 4,
+                      itemBuilder: (_, __) => Container(
+                        decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(20)),
+                      ),
+                    ),
+                  ),
+                ),
+                error: (e, _) => SliverToBoxAdapter(child: ErrorStateView(message: 'Error loading repos', onRetry: () => ref.invalidate(trendingReposProvider))),
               ),
               
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -550,460 +417,217 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMiniPeriod(TrendingPeriod p, String label, TrendingPeriod current, WidgetRef ref) {
-    final selected = current == p;
-    return GestureDetector(
-      onTap: () => ref.read(trendingPeriodProvider.notifier).state = p,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-            color: selected ? Colors.white : Colors.grey,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopicChip(_Topic topic, bool selected, WidgetRef ref, BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: () {
-        ref.read(trendingLanguageProvider.notifier).state = topic.id == 'All' ? null : topic.id;
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-        decoration: BoxDecoration(
-          gradient: selected
-              ? LinearGradient(colors: topic.gradient, begin: Alignment.centerLeft, end: Alignment.centerRight)
-              : null,
-          color: selected ? null : (isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? Colors.transparent : (isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.12)),
-            width: 1,
-          ),
-          boxShadow: selected ? [
-            BoxShadow(
-              color: topic.gradient.last.withValues(alpha: 0.35),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            )
-          ] : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+  void _showGroqKeyRequiredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Row(
           children: [
-            Icon(
-              topic.icon,
-              size: 15,
-              color: selected ? Colors.white : (isDark ? Colors.white60 : Colors.black54),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              topic.label,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-              ),
-            ),
+            Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6)),
+            SizedBox(width: 8),
+            Text('Groq API Key Required'),
           ],
         ),
+        content: const Text(
+          'This AI-powered feature requires a Groq API Key. You can get a free key from console.groq.com (no credit card required) and configure it in Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+            child: const Text('Go to Settings'),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _DeveloperCard extends StatelessWidget {
-  const _DeveloperCard({
-    required this.avatarUrl,
-    required this.login,
-    required this.followers,
-    required this.publicRepos,
-    required this.onTap,
-  });
-
-  final String avatarUrl;
-  final String login;
-  final int followers;
-  final int publicRepos;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+  Widget _buildFeatureHubCard(_FeatureAction action, bool isDark, BuildContext context) {
+    final hasKey = ref.watch(groqApiKeyProvider) != null && ref.watch(groqApiKeyProvider)!.isNotEmpty;
+    final isBlocked = action.requiresGroqKey && !hasKey;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        if (isBlocked) {
+          _showGroqKeyRequiredDialog(context);
+        } else {
+          Navigator.of(context).push(MaterialPageRoute(builder: action.destination));
+        }
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 90,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isBlocked
+                    ? (isDark
+                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
+                        : [Colors.grey.shade300, Colors.grey.shade400])
+                    : action.gradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: isBlocked
+                  ? Border.all(
+                      color: isDark ? Colors.white12 : Colors.black12,
+                      width: 1,
+                    )
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: (isBlocked ? Colors.black : action.gradient.first).withValues(alpha: isBlocked ? 0.05 : 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                )
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  action.icon,
+                  color: isBlocked ? (isDark ? Colors.white30 : Colors.black.withValues(alpha: 0.3)) : Colors.white,
+                  size: 24,
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Text(
+                    action.label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: isBlocked ? (isDark ? Colors.white30 : Colors.black.withValues(alpha: 0.3)) : Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isBlocked)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF59E0B), // Amber
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_rounded,
+                  color: Colors.white,
+                  size: 10,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildGridRepoCard(dynamic repo, BuildContext context, bool isDark) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RepoDetailScreen(owner: repo.owner.login, repoName: repo.name))),
       child: Container(
-        width: 110,
         decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-            width: 1,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            )
+          ],
+          image: DecorationImage(
+            image: CachedNetworkImageProvider(repo.owner.avatarUrl),
+            fit: BoxFit.cover,
           ),
         ),
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Avatar with accent ring
-            Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [AppColors.accent, AppColors.accentSoft],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              padding: const EdgeInsets.all(2),
-              child: ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: avatarUrl,
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
-                ),
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              colors: [
+                Colors.black.withValues(alpha: 0.85),
+                Colors.black.withValues(alpha: 0.4),
+                Colors.transparent,
+              ],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '@$login',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              followers > 0
-                ? '${formatCount(followers)} followers'
-                : '$publicRepos repos',
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: isDark ? Colors.white54 : Colors.black54,
-                fontWeight: FontWeight.w500,
-                fontSize: 10,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // GitHub link button
-            GestureDetector(
-              onTap: () => launchUrl(
-                Uri.parse('https://github.com/$login'),
-                mode: LaunchMode.externalApplication,
-              ),
-              child: Container(
+            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white30),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.open_in_new_rounded, size: 10, color: AppColors.accent),
-                    SizedBox(width: 3),
+                    const Icon(Icons.star_rounded, color: Color(0xFFFDE047), size: 12),
+                    const SizedBox(width: 4),
                     Text(
-                      'GitHub',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.accent,
-                      ),
+                      formatCount(repo.stargazersCount),
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PremiumToolsCarousel extends StatelessWidget {
-  const _PremiumToolsCarousel();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final List<_PremiumFeature> features = [
-      _PremiumFeature(
-        title: 'Developer Help Hub',
-        subtitle: 'Interactive wizard, feature guides, and technical code walk-throughs.',
-        icon: Icons.help_center_rounded,
-        gradient: const [Color(0xFF6366F1), Color(0xFFEC4899)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const DeveloperHelpHubScreen()),
-          );
-        },
-      ),
-      _PremiumFeature(
-        title: 'AI PR Reviewer',
-        subtitle: 'Audit Pull Requests for bugs, security holes, and code fixes.',
-        icon: Icons.rate_review_rounded,
-        gradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AiPrReviewScreen()),
-          );
-        },
-      ),
-      _PremiumFeature(
-        title: 'DevOps Control Center',
-        subtitle: 'Trigger workflows, stream live build logs, and monitor status.',
-        icon: Icons.rocket_launch_rounded,
-        gradient: const [Color(0xFF0EA5E9), Color(0xFF0284C7)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const DevOpsWorkflowsScreen()),
-          );
-        },
-      ),
-      _PremiumFeature(
-        title: 'AI Code Editor',
-        subtitle: 'Refactor code files and commit patches directly using AI.',
-        icon: Icons.code_rounded,
-        gradient: const [Color(0xFF10B981), Color(0xFF059669)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AiCodeEditorScreen()),
-          );
-        },
-      ),
-      _PremiumFeature(
-        title: 'Codebase Visualizer',
-        subtitle: 'Visualize directory metrics, radial dependency maps, and complexity.',
-        icon: Icons.bubble_chart_rounded,
-        gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ArchitectureVisualizerScreen()),
-          );
-        },
-      ),
-      _PremiumFeature(
-        title: 'Portfolio Generator',
-        subtitle: 'Generate portfolio websites and badges, deploy with one click.',
-        icon: Icons.art_track_rounded,
-        gradient: const [Color(0xFFEC4899), Color(0xFFDB2777)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PortfolioGeneratorScreen()),
-          );
-        },
-      ),
-      _PremiumFeature(
-        title: 'Offline Code Vault',
-        subtitle: 'Download repositories for offline search and syntax highlighted views.',
-        icon: Icons.offline_pin_rounded,
-        gradient: const [Color(0xFF6366F1), Color(0xFF4F46E5)],
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const OfflineCodebaseVaultScreen()),
-          );
-        },
-      ),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+              const SizedBox(height: 8),
+              Text(
+                repo.name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  height: 1.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Premium Developer Tools',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
-                      color: isDark ? Colors.white : Colors.black,
+                  Icon(Icons.circle, size: 8, color: AppColors.languageColors[repo.language] ?? Colors.grey),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      repo.language ?? 'Unknown',
+                      style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.help_outline_rounded, color: AppColors.accent, size: 20),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DeveloperHelpHubScreen()),
-                  );
-                },
-                tooltip: 'Developer Help Hub',
-                visualDensity: VisualDensity.compact,
-              ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 84,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            itemCount: features.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final f = features[index];
-              return Container(
-                width: 280,
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark 
-                          ? Colors.black.withValues(alpha: 0.2) 
-                          : f.gradient.first.withValues(alpha: 0.06),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: f.onTap,
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            right: -10,
-                            bottom: -10,
-                            child: Icon(
-                              f.icon,
-                              size: 60,
-                              color: f.gradient.first.withValues(alpha: 0.04),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: f.gradient,
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: f.gradient.first.withValues(alpha: 0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
-                                      )
-                                    ],
-                                  ),
-                                  child: Icon(f.icon, color: Colors.white, size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        f.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 14,
-                                          letterSpacing: -0.2,
-                                          color: isDark ? Colors.white : Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        f.subtitle,
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          height: 1.2,
-                                          color: isDark ? Colors.white60 : Colors.black54,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  size: 14,
-                                  color: isDark ? Colors.white30 : Colors.black26,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+      ),
     );
   }
-}
-
-class _PremiumFeature {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final List<Color> gradient;
-  final VoidCallback onTap;
-
-  const _PremiumFeature({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.gradient,
-    required this.onTap,
-  });
 }

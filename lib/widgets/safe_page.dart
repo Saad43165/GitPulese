@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_spacing.dart';
+import 'aurora_background.dart';
 
 /// Height of the floating bottom nav pill (excluding system inset).
 const kBottomNavReserve = 88.0;
@@ -9,21 +10,24 @@ class SafePage extends StatelessWidget {
   const SafePage({
     super.key,
     required this.child,
-    this.reserveBottomNav = true,
+    this.reserveBottomNav = false,
+    this.useAurora = false,
   });
 
   final Widget child;
   final bool reserveBottomNav;
+  final bool useAurora;
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final navReserve = reserveBottomNav ? kBottomNavReserve + bottomInset : 0.0;
-
-    return SafeArea(
-      bottom: false,
+    Widget page = SafeArea(
+      bottom: !reserveBottomNav,
       child: child,
     );
+    if (useAurora) {
+      page = AuroraBackground(child: page);
+    }
+    return page;
   }
 }
 

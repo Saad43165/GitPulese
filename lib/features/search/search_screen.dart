@@ -8,6 +8,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/history_providers.dart';
 import '../../providers/search_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/repo_card.dart';
@@ -51,7 +52,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 400));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _searchBarKey,
           _filterButtonKey,
           _searchTabsKey,
@@ -95,9 +96,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final filters = ref.watch(searchFiltersProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Column(
+    return Material(
+      color: Colors.transparent,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const PageHeader(
@@ -124,7 +125,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       height: 50,
                       decoration: BoxDecoration(
                         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                           width: 1,
@@ -153,11 +154,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   onPressed: () {
                                     _controller.clear();
                                     ref.read(searchQueryProvider.notifier).state = '';
-                                    _focusNode.unfocus();
+                                    Future.delayed(const Duration(milliseconds: 100), () {
+                                      if (mounted) {
+                                        _focusNode.unfocus();
+                                      }
+                                    });
                                   },
                                 )
                               : null,
                           border: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          filled: false,
+                          fillColor: Colors.transparent,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                       ),
@@ -188,7 +197,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       width: 50,
                       decoration: BoxDecoration(
                         color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       child: Stack(
                         alignment: Alignment.center,
@@ -277,7 +293,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return GestureDetector(
-      onTap: () => ref.read(searchTabProvider.notifier).state = value,
+      onTap: () {
+        if (ref.read(searchTabProvider) == value) return;
+        ref.read(searchTabProvider.notifier).state = value;
+        final currentQuery = ref.read(searchQueryProvider);
+        if (currentQuery.isNotEmpty) {
+          ref.read(searchQueryProvider.notifier).state = '';
+          Future.microtask(() {
+            if (mounted) {
+              ref.read(searchQueryProvider.notifier).state = currentQuery;
+            }
+          });
+        } else if (_controller.text.trim().isNotEmpty) {
+          _submit(_controller.text);
+        }
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
@@ -289,6 +319,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             color: isSelected ? AppColors.accent : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
             width: 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -325,11 +364,15 @@ class _RecentSearchesView extends ConsumerWidget {
 
     return historyAsync.when(
       data: (items) {
-        final searches = items
-            .where((e) => e.type.startsWith('search_'))
-            .map((e) => e.query)
-            .toSet()
-            .toList();
+        final uniqueSearches = <String, String>{};
+        for (var item in items.where((e) => e.type.startsWith('search_'))) {
+          final query = item.query.trim();
+          final lower = query.toLowerCase();
+          if (!uniqueSearches.containsKey(lower)) {
+            uniqueSearches[lower] = query;
+          }
+        }
+        final searches = uniqueSearches.values.toList();
 
         if (searches.isEmpty) {
           return const EmptyStateView(
@@ -444,6 +487,7 @@ class _RepoResultsView extends ConsumerWidget {
                 index: i,
                 child: RepoCard(
                   repo: repo,
+                  compact: ref.watch(compactCardsProvider),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => RepoDetailScreen(

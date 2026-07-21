@@ -24,6 +24,7 @@ dependencies:
   sqflite: ^2.3.3+1
   path: ^1.9.0
   shared_preferences: ^2.5.5
+  flutter_secure_storage: ^9.2.2
 
   # UI / rendering
   flutter_markdown: ^0.7.3

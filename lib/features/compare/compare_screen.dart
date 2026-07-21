@@ -14,6 +14,9 @@ import '../../providers/core_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_markdown.dart';
+import '../../widgets/app_back_button.dart';
+import '../../widgets/expandable_section.dart';
+import '../../widgets/safe_page.dart';
 
 final _localSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 
@@ -44,6 +47,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final GlobalKey _arenaKey = GlobalKey();
+  int _selectedMode = 0; // 0 = Repos, 1 = Accounts, 2 = Code
 
   @override
   void initState() {
@@ -54,7 +58,7 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       if (!seen && mounted) {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
-          ShowCaseWidget.of(context).startShowCase([_arenaKey]);
+          ShowcaseView.get().startShowCase([_arenaKey]);
           await prefs.setBool('seen_arena_tutorial', true);
         }
       }
@@ -144,11 +148,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       const Color(0xFFF59E0B), // Amber
     ];
 
-    return DecoratedBox(
-      decoration: AppDecorations.pageGradient(context),
+    return SafePage(
+      useAurora: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: const Text('AI Repo Arena'),
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -183,16 +188,37 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                     vertical: AppSpacing.md,
                   ),
                   children: [
-                    // Intro
-                    Text(
-                      'Decide between packages, frameworks, or libraries with real-time stats and AI analysis.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark ? Colors.white60 : Colors.black54,
-                        height: 1.4,
-                      ),
+                    // Mode Toggle
+                    SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(value: 0, label: Text('Repos'), icon: Icon(Icons.source_rounded)),
+                        ButtonSegment(value: 1, label: Text('Accounts'), icon: Icon(Icons.people_rounded)),
+                        ButtonSegment(value: 2, label: Text('Code'), icon: Icon(Icons.code_rounded)),
+                      ],
+                      selected: {_selectedMode},
+                      onSelectionChanged: (Set<int> newSelection) {
+                        setState(() {
+                          _selectedMode = newSelection.first;
+                        });
+                      },
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.xl),
+
+                    if (_selectedMode == 1)
+                      _buildAccountCompare(isDark)
+                    else if (_selectedMode == 2)
+                      _buildCodeCompare(isDark)
+                    else ...[
+                      // Intro
+                      Text(
+                        'Decide between packages, frameworks, or libraries with real-time stats and AI analysis.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark ? Colors.white60 : Colors.black54,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
 
                     // The 3 Arena Slots
                     Row(
@@ -429,8 +455,9 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           ],
                         ),
                       ),
-                    ]
+                    ],
                   ],
+                ],
                 ),
 
                 // Floating Search Results Overlay
@@ -461,17 +488,20 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
                           data: (results) {
                             if (results.isEmpty) {
                               return const Center(
-                                child: Text('No repositories found'),
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.0),
+                                  child: Text('No repositories found'),
+                                ),
                               );
                             }
                             return ListView.separated(
                               itemCount: results.length,
                               separatorBuilder: (_, __) => Divider(
                                 height: 1,
-                                color: isDark ? Colors.white12 : Colors.black12,
+                                color: isDark ? Colors.white10 : Colors.black12,
                               ),
-                              itemBuilder: (context, i) {
-                                final repo = results[i];
+                              itemBuilder: (context, index) {
+                                final repo = results[index];
                                 final alreadyAdded = repos.any((r) => r.id == repo.id);
 
                                 return ListTile(
@@ -762,9 +792,12 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          AppMarkdown(
-            data: verdict,
-            selectable: true,
+          ExpandableSection(
+            collapsedHeight: 200,
+            child: AppMarkdown(
+              data: verdict,
+              selectable: true,
+            ),
           ),
         ],
       ),
@@ -798,6 +831,168 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         child: Text(
           'Failed to run comparison: $error',
           style: const TextStyle(color: AppColors.danger, fontSize: 12),
+        ),
+      ),
+    );
+  }
+  Widget _buildAccountCompare(bool isDark) {
+    return Column(
+      children: [
+        Text(
+          'Compare developers & organizations',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          children: [
+            Expanded(child: _buildAccountEmptySlot('Account 1', isDark, Colors.blue)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'VS',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white24 : Colors.black26,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+            Expanded(child: _buildAccountEmptySlot('Account 2', isDark, Colors.purple)),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 32),
+              const SizedBox(height: 16),
+              const Text(
+                'Account comparison AI models are currently training.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Soon you will be able to analyze commit velocities, language proficiencies, and contribution graphs side-by-side.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCodeCompare(bool isDark) {
+    return Column(
+      children: [
+        Text(
+          'Analyze code snippets for performance & complexity',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.white60 : Colors.black54,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 200,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                ),
+                child: Center(
+                  child: Text(
+                    'Paste Snippet A\nor select file...',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                height: 200,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                ),
+                child: Center(
+                  child: Text(
+                    'Paste Snippet B\nor select file...',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: FilledButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.psychology_rounded),
+            label: const Text('Run Static AI Analysis (Coming Soon)'),
+            style: FilledButton.styleFrom(
+              disabledBackgroundColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+              disabledForegroundColor: isDark ? Colors.white54 : Colors.black54,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountEmptySlot(String label, bool isDark, Color color) {
+    return Container(
+      height: 140,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_add_alt_1_rounded, color: color, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white54 : Colors.black54,
+              ),
+            ),
+          ],
         ),
       ),
     );

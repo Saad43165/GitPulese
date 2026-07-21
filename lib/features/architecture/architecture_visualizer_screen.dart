@@ -14,6 +14,8 @@ import '../../widgets/safe_page.dart';
 import '../../data/models/user_and_search_models.dart';
 import '../../data/models/repo_model.dart';
 import '../editor/ai_code_editor_screen.dart';
+import '../../widgets/glowing_indicator.dart';
+import '../../widgets/app_back_button.dart';
 
 class VisualNode {
   final String name;
@@ -87,7 +89,7 @@ class _ArchitectureVisualizerScreenState extends ConsumerState<ArchitectureVisua
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _radialKey,
           _metricsKey,
         ]);
@@ -292,16 +294,30 @@ class _ArchitectureVisualizerScreenState extends ConsumerState<ArchitectureVisua
     }
 
     void checkChildren(VisualNode parent, int depth, double minAngle, double maxAngle) {
-      final children = parent.children;
-      if (children.isEmpty) return;
+      final allChildren = parent.children;
+      if (allChildren.isEmpty) return;
+
+      final dirs = allChildren.where((c) => c.isDir).toList();
+      final files = allChildren.where((c) => !c.isDir).toList();
+
+      final List<VisualNode> childrenToDraw = [];
+      childrenToDraw.addAll(dirs);
+
+      const maxFilesToDraw = 6;
+      final int actualFilesToDraw = files.length <= maxFilesToDraw + 1 ? files.length : maxFilesToDraw;
+      childrenToDraw.addAll(files.take(actualFilesToDraw));
+
+      final int hiddenFilesCount = files.length > maxFilesToDraw + 1 ? (files.length - maxFilesToDraw) : 0;
+      final int totalDrawCount = childrenToDraw.length + (hiddenFilesCount > 0 ? 1 : 0);
 
       final angleRange = maxAngle - minAngle;
-      final angleStep = angleRange / children.length;
+      final angleStep = angleRange / totalDrawCount;
 
-      for (int i = 0; i < children.length; i++) {
-        final child = children[i];
+      for (int i = 0; i < childrenToDraw.length; i++) {
+        final child = childrenToDraw[i];
+        final double stagger = child.isDir ? 0.0 : ((i % 3 - 1) * 12.0);
+        final radius = orbitRadiusStep * (depth + 1) + stagger;
         final currentAngle = minAngle + (i * angleStep) + (angleStep / 2) + (progress * 0.02 * pi);
-        final radius = orbitRadiusStep * (depth + 1);
         final childOffset = center + Offset(cos(currentAngle) * radius, sin(currentAngle) * radius);
 
         double dist = (tapPos - childOffset).distance;
@@ -394,6 +410,7 @@ class _ArchitectureVisualizerScreenState extends ConsumerState<ArchitectureVisua
       child: Scaffold(
         backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: const Text('Codebase Visualizer'),
           actions: [
             IconButton(
@@ -442,7 +459,7 @@ class _ArchitectureVisualizerScreenState extends ConsumerState<ArchitectureVisua
                       child: FilledButton.icon(
                         onPressed: _isLoading ? null : _fetchArchitecture,
                         icon: _isLoading
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const GlowingIndicator(size: 18)
                             : const Icon(Icons.hub_rounded),
                         label: const Text('Analyze & Map Codebase'),
                       ),
@@ -1061,24 +1078,70 @@ class _RadialStructurePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final maxRadius = min(size.width, size.height) / 2 * 0.95;
 
-    final paintLine = Paint()
-      ..color = isDark ? Colors.white10 : Colors.black12
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
+    // Draw background HUD grids for premium visual feel
+    if (isDark) {
+      final gridPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.02)
+        ..strokeWidth = 0.8;
+      
+      for (double x = 0; x < size.width; x += 40) {
+        canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+      }
+      for (double y = 0; y < size.height; y += 40) {
+        canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+      }
+      
+      final crosshairPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.04)
+        ..strokeWidth = 1.0;
+      canvas.drawLine(Offset(center.dx, 0), Offset(center.dx, size.height), crosshairPaint);
+      canvas.drawLine(Offset(0, center.dy), Offset(size.width, center.dy), crosshairPaint);
+    }
+
+    // Shimmering ambient background particles
+    final particlePaint = Paint()..style = PaintingStyle.fill;
+    for (int p = 0; p < 12; p++) {
+      final double seedAngle = (p * 137.5) % (2 * pi);
+      final double orbitRadius = (p * 22.3 + 30) % (maxRadius * 0.9);
+      final double currentAngle = seedAngle + (progress * 0.04 * pi * (p % 2 == 0 ? 1 : -1));
+      final particleOffset = center + Offset(cos(currentAngle) * orbitRadius, sin(currentAngle) * orbitRadius);
+      particlePaint.color = (p % 2 == 0 ? const Color(0xFF8B5CF6) : const Color(0xFF0EA5E9))
+          .withValues(alpha: 0.05 + 0.03 * sin(progress * 2 * pi + p).abs());
+      canvas.drawCircle(particleOffset, 2.0 + (p % 3), particlePaint);
+    }
 
     final orbitRadiusStep = maxRadius / (maxDepth + 1);
+    
+    // Radar style dashed orbit rings
     for (int i = 1; i <= maxDepth; i++) {
-      canvas.drawCircle(center, orbitRadiusStep * i, paintLine);
+      final r = orbitRadiusStep * i;
+      final dashPaint = Paint()
+        ..color = isDark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.04)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+      
+      final double dashCount = 24 + i * 8;
+      final double anglePerDash = 2 * pi / (dashCount * 2);
+      
+      for (int d = 0; d < dashCount * 2; d += 2) {
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: r),
+          d * anglePerDash,
+          anglePerDash,
+          false,
+          dashPaint,
+        );
+      }
     }
 
     if (rootNode == null || rootNode!.children.isEmpty) {
-      _drawDemo(canvas, center, orbitRadiusStep, paintLine);
+      _drawDemo(canvas, center, orbitRadiusStep);
       return;
     }
 
     _drawNodeChildren(canvas, center, rootNode!, 0, 0, 2 * pi, orbitRadiusStep);
 
-    // Draw central node (Root)
+    // Draw root central node
     final isRootSelected = selectedNode == rootNode;
     if (isRootSelected) {
       canvas.drawCircle(
@@ -1100,16 +1163,30 @@ class _RadialStructurePainter extends CustomPainter {
     double maxAngle,
     double radiusStep,
   ) {
-    final children = parent.children;
-    if (children.isEmpty) return;
+    final allChildren = parent.children;
+    if (allChildren.isEmpty) return;
+
+    final dirs = allChildren.where((c) => c.isDir).toList();
+    final files = allChildren.where((c) => !c.isDir).toList();
+
+    final List<VisualNode> childrenToDraw = [];
+    childrenToDraw.addAll(dirs);
+
+    const maxFilesToDraw = 6;
+    final int actualFilesToDraw = files.length <= maxFilesToDraw + 1 ? files.length : maxFilesToDraw;
+    childrenToDraw.addAll(files.take(actualFilesToDraw));
+
+    final int hiddenFilesCount = files.length > maxFilesToDraw + 1 ? (files.length - maxFilesToDraw) : 0;
+    final int totalDrawCount = childrenToDraw.length + (hiddenFilesCount > 0 ? 1 : 0);
 
     final angleRange = maxAngle - minAngle;
-    final angleStep = angleRange / children.length;
+    final angleStep = angleRange / totalDrawCount;
 
-    for (int i = 0; i < children.length; i++) {
-      final child = children[i];
+    for (int i = 0; i < childrenToDraw.length; i++) {
+      final child = childrenToDraw[i];
+      final double stagger = child.isDir ? 0.0 : ((i % 3 - 1) * 12.0);
+      final radius = radiusStep * (depth + 1) + stagger;
       final currentAngle = minAngle + (i * angleStep) + (angleStep / 2) + (progress * 0.02 * pi);
-      final radius = radiusStep * (depth + 1);
       final childOffset = center + Offset(cos(currentAngle) * radius, sin(currentAngle) * radius);
 
       final parentRadius = radiusStep * depth;
@@ -1121,7 +1198,11 @@ class _RadialStructurePainter extends CustomPainter {
       final isSelected = selectedNode == child;
       final isMatchingSearch = searchQuery.isNotEmpty && child.name.toLowerCase().contains(searchQuery.toLowerCase());
       
-      // Node highlighting color based on type
+      // Determine if this connection line is part of the path leading to the selected file node
+      final isOnSelectedPath = selectedNode != null && 
+          (selectedNode!.path == child.path || selectedNode!.path.startsWith(child.path + '/'));
+
+      // Node colors based on extension types
       Color nodeColor = Colors.grey;
       if (child.isDir) {
         nodeColor = Colors.amber;
@@ -1140,16 +1221,28 @@ class _RadialStructurePainter extends CustomPainter {
         }
       }
 
-      // Draw connection lines
+      // Selected Path Neon Glow Behind the line
+      if (isOnSelectedPath) {
+        final glowPaint = Paint()
+          ..color = const Color(0xFF0EA5E9).withValues(alpha: 0.15)
+          ..strokeWidth = 6.0
+          ..style = PaintingStyle.stroke
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+        canvas.drawLine(parentOffset, childOffset, glowPaint);
+      }
+
+      // Draw connection line
       final linePaint = Paint()
-        ..color = (child.isDir ? AppColors.accent : Colors.grey)
-            .withValues(alpha: isSelected ? 0.8 : (isMatchingSearch ? 0.7 : (child.isDir ? 0.35 : 0.15)))
-        ..strokeWidth = isSelected ? 2.0 : (child.isDir ? 1.5 : 1.0)
+        ..color = isOnSelectedPath
+            ? const Color(0xFF0EA5E9)
+            : (child.isDir ? AppColors.accent : Colors.grey)
+                .withValues(alpha: isSelected ? 0.8 : (isMatchingSearch ? 0.7 : (child.isDir ? 0.35 : 0.15)))
+        ..strokeWidth = isOnSelectedPath ? 2.5 : (child.isDir ? 1.5 : 1.0)
         ..style = PaintingStyle.stroke;
 
       canvas.drawLine(parentOffset, childOffset, linePaint);
 
-      // Selected Pulsing Ring
+      // Selected node pulsing halo ring
       if (isSelected) {
         final selectPulsePaint = Paint()
           ..color = Colors.cyanAccent.withValues(alpha: 0.4)
@@ -1163,7 +1256,7 @@ class _RadialStructurePainter extends CustomPainter {
         canvas.drawCircle(childOffset, 10.0 + 2 * sin(progress * 4 * pi).abs(), selectRingPaint);
       }
 
-      // Search matching Pulsing Ring
+      // Search matching glow indicator
       if (isMatchingSearch && !isSelected) {
         final searchRingPaint = Paint()
           ..color = Colors.amberAccent
@@ -1172,15 +1265,13 @@ class _RadialStructurePainter extends CustomPainter {
         canvas.drawCircle(childOffset, 8.0 + 3 * sin(progress * 2 * pi).abs(), searchRingPaint);
       }
 
-      // Draw Node
+      // Draw the node core dot
       final nodePaint = Paint()
         ..color = isMatchingSearch ? Colors.amberAccent : nodeColor
         ..style = PaintingStyle.fill;
-
       canvas.drawCircle(childOffset, child.isDir ? 5.5 : 3.5, nodePaint);
 
-      // Draw Node Text Labels elegantly
-      // Render text if: Selected, matches search, or is a first-level directory
+      // Render name labels if focused
       final shouldDrawText = isSelected || isMatchingSearch || (depth == 0 && child.isDir);
       if (shouldDrawText) {
         final textSpan = TextSpan(
@@ -1214,13 +1305,61 @@ class _RadialStructurePainter extends CustomPainter {
         radiusStep,
       );
     }
+
+    // Draw the virtual "+X more files" node if there are hidden files
+    if (hiddenFilesCount > 0) {
+      final i = childrenToDraw.length;
+      final double stagger = ((i % 3 - 1) * 12.0);
+      final radius = radiusStep * (depth + 1) + stagger;
+      final currentAngle = minAngle + (i * angleStep) + (angleStep / 2) + (progress * 0.02 * pi);
+      final childOffset = center + Offset(cos(currentAngle) * radius, sin(currentAngle) * radius);
+
+      final parentRadius = radiusStep * depth;
+      final parentAngle = minAngle + angleRange / 2 + (progress * 0.02 * pi);
+      final parentOffset = depth == 0
+          ? center
+          : center + Offset(cos(parentAngle) * parentRadius, sin(parentAngle) * parentRadius);
+
+      final linePaint = Paint()
+        ..color = Colors.grey.withValues(alpha: 0.1)
+        ..strokeWidth = 1.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(parentOffset, childOffset, linePaint);
+
+      final nodePaint = Paint()
+        ..color = isDark ? Colors.white24 : Colors.black12
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(childOffset, 4.0, nodePaint);
+
+      // Draw label "+X files"
+      final textSpan = TextSpan(
+        text: '+$hiddenFilesCount files',
+        style: TextStyle(
+          color: isDark ? Colors.white30 : Colors.black38,
+          fontSize: 7.5,
+          fontStyle: FontStyle.italic,
+          backgroundColor: isDark ? Colors.black54 : Colors.white70,
+        ),
+      );
+      final tp = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout();
+      tp.paint(canvas, Offset(childOffset.dx + 6, childOffset.dy - tp.height / 2));
+    }
   }
 
-  void _drawDemo(Canvas canvas, Offset center, double orbitRadiusStep, Paint paintLine) {
+  void _drawDemo(Canvas canvas, Offset center, double orbitRadiusStep) {
     final paintAccent = Paint()
       ..color = AppColors.accent.withValues(alpha: 0.3)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
+
+    final paintLine = Paint()
+      ..color = isDark ? Colors.white10 : Colors.black12
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
 
     final numSpokes = 8;
     for (int i = 0; i < numSpokes; i++) {

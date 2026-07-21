@@ -159,9 +159,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final historyAsync = ref.watch(historyListProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafePage(
+    return Material(
+      color: Colors.transparent,
+      child: SafePage(
+        reserveBottomNav: true,
         child: historyAsync.when(
           data: (entries) {
             final filtered = _applyFilters(entries);
@@ -172,6 +173,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   PageHeader(
                     title: 'History Log',
                     subtitle: 'Your developer journey and activity trace',
+                    showBackButton: false,
                   ),
                   Expanded(
                     child: EmptyStateView(
@@ -189,6 +191,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               grouped.putIfAbsent(_sectionFor(e.timestamp), () => []).add(e);
             }
 
+            final flatItems = <_FlatHistoryItem>[];
+            for (final section in grouped.entries) {
+              flatItems.add(_HeaderItem(section.key));
+              for (int i = 0; i < section.value.length; i++) {
+                flatItems.add(_EntryItem(
+                  section.value[i],
+                  i,
+                  i == section.value.length - 1,
+                ));
+              }
+            }
+            flatItems.add(_FooterItem());
+
             // Calculate telemetry metrics
             final totalCount = entries.length;
             final searchCount = entries.where((e) => e.isSearch).length;
@@ -202,6 +217,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   subtitle: filtered.isEmpty
                       ? 'No matching logs found'
                       : '${filtered.length} active logs traced',
+                  showBackButton: false,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -333,7 +349,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                // 3. Interactive Trace Timeline
+                // 3. Interactive Trace Timeline (Flat ListView)
                 Expanded(
                   child: filtered.isEmpty
                       ? const EmptyStateView(
@@ -347,201 +363,251 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                               AppSpacing.pageHorizontal,
                               0,
                               AppSpacing.pageHorizontal,
-                              24,
+                              0,
                             ),
-                            itemCount: grouped.entries.length,
-                            itemBuilder: (context, sectionIndex) {
-                              final section = grouped.entries.elementAt(sectionIndex);
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Date Section Header
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 8,
-                                          height: 8,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: AppColors.accent,
-                                          ),
+                            itemCount: flatItems.length,
+                            itemBuilder: (context, index) {
+                              final item = flatItems[index];
+
+                              if (item is _HeaderItem) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppColors.accent,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          section.key.toUpperCase(),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 11,
-                                            letterSpacing: 1.5,
-                                            color: isDark ? Colors.white60 : Colors.black54,
-                                          ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        item.title.toUpperCase(),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 11,
+                                          letterSpacing: 1.5,
+                                          color: isDark ? Colors.white60 : Colors.black54,
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                  
-                                  // Timeline List of Entries
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: section.value.length,
-                                    itemBuilder: (context, index) {
-                                      final entry = section.value[index];
-                                      final isLast = index == section.value.length - 1;
-                                      final nodeColor = _badgeColor(entry.type);
-                                      final nodeIcon = _iconFor(entry.type);
+                                );
+                              }
 
-                                      return AnimationConfiguration.staggeredList(
-                                        position: index,
-                                        duration: const Duration(milliseconds: 375),
-                                        child: SlideAnimation(
-                                          verticalOffset: 30.0,
-                                          child: FadeInAnimation(
-                                            child: Dismissible(
-                                              key: ValueKey(entry.id),
-                                              direction: DismissDirection.endToStart,
-                                              background: Container(
-                                                alignment: Alignment.centerRight,
-                                                padding: const EdgeInsets.only(right: AppSpacing.xl),
-                                                decoration: BoxDecoration(
-                                                  gradient: const LinearGradient(
-                                                    colors: [Colors.orange, AppColors.danger],
-                                                  ),
-                                                  borderRadius: BorderRadius.circular(20),
-                                                ),
-                                                child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
-                                              ),
-                                              onDismissed: (_) => _deleteWithUndo(context, ref, entry),
-                                              child: IntrinsicHeight(
-                                                child: Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                                                  children: [
-                                                    // Timeline Vertical Trace Line
-                                                    Container(
-                                                      width: 32,
-                                                      margin: const EdgeInsets.only(right: 8),
-                                                      child: Stack(
-                                                        alignment: Alignment.topCenter,
-                                                        children: [
-                                                          // Vertical Connector Line
-                                                          if (!isLast || index > 0)
-                                                            Positioned(
-                                                              top: index == 0 ? 26 : 0,
-                                                              bottom: isLast ? null : 0,
-                                                              height: isLast ? 26 : null,
-                                                              width: 1.8,
-                                                              child: Container(
-                                                                color: isDark ? Colors.white12 : Colors.black12,
-                                                              ),
-                                                            ),
-                                                          // Glowing indicator node
-                                                          Positioned(
-                                                            top: 14,
-                                                            child: Container(
-                                                              width: 26,
-                                                              height: 26,
-                                                              decoration: BoxDecoration(
-                                                                shape: BoxShape.circle,
-                                                                color: isDark ? const Color(0xFF0F141C) : Colors.white,
-                                                                border: Border.all(color: nodeColor, width: 2),
-                                                                boxShadow: [
-                                                                  BoxShadow(
-                                                                    color: nodeColor.withValues(alpha: 0.35),
-                                                                    blurRadius: 8,
-                                                                  )
-                                                                ],
-                                                              ),
-                                                              child: Icon(nodeIcon, size: 12, color: nodeColor),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-
-                                                    // Glass Card Content
-                                                    Expanded(
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.symmetric(vertical: 6.0),
-                                                        child: AppSurface(
-                                                          onTap: () => _handleTap(context, ref, entry),
-                                                          padding: const EdgeInsets.all(AppSpacing.md),
-                                                          child: Row(
-                                                            children: [
-                                                              _HistoryAvatar(entry: entry, fallbackIcon: nodeIcon),
-                                                              const SizedBox(width: AppSpacing.md),
-                                                              Expanded(
-                                                                child: Column(
-                                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                                  children: [
-                                                                    Row(
-                                                                      children: [
-                                                                        _TypeBadge(
-                                                                          label: _labelFor(entry.type),
-                                                                          color: nodeColor,
-                                                                        ),
-                                                                        const SizedBox(width: 8),
-                                                                        Expanded(
-                                                                          child: Text.rich(
-                                                                            TextSpan(
-                                                                              children: _highlightText(
-                                                                                entry.query,
-                                                                                const TextStyle(
-                                                                                  fontWeight: FontWeight.bold,
-                                                                                  fontSize: 13.5,
-                                                                                ),
-                                                                              ),
-                                                                            ),
-                                                                            maxLines: 1,
-                                                                            overflow: TextOverflow.ellipsis,
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                    if (entry.subtitle != null && entry.subtitle!.isNotEmpty) ...[
-                                                                      const SizedBox(height: 4),
-                                                                      Text.rich(
-                                                                        TextSpan(
-                                                                          children: _highlightText(
-                                                                            entry.subtitle!,
-                                                                            TextStyle(
-                                                                              fontSize: 11,
-                                                                              color: isDark ? Colors.white60 : Colors.black54,
-                                                                            ),
-                                                                          ),
-                                                                        ),
-                                                                        maxLines: 2,
-                                                                        overflow: TextOverflow.ellipsis,
-                                                                      ),
-                                                                    ],
-                                                                    const SizedBox(height: 4),
-                                                                    Text(
-                                                                      timeago.format(entry.timestamp),
-                                                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                              const SizedBox(width: AppSpacing.sm),
-                                                              
-                                                              // Quick Actions based on type
-                                                              _buildCardQuickAction(context, ref, entry, isDark),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
+                              if (item is _FooterItem) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: AppSpacing.xl, bottom: 100),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Expanded(
+                                            child: Container(
+                                              height: 1,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    Colors.transparent,
+                                                    isDark ? Colors.white10 : Colors.black12,
                                                   ],
                                                 ),
                                               ),
                                             ),
                                           ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                            child: Icon(
+                                              Icons.history_toggle_off_rounded,
+                                              size: 16,
+                                              color: isDark ? Colors.white30 : Colors.black38,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Container(
+                                              height: 1,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    isDark ? Colors.white10 : Colors.black12,
+                                                    Colors.transparent,
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Activity trace limited to the last 100 events',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.white30 : Colors.black38,
+                                          letterSpacing: 0.5,
                                         ),
-                                      );
-                                    },
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                );
+                              }
+
+                              final entryItem = item as _EntryItem;
+                              final entry = entryItem.entry;
+                              final isLast = entryItem.isLastInSection;
+                              final indexInSec = entryItem.indexInSection;
+                              final nodeColor = _badgeColor(entry.type);
+                              final nodeIcon = _iconFor(entry.type);
+
+                              return AnimationConfiguration.staggeredList(
+                                position: index,
+                                duration: const Duration(milliseconds: 375),
+                                child: SlideAnimation(
+                                  verticalOffset: 30.0,
+                                  child: FadeInAnimation(
+                                    child: Dismissible(
+                                      key: ValueKey(entry.id),
+                                      direction: DismissDirection.endToStart,
+                                      background: Container(
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.only(right: AppSpacing.xl),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [Colors.orange, AppColors.danger],
+                                          ),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
+                                      ),
+                                      onDismissed: (_) => _deleteWithUndo(context, ref, entry),
+                                      child: IntrinsicHeight(
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            // Timeline Vertical Trace Line
+                                            Container(
+                                              width: 32,
+                                              margin: const EdgeInsets.only(right: 8),
+                                              child: Stack(
+                                                alignment: Alignment.topCenter,
+                                                children: [
+                                                  // Vertical Connector Line
+                                                  if (!isLast || indexInSec > 0)
+                                                    Positioned(
+                                                      top: indexInSec == 0 ? 26 : 0,
+                                                      bottom: isLast ? null : 0,
+                                                      height: isLast ? 26 : null,
+                                                      width: 1.8,
+                                                      child: Container(
+                                                        color: isDark ? Colors.white12 : Colors.black12,
+                                                      ),
+                                                    ),
+                                                  // Glowing indicator node
+                                                  Positioned(
+                                                    top: 14,
+                                                    child: Container(
+                                                      width: 26,
+                                                      height: 26,
+                                                      decoration: BoxDecoration(
+                                                        shape: BoxShape.circle,
+                                                        color: isDark ? const Color(0xFF0F141C) : Colors.white,
+                                                        border: Border.all(color: nodeColor, width: 2),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: nodeColor.withValues(alpha: 0.35),
+                                                            blurRadius: 8,
+                                                          )
+                                                        ],
+                                                      ),
+                                                      child: Icon(nodeIcon, size: 12, color: nodeColor),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // Glass Card Content
+                                            Expanded(
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                                child: AppSurface(
+                                                  onTap: () => _handleTap(context, ref, entry),
+                                                  padding: const EdgeInsets.all(AppSpacing.md),
+                                                  child: Row(
+                                                    children: [
+                                                      _HistoryAvatar(entry: entry, fallbackIcon: nodeIcon),
+                                                      const SizedBox(width: AppSpacing.md),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Row(
+                                                              children: [
+                                                                _TypeBadge(
+                                                                  label: _labelFor(entry.type),
+                                                                  color: nodeColor,
+                                                                ),
+                                                                const SizedBox(width: 8),
+                                                                Expanded(
+                                                                  child: Text.rich(
+                                                                    TextSpan(
+                                                                      children: _highlightText(
+                                                                        entry.query,
+                                                                        const TextStyle(
+                                                                          fontWeight: FontWeight.bold,
+                                                                          fontSize: 13.5,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                    maxLines: 1,
+                                                                    overflow: TextOverflow.ellipsis,
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            if (entry.subtitle != null && entry.subtitle!.isNotEmpty) ...[
+                                                              const SizedBox(height: 4),
+                                                              Text.rich(
+                                                                TextSpan(
+                                                                  children: _highlightText(
+                                                                    entry.subtitle!,
+                                                                    TextStyle(
+                                                                      fontSize: 11,
+                                                                      color: isDark ? Colors.white60 : Colors.black54,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                maxLines: 2,
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ],
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              timeago.format(entry.timestamp),
+                                                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: AppSpacing.sm),
+                                                      
+                                                      // Quick Actions based on type
+                                                      _buildCardQuickAction(context, ref, entry, isDark),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -552,13 +618,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           },
           loading: () => const Column(
             children: [
-              PageHeader(title: 'History Log', subtitle: 'Loading trace details...'),
+              PageHeader(title: 'History Log', subtitle: 'Loading trace details...', showBackButton: false),
               Expanded(child: ShimmerListCards()),
             ],
           ),
           error: (e, _) => Column(
             children: [
-              const PageHeader(title: 'History Log'),
+              const PageHeader(title: 'History Log', showBackButton: false),
               Expanded(
                 child: ErrorStateView(
                   message: e.toString(),
@@ -799,3 +865,20 @@ class _TypeBadge extends StatelessWidget {
     );
   }
 }
+
+abstract class _FlatHistoryItem {}
+
+class _HeaderItem extends _FlatHistoryItem {
+  final String title;
+  _HeaderItem(this.title);
+}
+
+class _EntryItem extends _FlatHistoryItem {
+  final HistoryEntry entry;
+  final int indexInSection;
+  final bool isLastInSection;
+  _EntryItem(this.entry, this.indexInSection, this.isLastInSection);
+}
+
+class _FooterItem extends _FlatHistoryItem {}
+

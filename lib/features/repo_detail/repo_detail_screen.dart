@@ -23,12 +23,14 @@ import '../../providers/zip_download_provider.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/services/haptic_service.dart';
 import '../../widgets/glowing_indicator.dart';
+import '../../widgets/app_back_button.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/detail_section.dart';
 import '../../widgets/state_views.dart';
 import '../compare/compare_screen.dart';
 import '../user_detail/user_detail_screen.dart';
 import '../devops/devops_workflows_screen.dart';
+import '../auth/auth_dialog.dart';
 import 'widgets/ai_summary_card.dart';
 import 'widgets/recent_commits_section.dart';
 import 'widgets/risk_checker_card.dart';
@@ -40,6 +42,7 @@ import 'widgets/source_code_section.dart';
 import '../../widgets/expandable_section.dart';
 import '../../widgets/shimmer_skeletons.dart';
 import '../../widgets/app_markdown.dart';
+import '../../widgets/safe_page.dart';
 
 class RepoDetailScreen extends ConsumerStatefulWidget {
   const RepoDetailScreen({super.key, required this.owner, required this.repoName});
@@ -62,7 +65,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
     if (!seen && mounted) {
       await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
-        ShowCaseWidget.of(context).startShowCase([
+        ShowcaseView.get().startShowCase([
           _aiSummaryKey,
           _riskKey,
           _actionBarKey,
@@ -77,13 +80,11 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
     final args = (owner: widget.owner, repo: widget.repoName);
     final repoAsync = ref.watch(repoDetailProvider(args));
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        top: false,
-        child: DecoratedBox(
-          decoration: AppDecorations.pageGradient(context),
-          child: repoAsync.when(
+    return SafePage(
+      useAurora: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: repoAsync.when(
         data: (repo) {
           if (!_loggedView) {
             _loggedView = true;
@@ -104,6 +105,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
               CustomScrollView(
                 slivers: [
               SliverAppBar(
+                leading: const AppBackButton(),
                 pinned: true,
                 expandedHeight: 64,
                 backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -400,11 +402,10 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
           message: e is GitHubApiException ? e.message : e.toString(),
           onRetry: () => ref.invalidate(repoDetailProvider(args)),
         ),
-        ),
-        ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _GlassmorphicActionBar extends ConsumerStatefulWidget {
@@ -454,11 +455,14 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
     final trackedAsync = ref.watch(isTrackedProvider(widget.repo.id));
     final starAsync = ref.watch(repoStarProvider((owner: widget.owner, repo: widget.repoName)));
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pat = ref.watch(githubPatProvider);
+    final isLoggedIn = pat != null && pat.isNotEmpty;
     
     final authUser = ref.watch(authenticatedUserProvider).valueOrNull;
     final isOwnRepo = authUser?.login.toLowerCase() == widget.owner.toLowerCase();
 
     Widget actionButton(String label, IconData icon, VoidCallback? onTap, {bool isActive = false, bool isLoading = false, double? progress}) {
+      final isLocked = icon == Icons.lock_outline_rounded;
       return Expanded(
         child: GestureDetector(
           onTap: () {
@@ -477,24 +481,30 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
                 height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isActive 
-                      ? AppColors.accent 
-                      : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
+                  color: isLocked
+                      ? (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03))
+                      : (isActive 
+                          ? AppColors.accent 
+                          : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05))),
                 ),
                 child: Center(
                   child: isLoading 
                       ? SizedBox(
                           width: 20, height: 20, 
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2, 
-                            color: Colors.white,
-                            value: progress,
-                          )
+                          child: progress == null
+                              ? const GlowingIndicator(size: 20)
+                              : CircularProgressIndicator(
+                                  strokeWidth: 2, 
+                                  color: Colors.white,
+                                  value: progress,
+                                ),
                         )
                       : Icon(
                           icon, 
                           size: 20,
-                          color: isActive ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                          color: isLocked
+                              ? (isDark ? Colors.white30 : Colors.black38)
+                              : (isActive ? Colors.white : (isDark ? Colors.white70 : Colors.black87)),
                         ),
                 ),
               ),
@@ -502,7 +512,11 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontSize: 10, 
+                  fontWeight: FontWeight.w700,
+                  color: isLocked ? (isDark ? Colors.white30 : Colors.black38) : null,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -541,29 +555,85 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
           if (!isOwnRepo) ...[
             starAsync.when(
               data: (starred) => actionButton(
-                starred ? 'Starred' : 'Star', 
-                starred ? Icons.star_rounded : Icons.star_border_rounded, 
+                !isLoggedIn
+                    ? 'Star'
+                    : (starred ? 'Starred' : 'Star'), 
+                !isLoggedIn
+                    ? Icons.lock_outline_rounded
+                    : (starred ? Icons.star_rounded : Icons.star_border_rounded), 
                 () async {
+                  if (!isLoggedIn) {
+                    showDialog(context: context, builder: (_) => const AuthDialog());
+                    return;
+                  }
                   try {
                     await ref.read(repoStarProvider((owner: widget.owner, repo: widget.repoName)).notifier).toggleStar();
-                  } catch (e) {}
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(e is GitHubApiException ? e.message : e.toString()),
+                          backgroundColor: AppColors.danger,
+                        ),
+                      );
+                    }
+                  }
                 },
-                isActive: starred,
+                isActive: isLoggedIn && starred,
               ),
               loading: () => actionButton('Star', Icons.star_border_rounded, null, isLoading: true),
               error: (_, __) => const SizedBox.shrink(),
             ),
-            actionButton(
-              'Fork', 
-              Icons.call_split_rounded, 
-              () async {
-                try {
-                  await ref.read(githubApiServiceProvider).forkRepo(widget.owner, widget.repoName);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Forked!'), backgroundColor: Colors.green));
+            // Fork button — driven by repoForkProvider
+            ref.watch(repoForkProvider((owner: widget.owner, repo: widget.repoName))).when(
+              data: (isForked) => actionButton(
+                !isLoggedIn
+                    ? 'Fork'
+                    : (isForked ? 'Forked ✓' : 'Fork'),
+                !isLoggedIn
+                    ? Icons.lock_outline_rounded
+                    : (isForked ? Icons.call_split_rounded : Icons.call_split_rounded),
+                () async {
+                  if (!isLoggedIn) {
+                    showDialog(context: context, builder: (_) => const AuthDialog());
+                    return;
                   }
-                } catch (e) {}
-              },
+                  if (isForked) {
+                    if (authUser != null) {
+                      final url = 'https://github.com/${authUser.login}/${widget.repoName}';
+                      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                    }
+                    return;
+                  }
+                  try {
+                    await ref.read(repoForkProvider((owner: widget.owner, repo: widget.repoName)).notifier).fork();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🍴 Fork created in your account!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(e is GitHubApiException ? e.message : 'Fork failed. Check your PAT has the "repo" scope.'),
+                          backgroundColor: AppColors.danger,
+                        ),
+                      );
+                    }
+                  }
+                },
+                isActive: isLoggedIn && isForked,
+              ),
+              loading: () => actionButton('Fork', Icons.call_split_rounded, null, isLoading: true),
+              error: (_, __) => actionButton(
+                !isLoggedIn ? 'Fork' : 'Fork',
+                !isLoggedIn ? Icons.lock_outline_rounded : Icons.call_split_rounded,
+                !isLoggedIn ? () => showDialog(context: context, builder: (_) => const AuthDialog()) : null,
+              ),
             ),
           ],
           actionButton(

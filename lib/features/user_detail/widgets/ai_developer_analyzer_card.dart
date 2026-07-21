@@ -8,6 +8,8 @@ import '../../../data/remote/groq_api_service.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../widgets/app_surface.dart';
 import '../../../widgets/glowing_indicator.dart';
+import '../../../widgets/app_markdown.dart';
+import '../../../widgets/expandable_section.dart';
 
 class AiDeveloperAnalyzerCard extends ConsumerWidget {
   const AiDeveloperAnalyzerCard({super.key, required this.user, required this.repos});
@@ -74,12 +76,11 @@ class AiDeveloperAnalyzerCard extends ConsumerWidget {
                     width: 1,
                   ),
                 ),
-                child: Text(
-                  analysis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.6,
-                    color: isDark ? Colors.white70 : Colors.black87,
+                child: ExpandableSection(
+                  collapsedHeight: 180,
+                  child: AppMarkdown(
+                    data: analysis,
+                    selectable: true,
                   ),
                 ),
               );

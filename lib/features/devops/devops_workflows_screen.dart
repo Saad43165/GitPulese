@@ -11,6 +11,9 @@ import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../data/models/user_and_search_models.dart';
 import '../../data/models/repo_model.dart';
+import '../../widgets/glowing_indicator.dart';
+import '../../widgets/app_back_button.dart';
+import '../auth/auth_dialog.dart';
 
 final workflowsFutureProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, ({String owner, String repo})>((ref, args) async {
   final api = ref.watch(githubApiServiceProvider);
@@ -62,7 +65,7 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
       if (!seen && mounted) {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
-          ShowCaseWidget.of(context).startShowCase([
+          ShowcaseView.get().startShowCase([
             _ownerKey,
             _repoKey,
             _connectKey,
@@ -161,11 +164,12 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return ShowCaseWidget(
-      builder: (context) => SafePage(
-        child: Scaffold(
-          backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
+    return SafePage(
+      useAurora: true,
+      child: Scaffold(
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
+            leading: const AppBackButton(),
             title: const Text('DevOps Control Center'),
             elevation: 0,
             backgroundColor: Colors.transparent,
@@ -324,8 +328,7 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildRepositorySelector(bool isDark, GhUser? authUser) {
@@ -812,11 +815,7 @@ class _RunsTab extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (spinning)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2.5),
-                        )
+                        const GlowingIndicator(size: 20)
                       else
                         Icon(statusIcon, color: statusColor, size: 22),
                       const SizedBox(width: AppSpacing.md),
@@ -865,7 +864,7 @@ class _RunsTab extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: GlowingIndicator()),
       error: (e, _) => Center(child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text('Error: ${e.toString()}', textAlign: TextAlign.center,),
@@ -979,10 +978,26 @@ class _WorkflowsTab extends ConsumerWidget {
                       ),
                     ),
                     if (state == 'active')
-                      IconButton(
-                        icon: const Icon(Icons.play_circle_fill_rounded, color: Colors.green, size: 30),
-                        onPressed: () => _showTriggerDialog(context, ref, w),
-                        tooltip: 'Trigger manually (workflow_dispatch)',
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final pat = ref.watch(githubPatProvider);
+                          final isLoggedIn = pat != null && pat.isNotEmpty;
+                          return IconButton(
+                            icon: Icon(
+                              isLoggedIn ? Icons.play_circle_fill_rounded : Icons.lock_outline_rounded,
+                              color: isLoggedIn ? Colors.green : Colors.grey,
+                              size: 30,
+                            ),
+                            onPressed: () {
+                              if (!isLoggedIn) {
+                                showDialog(context: context, builder: (_) => const AuthDialog());
+                              } else {
+                                _showTriggerDialog(context, ref, w);
+                              }
+                            },
+                            tooltip: isLoggedIn ? 'Trigger manually (workflow_dispatch)' : 'Login to trigger workflow',
+                          );
+                        },
                       ),
                   ],
                 ),
@@ -991,7 +1006,7 @@ class _WorkflowsTab extends ConsumerWidget {
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: GlowingIndicator()),
       error: (e, _) => Center(child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text('Error: ${e.toString()}', textAlign: TextAlign.center,),
@@ -1040,6 +1055,12 @@ class _WorkflowRunDetailsScreenState extends ConsumerState<WorkflowRunDetailsScr
   }
 
   Future<void> _rerun() async {
+    final pat = ref.read(githubPatProvider);
+    final isLoggedIn = pat != null && pat.isNotEmpty;
+    if (!isLoggedIn) {
+      showDialog(context: context, builder: (_) => const AuthDialog());
+      return;
+    }
     try {
       await ref.read(githubApiServiceProvider).rerunWorkflow(widget.owner, widget.repo, widget.runId);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1056,6 +1077,12 @@ class _WorkflowRunDetailsScreenState extends ConsumerState<WorkflowRunDetailsScr
   }
 
   Future<void> _cancel() async {
+    final pat = ref.read(githubPatProvider);
+    final isLoggedIn = pat != null && pat.isNotEmpty;
+    if (!isLoggedIn) {
+      showDialog(context: context, builder: (_) => const AuthDialog());
+      return;
+    }
     try {
       await ref.read(githubApiServiceProvider).cancelWorkflow(widget.owner, widget.repo, widget.runId);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1079,6 +1106,7 @@ class _WorkflowRunDetailsScreenState extends ConsumerState<WorkflowRunDetailsScr
       child: Scaffold(
         backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
         appBar: AppBar(
+          leading: const AppBackButton(),
           title: Text('${widget.workflowName} #${widget.runNumber}'),
           actions: [
             if (widget.status == 'in_progress' || widget.status == 'queued')
@@ -1099,7 +1127,7 @@ class _WorkflowRunDetailsScreenState extends ConsumerState<WorkflowRunDetailsScr
           future: _jobsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: GlowingIndicator());
             }
             if (snapshot.hasError) {
               return Center(child: Text('Error loading jobs: ${snapshot.error}'));
@@ -1198,11 +1226,7 @@ class _WorkflowRunDetailsScreenState extends ConsumerState<WorkflowRunDetailsScr
       statusColor = Colors.amber;
       statusIcon = Icons.hourglass_empty_rounded;
     } else if (status == 'in_progress') {
-      return SizedBox(
-        width: size,
-        height: size,
-        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
-      );
+      return GlowingIndicator(size: size);
     } else if (status == 'completed') {
       if (conclusion == 'success') {
         statusColor = Colors.green;
@@ -1262,6 +1286,7 @@ class _JobLogsScreenState extends ConsumerState<JobLogsScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0F172A), // Dark slate console background
         appBar: AppBar(
+          leading: const AppBackButton(),
           backgroundColor: const Color(0xFF1E293B),
           elevation: 0,
           title: _isSearching
@@ -1302,7 +1327,7 @@ class _JobLogsScreenState extends ConsumerState<JobLogsScreen> {
           future: _logsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: GlowingIndicator());
             }
             if (snapshot.hasError) {
               return Center(

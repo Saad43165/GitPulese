@@ -3,6 +3,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
+import '../../widgets/app_back_button.dart';
 import '../../data/models/repo_model.dart';
 import '../../core/notifications/home_widgets_ui.dart';
 
@@ -13,16 +14,16 @@ class WidgetsConfigurationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return DecoratedBox(
-      decoration: AppDecorations.pageGradient(context),
+    return SafePage(
+      useAurora: true,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: SafePage(
-        child: CustomScrollView(
+        body: CustomScrollView(
           slivers: [
             SliverAppBar(
+              leading: const AppBackButton(),
               pinned: true,
-              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              backgroundColor: Colors.transparent,
               title: const Text('Home Screen Widgets'),
               centerTitle: true,
             ),
@@ -87,7 +88,6 @@ class WidgetsConfigurationScreen extends StatelessWidget {
             ),
           ],
         ),
-      ),
       ),
     );
   }

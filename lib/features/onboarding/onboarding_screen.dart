@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/settings_providers.dart';
 import '../auth/auth_dialog.dart';
 import '../home/root_shell.dart';
+import '../../widgets/glowing_indicator.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -591,11 +592,7 @@ class _DevOpsPreview extends StatelessWidget {
         children: [
           Row(
             children: const [
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent),
-              ),
+              GlowingIndicator(size: 14),
               SizedBox(width: 8),
               Text(
                 'build_apk (run #42)',
