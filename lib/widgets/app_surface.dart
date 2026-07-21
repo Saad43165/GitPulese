@@ -97,36 +97,32 @@ class AppSurface extends StatelessWidget {
       child: Padding(
         // 1px gradient border padding
         padding: const EdgeInsets.all(1),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppSpacing.radiusLg - 1),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: baseFill,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusLg - 1),
-              ),
-              child: showAccentStripe
-                  ? IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Container(width: 3, color: stripe),
-                          Expanded(
-                            child: Padding(
-                              padding: padding ?? const EdgeInsets.all(AppSpacing.lg),
-                              child: child,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Padding(
-                      padding: padding ?? const EdgeInsets.all(AppSpacing.lg),
-                      child: child,
-                    ),
-            ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark 
+                ? const Color(0xFF161B22) 
+                : Colors.white,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusLg - 1),
           ),
+          child: showAccentStripe
+              ? IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(width: 3, color: stripe),
+                      Expanded(
+                        child: Padding(
+                          padding: padding ?? const EdgeInsets.all(AppSpacing.lg),
+                          child: child,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: padding ?? const EdgeInsets.all(AppSpacing.lg),
+                  child: child,
+                ),
         ),
       ),
     );

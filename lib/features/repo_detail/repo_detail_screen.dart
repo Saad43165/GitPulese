@@ -98,12 +98,16 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
               _checkAndShowTutorial();
             });
           }
-          final bookmarkedAsync = ref.watch(isBookmarkedProvider(repo.id));
+          // (Removed root-level watch to prevent global rebuilds)
 
           return Stack(
             children: [
-              CustomScrollView(
-                slivers: [
+              RefreshIndicator(
+                onRefresh: () async {
+                  ref.invalidate(repoDetailProvider(args));
+                },
+                child: CustomScrollView(
+                  slivers: [
               SliverAppBar(
                 leading: const AppBackButton(),
                 pinned: true,
@@ -135,17 +139,22 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       Share.share(repo.htmlUrl);
                     },
                   ),
-                  bookmarkedAsync.when(
-                    data: (saved) => IconButton(
-                      icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                          color: saved ? AppColors.accent : null),
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        ref.read(bookmarkActionsProvider).toggle(repo);
-                      },
-                    ),
-                    loading: () => const SizedBox(width: 48),
-                    error: (_, __) => const SizedBox(width: 48),
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final bookmarkedAsync = ref.watch(isBookmarkedProvider(repo.id));
+                      return bookmarkedAsync.when(
+                        data: (saved) => IconButton(
+                          icon: Icon(saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                              color: saved ? AppColors.accent : null),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            ref.read(bookmarkActionsProvider).toggle(repo);
+                          },
+                        ),
+                        loading: () => const SizedBox(width: 48),
+                        error: (_, __) => const SizedBox(width: 48),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -377,6 +386,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                 ),
               ),
                 ],
+              ),
               ),
               Positioned(
                 bottom: 24,

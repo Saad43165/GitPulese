@@ -9,6 +9,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/repo_model.dart';
+import '../../data/models/user_and_search_models.dart';
 import '../../providers/ai_providers.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/app_surface.dart';
@@ -49,6 +50,20 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   final GlobalKey _arenaKey = GlobalKey();
   int _selectedMode = 0; // 0 = Repos, 1 = Accounts, 2 = Code
 
+  // State for Account Compare
+  GhUser? _accountUser1;
+  GhUser? _accountUser2;
+  String? _accountAiResult;
+  String? _accountErrorMsg;
+  bool _isAccountAnalyzing = false;
+
+  // State for Code Compare
+  final TextEditingController _code1Controller = TextEditingController();
+  final TextEditingController _code2Controller = TextEditingController();
+  String? _codeAiResult;
+  String? _codeErrorMsg;
+  bool _isCodeAnalyzing = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +84,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _code1Controller.dispose();
+    _code2Controller.dispose();
     super.dispose();
   }
 
@@ -633,17 +650,17 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       decoration: BoxDecoration(
         color: isDark
             ? Colors.white.withValues(alpha: 0.02)
-            : Colors.black.withValues(alpha: 0.02),
+            : Colors.black.withValues(alpha: 0.06), // Darker for light mode
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? Colors.white12 : Colors.black12,
-          style: BorderStyle.none, // simple border
+          color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.15), // Stronger border
+          width: 1.5,
         ),
       ),
       child: Center(
         child: Icon(
           Icons.add_rounded,
-          color: isDark ? Colors.white38 : Colors.black38,
+          color: isDark ? Colors.white38 : Colors.black45,
           size: 28,
         ),
       ),
@@ -835,7 +852,103 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       ),
     );
   }
+  Widget _buildAccountSlot(GhUser? user, bool isDark, String hintText, Color iconColor) {
+    if (user != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: iconColor.withValues(alpha: 0.5)),
+        ),
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: CircleAvatar(backgroundImage: NetworkImage(user.avatarUrl)),
+          title: Text(user.login, style: const TextStyle(fontWeight: FontWeight.bold)),
+          trailing: IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.redAccent),
+            onPressed: () {
+              ref.read(accountCompareListProvider.notifier).remove(user.id);
+              setState(() { _accountAiResult = null; _accountErrorMsg = null; });
+            },
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+      ),
+      child: Autocomplete<GhUser>(
+        optionsBuilder: (TextEditingValue textEditingValue) async {
+          if (textEditingValue.text.length < 2) return const Iterable<GhUser>.empty();
+          try {
+            final api = ref.read(githubApiServiceProvider);
+            final result = await api.searchUsers(query: textEditingValue.text, perPage: 5);
+            return result.items;
+          } catch (_) {
+            return const Iterable<GhUser>.empty();
+          }
+        },
+        displayStringForOption: (GhUser option) => option.login,
+        onSelected: (GhUser selection) {
+          ref.read(accountCompareListProvider.notifier).add(selection);
+        },
+        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+          return TextField(
+            controller: controller,
+            focusNode: focusNode,
+            decoration: InputDecoration(
+              icon: Icon(Icons.person_rounded, color: iconColor),
+              hintText: hintText,
+              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+              border: InputBorder.none,
+            ),
+            style: TextStyle(color: isDark ? Colors.white : Colors.black),
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (BuildContext context, int index) {
+                    final GhUser option = options.elementAt(index);
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 12,
+                        backgroundImage: NetworkImage(option.avatarUrl),
+                      ),
+                      title: Text(option.login, style: TextStyle(color: isDark ? Colors.white : Colors.black)),
+                      onTap: () => onSelected(option),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildAccountCompare(bool isDark) {
+    final accountList = ref.watch(accountCompareListProvider);
+    final user1 = accountList.isNotEmpty ? accountList[0] : null;
+    final user2 = accountList.length > 1 ? accountList[1] : null;
+
     return Column(
       children: [
         Text(
@@ -846,50 +959,109 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        Row(
-          children: [
-            Expanded(child: _buildAccountEmptySlot('Account 1', isDark, Colors.blue)),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'VS',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white24 : Colors.black26,
-                  fontStyle: FontStyle.italic,
-                ),
+        _buildAccountSlot(user1, isDark, 'Search first account (e.g. yyx990803)', Colors.blue),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              'VS',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white24 : Colors.black26,
+                fontStyle: FontStyle.italic,
               ),
             ),
-            Expanded(child: _buildAccountEmptySlot('Account 2', isDark, Colors.purple)),
-          ],
+          ),
         ),
+        _buildAccountSlot(user2, isDark, 'Search second account (e.g. gaearon)', Colors.purple),
         const SizedBox(height: AppSpacing.xxl),
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-          ),
-          child: Column(
-            children: [
-              const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 32),
-              const SizedBox(height: 16),
-              const Text(
-                'Account comparison AI models are currently training.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        if (_isAccountAnalyzing)
+          _buildAiLoadingPanel(isDark)
+        else if (_accountErrorMsg != null)
+          _buildAiErrorPanel(_accountErrorMsg!)
+        else if (_accountAiResult != null)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.5), width: 2),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.psychology_rounded, color: AppColors.accent, size: 32),
+                const SizedBox(height: 16),
+                const Text(
+                  'AI Battle Verdict',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 12),
+                AppMarkdown(data: _accountAiResult!),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: FilledButton.icon(
+              onPressed: (user1 == null || user2 == null) ? null : () async {
+                setState(() {
+                  _isAccountAnalyzing = true;
+                  _accountErrorMsg = null;
+                  _accountAiResult = null;
+                });
+                try {
+                  final github = ref.read(githubApiServiceProvider);
+                  
+                  // Fetch rich data in parallel for both users
+                  final results = await Future.wait([
+                    github.getUserDetail(user1.login),
+                    github.getUserRepos(user1.login, perPage: 5),
+                    github.getUserDetail(user2.login),
+                    github.getUserRepos(user2.login, perPage: 5),
+                  ]);
+
+                  final user1Detail = results[0] as GhUser;
+                  final user1Repos = results[1] as List<GhRepo>;
+                  final user2Detail = results[2] as GhUser;
+                  final user2Repos = results[3] as List<GhRepo>;
+
+                  final groq = ref.read(groqApiServiceProvider);
+                  final prompt = '''
+Compare these two GitHub developers based on their profile and repositories.
+
+User 1: ${user1Detail.login}
+- Name: ${user1Detail.name ?? 'Unknown'}
+- Followers: ${user1Detail.followers}
+- Public Repos: ${user1Detail.publicRepos}
+- Bio: ${user1Detail.bio ?? 'None'}
+- Top Repos: ${user1Repos.map((r) => '${r.name} (⭐ ${r.stargazersCount} - ${r.language ?? 'Mixed'})').join(', ')}
+
+User 2: ${user2Detail.login}
+- Name: ${user2Detail.name ?? 'Unknown'}
+- Followers: ${user2Detail.followers}
+- Public Repos: ${user2Detail.publicRepos}
+- Bio: ${user2Detail.bio ?? 'None'}
+- Top Repos: ${user2Repos.map((r) => '${r.name} (⭐ ${r.stargazersCount} - ${r.language ?? 'Mixed'})').join(', ')}
+
+Act as an expert technical recruiter and open-source analyst. Provide a brief, fun, yet highly insightful verdict on their respective coding styles, areas of expertise, and who wins this battle and why.
+''';
+                  final res = await groq.explainCode(filename: 'Account Comparison', code: prompt);
+                  if (mounted) setState(() { _isAccountAnalyzing = false; _accountAiResult = res; });
+                } catch (e) {
+                  if (mounted) setState(() { _isAccountAnalyzing = false; _accountErrorMsg = e.toString(); });
+                }
+              },
+              icon: const Icon(Icons.sports_martial_arts_rounded),
+              label: const Text('Run Account AI Analysis'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Soon you will be able to analyze commit velocities, language proficiencies, and contribution graphs side-by-side.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: isDark ? Colors.white60 : Colors.black54),
-              ),
-            ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -905,96 +1077,117 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                height: 200,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-                ),
-                child: Center(
-                  child: Text(
-                    'Paste Snippet A\nor select file...',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Container(
-                height: 200,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-                ),
-                child: Center(
-                  child: Text(
-                    'Paste Snippet B\nor select file...',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xxl),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: FilledButton.icon(
-            onPressed: null,
-            icon: const Icon(Icons.psychology_rounded),
-            label: const Text('Run Static AI Analysis (Coming Soon)'),
-            style: FilledButton.styleFrom(
-              disabledBackgroundColor: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-              disabledForegroundColor: isDark ? Colors.white54 : Colors.black54,
+        Container(
+          height: 250,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+          ),
+          child: TextField(
+            controller: _code1Controller,
+            maxLines: null,
+            expands: true,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            decoration: InputDecoration(
+              hintText: 'Paste Code Snippet A here...',
+              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+              border: InputBorder.none,
             ),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Text(
+              'VS',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: isDark ? Colors.white24 : Colors.black26,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        ),
+        Container(
+          height: 250,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+          ),
+          child: TextField(
+            controller: _code2Controller,
+            maxLines: null,
+            expands: true,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            decoration: InputDecoration(
+              hintText: 'Paste Code Snippet B here...',
+              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xxl),
+        if (_isCodeAnalyzing)
+          _buildAiLoadingPanel(isDark)
+        else if (_codeErrorMsg != null)
+          _buildAiErrorPanel(_codeErrorMsg!)
+        else if (_codeAiResult != null)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.5), width: 2),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.code_rounded, color: AppColors.accent, size: 32),
+                const SizedBox(height: 16),
+                const Text(
+                  'Static Analysis Results',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 12),
+                AppMarkdown(data: _codeAiResult!),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: FilledButton.icon(
+              onPressed: () async {
+                if (_code1Controller.text.trim().isEmpty || _code2Controller.text.trim().isEmpty) return;
+                setState(() {
+                  _isCodeAnalyzing = true;
+                  _codeErrorMsg = null;
+                  _codeAiResult = null;
+                });
+                try {
+                  final groq = ref.read(groqApiServiceProvider);
+                  final prompt = 'Compare these two code snippets:\n\nSnippet A:\n${_code1Controller.text}\n\nSnippet B:\n${_code2Controller.text}\n\nAnalyze time/space complexity and recommend which one is better and why.';
+                  final res = await groq.explainCode(filename: 'Code Comparison', code: prompt);
+                  if (mounted) setState(() { _isCodeAnalyzing = false; _codeAiResult = res; });
+                } catch (e) {
+                  if (mounted) setState(() { _isCodeAnalyzing = false; _codeErrorMsg = e.toString(); });
+                }
+              },
+              icon: const Icon(Icons.psychology_rounded),
+              label: const Text('Run Static AI Analysis'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildAccountEmptySlot(String label, bool isDark, Color color) {
-    return Container(
-      height: 140,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          )
-        ],
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.person_add_alt_1_rounded, color: color, size: 32),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white54 : Colors.black54,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

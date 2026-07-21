@@ -49,12 +49,23 @@ class BookmarksScreen extends ConsumerWidget {
               );
             }
 
+            final groupedItems = <String, List<Map<String, dynamic>>>{};
+            for (var item in items) {
+              final lang = (item['language'] as String?)?.isNotEmpty == true ? item['language'] as String : 'Other';
+              groupedItems.putIfAbsent(lang, () => []).add(item);
+            }
+            final sortedCategories = groupedItems.keys.toList()..sort((a, b) {
+              if (a == 'Other') return 1;
+              if (b == 'Other') return -1;
+              return a.compareTo(b);
+            });
+
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverAppBar(
                   leading: const AppBackButton(),
-                  title: const Text('Saved Items'),
+                  title: const Text('Saved Libraries'),
                   elevation: 0,
                   backgroundColor: Colors.transparent,
                   pinned: true,
@@ -73,7 +84,7 @@ class BookmarksScreen extends ConsumerWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     child: Text(
-                      '${items.length} ${items.length == 1 ? 'repository' : 'repositories'} bookmarked',
+                      '${items.length} ${items.length == 1 ? 'repository' : 'repositories'} categorized',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -83,147 +94,142 @@ class BookmarksScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) {
-                        final item = items[i];
-                        final compactCards = ref.watch(compactCardsProvider);
-                        final parts = (item['fullName'] as String).split('/');
-                        final repoName = parts.length == 2 ? parts[1] : item['fullName'] as String;
-                        final owner = parts.length == 2 ? parts[0] : '';
-                        final language = item['language'] as String?;
+                ...sortedCategories.map((category) {
+                  final categoryItems = groupedItems[category]!;
+                  return SliverMainAxisGroup(
+                    slivers: [
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _CategoryHeaderDelegate(
+                          category: category,
+                          isDark: isDark,
+                          itemCount: categoryItems.length,
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, i) {
+                              final item = categoryItems[i];
+                              final compactCards = ref.watch(compactCardsProvider);
+                              final parts = (item['fullName'] as String).split('/');
+                              final repoName = parts.length == 2 ? parts[1] : item['fullName'] as String;
+                              final owner = parts.length == 2 ? parts[0] : '';
+                              final language = item['language'] as String?;
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: AppSurface(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              if (parts.length == 2) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => RepoDetailScreen(
-                                      owner: owner,
-                                      repoName: repoName,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: compactCards ? 12 : 16,
-                            ),
-                            showAccentStripe: true,
-                            accentColor: AppColors.star,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(4),
-                                            child: CachedNetworkImage(
-                                              imageUrl: item['avatarUrl'] as String? ?? '',
-                                              width: 16,
-                                              height: 16,
-                                              errorWidget: (_, __, ___) => const Icon(Icons.source_rounded, size: 16),
-                                            ),
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: AppSurface(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    if (parts.length == 2) {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => RepoDetailScreen(
+                                            owner: owner,
+                                            repoName: repoName,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              owner,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: isDark ? Colors.white54 : Colors.black54,
-                                              ),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: compactCards ? 12 : 16,
+                                  ),
+                                  showAccentStripe: true,
+                                  accentColor: AppColors.star,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  child: CachedNetworkImage(
+                                                    imageUrl: item['avatarUrl'] as String? ?? '',
+                                                    width: 16,
+                                                    height: 16,
+                                                    errorWidget: (_, __, ___) => const Icon(Icons.source_rounded, size: 16),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    owner,
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: isDark ? Colors.white54 : Colors.black54,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              repoName,
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            if (item['description'] != null && (item['description'] as String).isNotEmpty && !compactCards) ...[
+                                              const SizedBox(height: 6),
+                                              Text(
+                                                item['description'] as String,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  height: 1.3,
+                                                  color: isDark ? Colors.white38 : Colors.black38,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                formatCount(item['stars'] as int? ?? 0),
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        repoName,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (item['description'] != null && (item['description'] as String).isNotEmpty && !compactCards) ...[
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          item['description'] as String,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            height: 1.3,
-                                            color: isDark ? Colors.white38 : Colors.black38,
-                                          ),
-                                        ),
-                                      ],
-                                      if (language != null && language.isNotEmpty) ...[
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.circle,
-                                              size: 8,
-                                              color: AppColors.colorForLanguage(language),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              language,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: isDark ? Colors.white38 : Colors.black38,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.star_rounded, size: 16, color: AppColors.star),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          formatCount(item['stars'] as int? ?? 0),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                              );
+                            },
+                            childCount: categoryItems.length,
                           ),
-                        );
-                      },
-                      childCount: items.length,
-                    ),
-                  ),
-                ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+                const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
               ],
             );
           },
@@ -294,5 +300,63 @@ class BookmarksScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class _CategoryHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final String category;
+  final bool isDark;
+  final int itemCount;
+
+  _CategoryHeaderDelegate({
+    required this.category,
+    required this.isDark,
+    required this.itemCount,
+  });
+
+  @override
+  double get minExtent => 48.0;
+  @override
+  double get maxExtent => 48.0;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: isDark ? const Color(0xFF0D1117) : const Color(0xFFF3F4F6),
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          Icon(
+            Icons.folder_special_rounded,
+            size: 18,
+            color: category == 'Other' ? (isDark ? Colors.white54 : Colors.black54) : AppColors.colorForLanguage(category),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            category,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$itemCount',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _CategoryHeaderDelegate oldDelegate) {
+    return category != oldDelegate.category || isDark != oldDelegate.isDark || itemCount != oldDelegate.itemCount;
   }
 }

@@ -955,4 +955,19 @@ class GitHubApiService {
       throw GitHubApiException.fromDioError(e);
     }
   }
+  /// Fetch public events for a user (GET /users/{username}/events/public)
+  Future<List<Map<String, dynamic>>> getUserEvents(String username, {int page = 1, int perPage = 30}) async {
+    try {
+      final response = await _dio.get(
+        '/users/$username/events/public',
+        queryParameters: {
+          'page': page,
+          'per_page': perPage,
+        },
+      );
+      return List<Map<String, dynamic>>.from(response.data as List);
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
 }

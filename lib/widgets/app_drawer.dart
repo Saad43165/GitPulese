@@ -13,6 +13,7 @@ import '../features/tracked_repos/tracked_repos_screen.dart';
 import '../features/auth/auth_dialog.dart';
 import '../features/user_detail/user_detail_screen.dart';
 import '../features/editor/ai_code_editor_screen.dart';
+import '../features/activity/activity_feed_screen.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -211,6 +212,10 @@ class AppDrawer extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       physics: const BouncingScrollPhysics(),
                       children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+                          child: Text('EXPLORE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white38 : Colors.black38, letterSpacing: 1.2)),
+                        ),
                         _buildNavItem(
                           context,
                           isDark: isDark,
@@ -241,6 +246,11 @@ class AppDrawer extends ConsumerWidget {
                             Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TrackedReposScreen()));
                           },
                         ),
+                        
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+                          child: Text('DEVELOPER TOOLS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white38 : Colors.black38, letterSpacing: 1.2)),
+                        ),
                         _buildNavItem(
                           context,
                           isDark: isDark,
@@ -255,6 +265,27 @@ class AppDrawer extends ConsumerWidget {
                         _buildNavItem(
                           context,
                           isDark: isDark,
+                          icon: Icons.timeline_rounded,
+                          title: 'My Activity Feed',
+                          iconColor: const Color(0xFFF59E0B),
+                          onTap: () {
+                            Navigator.pop(context);
+                            final username = authUser.valueOrNull?.login;
+                            if (username != null) {
+                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => ActivityFeedScreen(username: username)));
+                            } else {
+                              showDialog(context: context, builder: (_) => const AuthDialog());
+                            }
+                          },
+                        ),
+                        
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+                          child: Text('PREFERENCES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isDark ? Colors.white38 : Colors.black38, letterSpacing: 1.2)),
+                        ),
+                        _buildNavItem(
+                          context,
+                          isDark: isDark,
                           icon: Icons.settings_rounded,
                           title: 'App Settings',
                           iconColor: Colors.grey,
@@ -262,19 +293,6 @@ class AppDrawer extends ConsumerWidget {
                             Navigator.pop(context);
                             Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
                           },
-                        ),
-                        
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-                          child: Text(
-                            'PREFERENCES',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white38 : Colors.black38,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
                         ),
       
                         _buildNavItem(

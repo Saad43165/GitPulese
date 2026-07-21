@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/manifest_parser.dart';
 import '../data/models/repo_model.dart';
+import '../data/models/user_and_search_models.dart';
 import '../data/remote/github_api_service.dart';
 import '../data/remote/groq_api_service.dart';
 import 'core_providers.dart';
 import 'settings_providers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final groqApiServiceProvider = Provider<GroqApiService>((ref) => GroqApiService());
 
@@ -29,6 +31,26 @@ class CompareListNotifier extends StateNotifier<List<GhRepo>> {
 
 final compareListProvider =
     StateNotifierProvider<CompareListNotifier, List<GhRepo>>((ref) => CompareListNotifier());
+
+class AccountCompareListNotifier extends StateNotifier<List<GhUser>> {
+  AccountCompareListNotifier() : super([]);
+
+  void add(GhUser user) {
+    if (state.any((u) => u.id == user.id) || state.length >= 2) return;
+    state = [...state, user];
+  }
+
+  void remove(int userId) {
+    state = state.where((u) => u.id != userId).toList();
+  }
+
+  void clear() => state = [];
+
+  bool contains(int userId) => state.any((u) => u.id == userId);
+}
+
+final accountCompareListProvider =
+    StateNotifierProvider<AccountCompareListNotifier, List<GhUser>>((ref) => AccountCompareListNotifier());
 
 // ---------- Similar / Alternative Repos ----------
 
@@ -130,6 +152,18 @@ class RepoSummaryNotifier extends StateNotifier<AsyncValue<String>?> {
   Future<void> summarize(GhRepo repo, String? readme) async {
     state = const AsyncValue.loading();
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = 'ai_summary_${repo.id}';
+      
+      // Try to read from local cache first for instant offline support
+      final cachedSummary = prefs.getString(cacheKey);
+      if (cachedSummary != null) {
+        state = AsyncValue.data(cachedSummary);
+        // Optionally fetch in background to refresh, but since it's an AI summary, 
+        // it doesn't change often, so we can just return it.
+        return;
+      }
+
       final groq = GroqApiService();
       final summary = await groq.summarizeRepo(
         repoFullName: repo.fullName,
@@ -138,11 +172,24 @@ class RepoSummaryNotifier extends StateNotifier<AsyncValue<String>?> {
         primaryLanguage: repo.language,
         topics: repo.topics,
       );
+      
       if (!mounted) return;
+      
+      // Save to local cache
+      await prefs.setString(cacheKey, summary);
+      
       state = AsyncValue.data(summary);
     } catch (e) {
       if (!mounted) return;
-      state = AsyncValue.error(e, StackTrace.current);
+      
+      // Fallback: If offline and API fails, check if we have ANY cached version
+      final prefs = await SharedPreferences.getInstance();
+      final cachedSummary = prefs.getString('ai_summary_${repo.id}');
+      if (cachedSummary != null) {
+        state = AsyncValue.data(cachedSummary);
+      } else {
+        state = AsyncValue.error(e, StackTrace.current);
+      }
     }
   }
 
@@ -481,9 +528,7 @@ class FollowNotifier extends StateNotifier<AsyncValue<bool>> {
       await _api.followUser(_username, follow: next);
       // Update confirmed server state
       _serverState = next;
-
-      // 3. Invalidate the following list so it refreshes on next open
-      _ref.invalidate(userDetailProvider(_username));
+      // We rely on optimistic updates and followersDelta rather than invalidating the entire screen.
     } catch (e) {
       // Revert optimistic update on failure
       state = AsyncValue.data(current);

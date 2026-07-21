@@ -34,7 +34,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
   bool _copied = false;
 
   // Manual PAT input fallback state
-  bool _showManual = false;
+  bool _showManual = true;
   bool _validatingManual = false;
   final _manualController = TextEditingController();
   bool _obscureManual = true;
@@ -43,7 +43,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
   @override
   void initState() {
     super.initState();
-    _startDeviceFlow();
+    // Device flow will only start if they click "Use Device Code instead"
   }
 
   @override
@@ -354,6 +354,7 @@ class _AuthDialogState extends ConsumerState<AuthDialog> {
                     setState(() {
                       _showManual = false;
                       _manualError = null;
+                      if (_userCode == null) _startDeviceFlow();
                     });
                   },
                   child: const Text('Use Device Code instead'),

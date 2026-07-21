@@ -375,10 +375,60 @@ class _RecentSearchesView extends ConsumerWidget {
         final searches = uniqueSearches.values.toList();
 
         if (searches.isEmpty) {
-          return const EmptyStateView(
-            icon: Icons.travel_explore_rounded,
-            title: 'Explore the universe',
-            subtitle: 'Search "machine learning", "flutter", or "react"',
+          final presetPicks = [
+            'machine learning', 'flutter ui', 'react native', 
+            'linux kernel', 'rust web', 'ios development'
+          ];
+          
+          return ListView(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: AppSpacing.lg),
+            children: [
+              const EmptyStateView(
+                icon: Icons.travel_explore_rounded,
+                title: 'Explore the universe',
+                subtitle: 'Tap a trending topic or search above to begin',
+              ),
+              const SizedBox(height: 32),
+              Text(
+                'Trending Topics 🔥',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: presetPicks.map((q) => GestureDetector(
+                  onTap: () => onSelect(q),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.trending_up_rounded, size: 14, color: AppColors.accentSoft),
+                        const SizedBox(width: 6),
+                        Text(
+                          q,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )).toList(),
+              ),
+            ],
           );
         }
 

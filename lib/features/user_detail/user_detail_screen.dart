@@ -1,6 +1,8 @@
 import 'package:gitexplorer/core/network/dio_client.dart' show GitHubApiException;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -122,9 +124,16 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
               });
             }
 
-            return CustomScrollView(
-              slivers: [
-                _buildSliverAppBar(user, isDark),
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(_userDetailProvider(widget.username));
+                ref.invalidate(_userReposProvider(widget.username));
+                ref.invalidate(_userFollowersProvider(widget.username));
+                ref.invalidate(_userFollowingProvider(widget.username));
+              },
+              child: CustomScrollView(
+                slivers: [
+                  _buildSliverAppBar(user, isDark),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
@@ -270,18 +279,23 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                 ),
 
                 // Repositories List
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.folder_rounded, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Repositories',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _StickyHeaderDelegate(
+                    height: 50.0,
+                    isDark: isDark,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.folder_rounded, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Repositories',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -325,6 +339,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                   error: (e, _) => SliverToBoxAdapter(child: Text('Could not load repos: $e')),
                 ),
               ],
+            ),
             );
           },
           loading: () => const ShimmerUserDetailPage(),
@@ -348,6 +363,44 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
       elevation: 0,
       shadowColor: Colors.black.withValues(alpha: 0.15),
       actions: [
+        Consumer(
+          builder: (context, ref, _) {
+            final compareList = ref.watch(accountCompareListProvider);
+            final isInCompare = compareList.any((u) => u.id == user.id);
+            return IconButton(
+              icon: Icon(
+                isInCompare ? Icons.sports_martial_arts_rounded : Icons.sports_martial_arts_outlined,
+                color: isInCompare ? AppColors.accent : (isDark ? Colors.white : Colors.black),
+              ),
+              tooltip: isInCompare ? 'Remove from Compare Arena' : 'Add to Compare Arena',
+              onPressed: () {
+                if (isInCompare) {
+                  HapticFeedback.lightImpact();
+                  ref.read(accountCompareListProvider.notifier).remove(user.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Removed from Compare Arena')),
+                  );
+                } else {
+                  if (compareList.length >= 2) {
+                    HapticFeedback.vibrate();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Arena is full! Remove an account first.'),
+                        backgroundColor: AppColors.danger,
+                      ),
+                    );
+                    return;
+                  }
+                  HapticFeedback.heavyImpact();
+                  ref.read(accountCompareListProvider.notifier).add(user);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Added to Compare Arena!')),
+                  );
+                }
+              },
+            );
+          },
+        ),
         IconButton(
           icon: Icon(AdaptiveIcons.share),
           onPressed: () => Share.share('https://github.com/${widget.username}'),
@@ -579,17 +632,10 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
         final notifier = ref.read(userFollowProvider(user.login).notifier);
         final followersDelta = notifier.followersDelta;
 
-        // Following count: only apply delta on OWN profile, using per-target map
-        // Sum all per-target deltas that the owner triggered this session
-        final ownFollowingDelta = isOwnProfile
-            ? ref.watch(followDeltaMapProvider).values.fold(0, (a, b) => a + b)
-            : 0;
-
         // Clamp so counts never go below 0
         final displayFollowers =
             (user.followers + followersDelta).clamp(0, double.maxFinite).toInt();
-        final displayFollowing =
-            (user.following + ownFollowingDelta).clamp(0, double.maxFinite).toInt();
+        final displayFollowing = user.following;
 
         return AppSurface(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
@@ -737,88 +783,90 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
   }
 
   Widget _buildTopLanguages(List<GhRepo> repos, BuildContext context) {
-    final langCounts = <String, int>{};
-    for (final r in repos) {
-      if (r.language != null) {
-        langCounts[r.language!] = (langCounts[r.language!] ?? 0) + 1;
-      }
-    }
-    if (langCounts.isEmpty) return const SizedBox.shrink();
-    final sorted = langCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    final total = langCounts.values.fold<int>(0, (a, b) => a + b);
+    if (repos.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
-      child: DetailSection(
-        title: 'Top Languages',
-        subtitle: 'Based on public repositories',
-        icon: Icons.pie_chart_outline_rounded,
-        wrapInSurface: true,
-        child: Column(
-          children: sorted.take(6).map((e) {
-            final pct = e.value / total;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return FutureBuilder<List<MapEntry<String, int>>>(
+      future: compute(_computeTopLanguages, repos),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()));
+        }
+
+        final sorted = snapshot.data!;
+        if (sorted.isEmpty) return const SizedBox.shrink();
+        
+        final total = sorted.fold<int>(0, (a, b) => a + b.value);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
+          child: DetailSection(
+            title: 'Top Languages',
+            subtitle: 'Based on public repositories',
+            icon: Icons.pie_chart_outline_rounded,
+            wrapInSurface: true,
+            child: Column(
+              children: sorted.take(6).map((e) {
+                final pct = e.value / total;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(e.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                      Text('${e.value} repos', style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(e.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          Text('${e.value} repos', style: TextStyle(fontSize: 12, color: Theme.of(context).hintColor)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 8,
+                          backgroundColor: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+                          color: AppColors.colorForLanguage(e.key),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: pct,
-                      minHeight: 8,
-                      backgroundColor: Theme.of(context).dividerColor.withValues(alpha: 0.1),
-                      color: AppColors.colorForLanguage(e.key),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
-      ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildContributionGraph(BuildContext context, dynamic repos) {
-    int totalPushes = 0;
-    final Map<int, int> daysActivity = {};
-    if (repos != null) {
-      final now = DateTime.now();
-      for (final repo in repos) {
-        if (repo.pushedAt != null) {
-          final diff = now.difference(repo.pushedAt).inDays;
-          if (diff >= 0 && diff < 105) {
-            daysActivity[diff] = (daysActivity[diff] ?? 0) + 1;
-            totalPushes++;
-          }
+    if (repos == null) return const SizedBox.shrink();
+
+    return FutureBuilder<Map<int, int>>(
+      future: compute(_computeContributionGraph, repos as List<GhRepo>),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: Padding(padding: EdgeInsets.all(24.0), child: CircularProgressIndicator()));
         }
-      }
-    }
+        
+        final daysActivity = snapshot.data!;
+        
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final dimText = Theme.of(context).colorScheme.onSurfaceVariant;
+        const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const double gap = 3.0;
+        const int rows = 7;
+        const int cols = 15; // 15 weeks
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dimText = Theme.of(context).colorScheme.onSurfaceVariant;
-    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const double gap = 3.0;
-    const int rows = 7;
-    const int cols = 15; // 15 weeks
-
-    Color cellColor(int dayIndex) {
-      final count = daysActivity[dayIndex] ?? 0;
-      if (count == 0) return isDark ? const Color(0xFF21262D) : const Color(0xFFEBEDF0);
-      if (count == 1) return const Color(0xFF9BE9A8);
-      if (count == 2) return const Color(0xFF40C463);
-      if (count >= 3) return const Color(0xFF216E39);
-      return const Color(0xFF30A14E);
-    }
+        Color cellColor(int dayIndex) {
+          final count = daysActivity[dayIndex] ?? 0;
+          if (count == 0) return isDark ? const Color(0xFF21262D) : const Color(0xFFEBEDF0);
+          if (count == 1) return const Color(0xFF9BE9A8);
+          if (count == 2) return const Color(0xFF40C463);
+          if (count >= 3) return const Color(0xFF216E39);
+          return const Color(0xFF30A14E);
+        }
 
     return DetailSection(
       title: 'Contributions',
@@ -906,7 +954,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '$totalPushes pushes  ·  15 weeks',
+                '${daysActivity.values.fold<int>(0, (a, b) => a + b)} pushes  ·  15 weeks',
                 style: TextStyle(color: dimText, fontSize: 11, fontWeight: FontWeight.w600),
               ),
               Row(
@@ -924,6 +972,8 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 
@@ -1204,3 +1254,53 @@ class _InfoRow {
   final VoidCallback? onTap;
 }
 
+class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+  final bool isDark;
+
+  _StickyHeaderDelegate({required this.child, required this.height, required this.isDark});
+
+  @override
+  double get minExtent => height;
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: isDark ? const Color(0xFF0D1117) : const Color(0xFFF3F4F6),
+      alignment: Alignment.centerLeft,
+      child: child,
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _StickyHeaderDelegate oldDelegate) {
+    return child != oldDelegate.child || height != oldDelegate.height || isDark != oldDelegate.isDark;
+  }
+}
+
+List<MapEntry<String, int>> _computeTopLanguages(List<GhRepo> repos) {
+  final langCounts = <String, int>{};
+  for (final r in repos) {
+    if (r.language != null) {
+      langCounts[r.language!] = (langCounts[r.language!] ?? 0) + 1;
+    }
+  }
+  return langCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+}
+
+Map<int, int> _computeContributionGraph(List<GhRepo> repos) {
+  final Map<int, int> daysActivity = {};
+  final now = DateTime.now();
+  for (final repo in repos) {
+    if (repo.pushedAt != null) {
+      final diff = now.difference(repo.pushedAt!).inDays;
+      if (diff >= 0 && diff < 105) {
+        daysActivity[diff] = (daysActivity[diff] ?? 0) + 1;
+      }
+    }
+  }
+  return daysActivity;
+}
