@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saad Ikram | Portfolio</title>
+  <style>
+            :root {
+          --bg-color: #0F172A;
+          --card-bg: #1E293B;
+          --accent: #8B5CF6;
+          --accent-soft: rgba(139, 92, 246, 0.15);
+          --text-primary: #F8FAFC;
+          --text-secondary: #94A3B8;
+          --border: #334155;
+        }
+        body {
+          background-color: var(--bg-color);
+          color: var(--text-primary);
+          font-family: 'Inter', system-ui, -apple-system, sans-serif;
+          margin: 0;
+          padding: 40px 20px;
+          display: flex;
+          justify-content: center;
+        }
+        .container {
+          max-width: 900px;
+          width: 100%;
+        }
+        header {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          padding-bottom: 32px;
+          border-bottom: 1px solid var(--border);
+          margin-bottom: 40px;
+        }
+        .avatar {
+          width: 96px;
+          height: 96px;
+          border-radius: 50%;
+          border: 3px solid var(--accent);
+          object-fit: cover;
+        }
+        .info h1 {
+          margin: 0 0 8px 0;
+          font-size: 32px;
+          font-weight: 800;
+        }
+        .info p {
+          margin: 0 0 12px 0;
+          color: var(--text-secondary);
+          line-height: 1.5;
+        }
+        .meta-badges {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-bottom: 16px;
+        }
+        .badge {
+          background: var(--card-bg);
+          border: 1px solid var(--border);
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 13px;
+          color: var(--text-secondary);
+        }
+        .skills-section {
+          margin-bottom: 32px;
+        }
+        .skills-grid {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .skill-pill {
+          background: var(--accent-soft);
+          color: #DDD6FE;
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          padding: 6px 14px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .socials-row {
+          display: flex;
+          gap: 16px;
+          margin-top: 12px;
+        }
+        .social-link {
+          color: var(--accent);
+          text-decoration: none;
+          font-weight: 600;
+          font-size: 14px;
+        }
+        .social-link:hover {
+          text-decoration: underline;
+        }
+        .grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 20px;
+        }
+        .card {
+          background: var(--card-bg);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          padding: 24px;
+          transition: transform 0.2s, border-color 0.2s;
+          text-decoration: none;
+          color: inherit;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .card:hover {
+          transform: translateY(-4px);
+          border-color: var(--accent);
+        }
+        .card h3 {
+          margin: 0 0 8px 0;
+          font-size: 18px;
+          color: var(--text-primary);
+        }
+        .card p {
+          margin: 0 0 20px 0;
+          font-size: 14px;
+          color: var(--text-secondary);
+          line-height: 1.5;
+          flex-grow: 1;
+        }
+        .card-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12px;
+          color: var(--text-secondary);
+        }
+        .lang {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .lang-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--accent);
+        }
+      
+  </style>
+</head>
+<body>
+        <div class="container">
+        <header>
+          <img class="avatar" src="https://avatars.githubusercontent.com/u/119664413?v=4" alt="Avatar">
+          <div class="info">
+            <h1>Saad Ikram</h1>
+            <p>Full Stack Developer & Open Source Contributor</p>
+            <div class="meta-badges">
+              <span class="badge">📍 Chakwal</span>
+              <span class="badge">📦 27 Repositories</span>
+              <span class="badge">👥 4 Followers</span>
+            </div>
+            <div class="socials-row"><a href="https://portfolio-saad-mu.vercel.app/" target="_blank" class="social-link">🌐 Website</a></div>
+          </div>
+        </header>
+        <main>
+          <div class="skills-section">
+            <h2 style="margin-bottom: 16px; font-weight: 800; font-size: 20px;">Skills & Technologies</h2>
+            <div class="skills-grid"><span class="skill-pill">Flutter</span><span class="skill-pill">Dart</span><span class="skill-pill">React</span><span class="skill-pill">TypeScript</span><span class="skill-pill">Node.js</span><span class="skill-pill">Git</span></div>
+          </div>
+          <h2 style="margin-bottom: 24px; font-weight: 800; font-size: 20px;">Featured Projects</h2>
+          <div class="grid">
+                    <a href="https://github.com/Saad43165/GitPulese" target="_blank" class="card">
+          <div>
+            <h3>GitPulese</h3>
+            <p>A Github Advanced Search Application</p>
+          </div>
+          <div class="card-footer">
+            <span class="lang"><span class="lang-dot"></span>Dart</span>
+            <span>★ 0</span>
+          </div>
+        </a>
+                <a href="https://github.com/Saad43165/CSSwitch" target="_blank" class="card">
+          <div>
+            <h3>CSSwitch</h3>
+            <p>帮你的 Claude Science 一键接入你自己的 API：DeepSeek / 通义千问 / 智谱 GLM / Kimi / MiniMax / 小米 MiMo / 硅基流动 / OpenRouter / 任意 OpenAI·Anthropic 兼容端点</p>
+          </div>
+          <div class="card-footer">
+            <span class="lang"><span class="lang-dot"></span>Unknown</span>
+            <span>★ 0</span>
+          </div>
+        </a>
+                <a href="https://github.com/Saad43165/CS-Fundamentals" target="_blank" class="card">
+          <div>
+            <h3>CS-Fundamentals</h3>
+            <p>Curated CS fundamentals for placement prep: DSA,Computer Networks, DBMS & SQL, OOPs, Operating Systems, System Design & Software Engineering</p>
+          </div>
+          <div class="card-footer">
+            <span class="lang"><span class="lang-dot"></span>Unknown</span>
+            <span>★ 0</span>
+          </div>
+        </a>
+        
+          </div>
+        </main>
+      </div>
+      
+</body>
+</html>
