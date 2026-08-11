@@ -9,10 +9,11 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
 
   static const String _dbName = 'gitexplorer.db';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
 
   static const String tableHistory = 'history';
   static const String tableBookmarks = 'bookmarks';
+  static const String tableRepoCache = 'repo_cache';
 
   Database? _db;
 
@@ -55,6 +56,15 @@ class DatabaseHelper {
           )
         ''');
 
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS $tableRepoCache (
+            fullName TEXT PRIMARY KEY,
+            jsonContent TEXT NOT NULL,
+            readmeContent TEXT,
+            updatedAt INTEGER NOT NULL
+          )
+        ''');
+
         await db.execute(
             'CREATE INDEX idx_history_timestamp ON $tableHistory(timestamp)');
 
@@ -63,6 +73,16 @@ class DatabaseHelper {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await TrackedReposTable.createTable(db);
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS $tableRepoCache (
+              fullName TEXT PRIMARY KEY,
+              jsonContent TEXT NOT NULL,
+              readmeContent TEXT,
+              updatedAt INTEGER NOT NULL
+            )
+          ''');
         }
       },
     );
@@ -140,5 +160,35 @@ class DatabaseHelper {
   Future<void> clearBookmarks() async {
     final db = await database;
     await db.delete(tableBookmarks);
+  }
+
+  // ----- Repo Offline Cache -----
+
+  Future<void> cacheRepo(String fullName, String jsonContent, {String? readmeContent}) async {
+    final db = await database;
+    await db.insert(
+      tableRepoCache,
+      {
+        'fullName': fullName,
+        'jsonContent': jsonContent,
+        if (readmeContent != null) 'readmeContent': readmeContent,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>?> getCachedRepo(String fullName) async {
+    final db = await database;
+    final result = await db.query(
+      tableRepoCache,
+      where: 'fullName = ?',
+      whereArgs: [fullName],
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      return result.first;
+    }
+    return null;
   }
 }

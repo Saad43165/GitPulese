@@ -1,47 +1,17 @@
-import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/dashboard_providers.dart';
 import '../../providers/settings_providers.dart';
-import '../../providers/core_providers.dart';
-import '../repo_detail/repo_detail_screen.dart';
-import '../user_detail/user_detail_screen.dart';
 import '../auth/auth_dialog.dart';
 import '../../widgets/glowing_indicator.dart';
-import '../../widgets/shimmer_skeletons.dart';
 import '../../widgets/state_views.dart';
-import '../../widgets/app_drawer.dart';
-import '../repo_detail/ai_pr_review_screen.dart';
-import '../vault/offline_codebase_vault_screen.dart';
-import '../bookmarks/bookmarks_screen.dart';
-import '../tracked_repos/tracked_repos_screen.dart';
-import '../settings/settings_screen.dart';
-import '../editor/ai_code_editor_screen.dart';
-import '../compare/compare_screen.dart';
-
-// --- Quick Feature Hub ---
-class _FeatureAction {
-  final String label;
-  final IconData icon;
-  final List<Color> gradient;
-  final WidgetBuilder destination;
-  final bool requiresGroqKey;
-  const _FeatureAction(this.label, this.icon, this.gradient, this.destination, {this.requiresGroqKey = false});
-}
-
-final List<_FeatureAction> _features = [
-  _FeatureAction('Offline Vault', Icons.offline_pin_rounded, const [Color(0xFF10B981), Color(0xFF059669)], (_) => const OfflineCodebaseVaultScreen()),
-  _FeatureAction('Saved Items', Icons.bookmark_rounded, const [Color(0xFF3B82F6), Color(0xFF1D4ED8)], (_) => const BookmarksScreen()),
-  _FeatureAction('AI Code Editor', Icons.code_rounded, const [Color(0xFFEC4899), Color(0xFFDB2777)], (_) => const AiCodeEditorScreen()),
-  _FeatureAction('AI PR Review', Icons.rate_review_rounded, const [Color(0xFF8B5CF6), Color(0xFF6D28D9)], (_) => const AiPrReviewScreen()),
-  _FeatureAction('Tracked Releases', Icons.radar_rounded, const [Color(0xFF14B8A6), Color(0xFF0F766E)], (_) => const TrackedReposScreen()),
-  _FeatureAction('App Settings', Icons.settings_rounded, const [Color(0xFF6B7280), Color(0xFF4B5563)], (_) => const SettingsScreen()),
-];
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -71,63 +41,120 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-              // Header Row
+              // 1. Clean Modern AppBar / Header Row
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Builder(
-                        builder: (innerContext) => GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            innerContext.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
+                      // Drawer Trigger & Brand Name
+                      Row(
+                        children: [
+                          Builder(
+                            builder: (innerContext) => GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                innerContext.findRootAncestorStateOfType<ScaffoldState>()?.openDrawer();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                  ),
+                                ),
+                                child: const Icon(Icons.menu_open_rounded, color: AppColors.accent, size: 20),
+                              ),
                             ),
-                            child: Icon(Icons.grid_view_rounded, color: isDark ? Colors.white : Colors.black87, size: 22),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'GitPulse',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'v1.0.1 Live',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? Colors.white54 : Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
+
+                      // Header Action Shortcuts: Notifications, Arena & Profile
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Notifications Shortcut Icon
                           GestureDetector(
                             onTap: () {
                               HapticFeedback.lightImpact();
-                              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CompareScreen()));
+                              context.push(AppRoutes.notifications);
                             },
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              margin: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                              ),
+                              child: const Icon(Icons.notifications_outlined, color: AppColors.accent, size: 18),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Arena Shortcut
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              context.push(AppRoutes.compare);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.compare_arrows_rounded, color: Colors.white, size: 16),
-                                  SizedBox(width: 6),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.compare_arrows_rounded, color: Colors.white, size: 15),
+                                  SizedBox(width: 4),
                                   Text(
                                     'Arena',
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
                                     ),
@@ -136,6 +163,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+
+                          // Profile / Sign In
                           authUser.when(
                             data: (user) {
                               if (user == null) {
@@ -145,34 +175,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     showDialog(context: context, builder: (_) => const AuthDialog());
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                                     decoration: BoxDecoration(
-                                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: isDark ? Colors.white24 : Colors.black12),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.05),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 2),
-                                        ),
-                                      ],
+                                      color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                                     ),
                                     child: Row(
                                       children: [
                                         Image.asset(
                                           'assets/images/github.png',
-                                          height: 16,
-                                          width: 16,
+                                          height: 14,
+                                          width: 14,
                                           color: isDark ? Colors.white : Colors.black87,
                                         ),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: 4),
                                         Text(
                                           'Sign In',
                                           style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             fontWeight: FontWeight.bold,
-                                            color: isDark ? Colors.white : Colors.black87,
+                                            color: textColor,
                                           ),
                                         ),
                                       ],
@@ -181,31 +204,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 );
                               }
                               return GestureDetector(
-                                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: user.login))),
+                                onTap: () => context.push(AppRoutes.userPath(user.login)),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.all(2),
                                   decoration: BoxDecoration(
-                                    color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.accent, width: 1.5),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 12,
-                                        backgroundImage: CachedNetworkImageProvider(user.avatarUrl),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        user.login,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: isDark ? Colors.white : Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
+                                  child: CircleAvatar(
+                                    radius: 13,
+                                    backgroundImage: CachedNetworkImageProvider(user.avatarUrl),
                                   ),
                                 ),
                               );
@@ -220,100 +228,131 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               ),
 
-              // Title
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    'Explore',
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w900,
-                      color: textColor,
-                      letterSpacing: -0.5,
+              // Rate Limit Warning Banner for Unauthenticated Mode
+              if (ref.watch(githubPatProvider) == null || ref.watch(githubPatProvider)!.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 18),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Guest Mode: 60 API requests/hr limit.',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              showDialog(context: context, builder: (_) => const AuthDialog());
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Connect PAT',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-              // 1. Feature Hub (Replacing Search Bar)
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 104,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: _features.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 16),
-                    itemBuilder: (context, i) {
-                      final f = _features[i];
-                      return _buildFeatureHubCard(f, isDark, context);
-                    },
-                  ),
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-              // 2. Top Developers Section
+              // 2. Top Developers Section (Featured First)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: [
-                      Icon(Icons.military_tech_rounded, color: AppColors.accent, size: 20),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.military_tech_rounded, color: AppColors.accent, size: 20),
+                      const SizedBox(width: 6),
                       Text(
                         'Top Developers',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                           color: textColor,
+                          letterSpacing: -0.5,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
               SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 100,
+                  height: 92,
                   child: topUsers.when(
                     data: (result) {
                       if (result.items.isEmpty) return const SizedBox.shrink();
                       return ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         physics: const BouncingScrollPhysics(),
                         itemCount: result.items.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 16),
+                        separatorBuilder: (_, __) => const SizedBox(width: 14),
                         itemBuilder: (context, i) {
                           final user = result.items[i];
                           return GestureDetector(
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: user.login))),
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              context.push(AppRoutes.userPath(user.login));
+                            },
                             child: SizedBox(
-                              width: 76,
+                              width: 68,
                               child: Column(
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF3B82F6)]),
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: 32,
-                                      backgroundImage: CachedNetworkImageProvider(user.avatarUrl),
-                                    ),
+                                  Stack(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]),
+                                        ),
+                                        child: CircleAvatar(
+                                          radius: 26,
+                                          backgroundImage: CachedNetworkImageProvider(user.avatarUrl),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.accent,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: isDark ? AppColors.darkBg : Colors.white, width: 1.5),
+                                          ),
+                                          child: Text(
+                                            '#${i + 1}',
+                                            style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 6),
                                   Text(
                                     user.login,
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     textAlign: TextAlign.center,
@@ -325,48 +364,113 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         },
                       );
                     },
-                    loading: () => const Center(child: GlowingIndicator()),
+                    loading: () => const Center(child: GlowingIndicator(size: 24)),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-              // 3. Trending Repositories Grid
+              // 3. Compact Essential Tools Pill Row (Single Horizontal Line, ~44px height)
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 38,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    physics: const BouncingScrollPhysics(),
+                    children: [
+                      _buildQuickToolChip(
+                        context: context,
+                        isDark: isDark,
+                        icon: Icons.code_rounded,
+                        label: 'AI Editor',
+                        color: const Color(0xFFEC4899),
+                        onTap: () => context.push(AppRoutes.editor),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildQuickToolChip(
+                        context: context,
+                        isDark: isDark,
+                        icon: Icons.rate_review_rounded,
+                        label: 'PR Review',
+                        color: const Color(0xFF6366F1),
+                        onTap: () => context.push(AppRoutes.prReview),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildQuickToolChip(
+                        context: context,
+                        isDark: isDark,
+                        icon: Icons.rocket_launch_rounded,
+                        label: 'DevOps',
+                        color: const Color(0xFFEF4444),
+                        onTap: () => context.push(AppRoutes.devops),
+                      ),
+                      const SizedBox(width: 8),
+                      _buildQuickToolChip(
+                        context: context,
+                        isDark: isDark,
+                        icon: Icons.offline_pin_rounded,
+                        label: 'Offline Vault',
+                        color: const Color(0xFF10B981),
+                        onTap: () => context.push(AppRoutes.vault),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+              // 4. Trending Repositories Grid (Main Highlight)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(Icons.local_fire_department_rounded, color: Colors.orange, size: 20),
-                      const SizedBox(width: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.local_fire_department_rounded, color: Colors.orange, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Trending Repositories',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
                       Text(
-                        'Trending Repositories',
+                        'Top 10 Today',
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
+                          fontSize: 11,
+                          color: isDark ? Colors.white54 : Colors.black54,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
               
               trending.when(
                 data: (result) {
                   if (result.items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
                   
                   return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     sliver: SliverGrid(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 0.8,
+                        mainAxisSpacing: 14,
+                        crossAxisSpacing: 14,
+                        childAspectRatio: 0.82,
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, i) {
@@ -387,23 +491,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   );
                 },
-                loading: () => SliverToBoxAdapter(
+                loading: () => const SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 0.8,
-                      ),
-                      itemCount: 4,
-                      itemBuilder: (_, __) => Container(
-                        decoration: BoxDecoration(color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(20)),
-                      ),
-                    ),
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: GlowingIndicator(size: 32)),
                   ),
                 ),
                 error: (e, _) => SliverToBoxAdapter(child: ErrorStateView(message: 'Error loading repos', onRetry: () => ref.invalidate(trendingReposProvider))),
@@ -417,134 +508,58 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  void _showGroqKeyRequiredDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6)),
-            SizedBox(width: 8),
-            Text('Groq API Key Required'),
-          ],
-        ),
-        content: const Text(
-          'This AI-powered feature requires a Groq API Key. You can get a free key from console.groq.com (no credit card required) and configure it in Settings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6)),
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-            child: const Text('Go to Settings'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureHubCard(_FeatureAction action, bool isDark, BuildContext context) {
-    final hasKey = ref.watch(groqApiKeyProvider) != null && ref.watch(groqApiKeyProvider)!.isNotEmpty;
-    final isBlocked = action.requiresGroqKey && !hasKey;
-
+  Widget _buildQuickToolChip({
+    required BuildContext context,
+    required bool isDark,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
-        if (isBlocked) {
-          _showGroqKeyRequiredDialog(context);
-        } else {
-          Navigator.of(context).push(MaterialPageRoute(builder: action.destination));
-        }
+        onTap();
       },
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: 90,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isBlocked
-                    ? (isDark
-                        ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                        : [Colors.grey.shade300, Colors.grey.shade400])
-                    : action.gradient,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: isBlocked
-                  ? Border.all(
-                      color: isDark ? Colors.white12 : Colors.black12,
-                      width: 1,
-                    )
-                  : null,
-              boxShadow: [
-                BoxShadow(
-                  color: (isBlocked ? Colors.black : action.gradient.first).withValues(alpha: isBlocked ? 0.05 : 0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                )
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  action.icon,
-                  color: isBlocked ? (isDark ? Colors.white30 : Colors.black.withValues(alpha: 0.3)) : Colors.white,
-                  size: 24,
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text(
-                    action.label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: isBlocked ? (isDark ? Colors.white30 : Colors.black.withValues(alpha: 0.3)) : Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withValues(alpha: 0.3),
+            width: 1,
           ),
-          if (isBlocked)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF59E0B), // Amber
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.lock_rounded,
-                  color: Colors.white,
-                  size: 10,
-                ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : Colors.black87,
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-
-
   Widget _buildGridRepoCard(dynamic repo, BuildContext context, bool isDark) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RepoDetailScreen(owner: repo.owner.login, repoName: repo.name))),
+      onTap: () => context.push(AppRoutes.repoPath(repo.owner.login, repo.name)),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),

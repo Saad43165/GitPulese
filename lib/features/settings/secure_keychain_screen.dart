@@ -12,7 +12,6 @@ import '../../widgets/app_back_button.dart';
 import '../../widgets/aurora_background.dart';
 import 'package:dio/dio.dart';
 import '../../core/constants/api_constants.dart';
-import '../../core/network/dio_client.dart';
 import '../../widgets/glowing_indicator.dart';
 
 class SecureKeychainScreen extends ConsumerStatefulWidget {
@@ -26,7 +25,6 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
   String _pinBuffer = '';
   String _confirmBuffer = '';
   bool _confirming = false;
-  bool _revealingAll = false;
   final Map<String, bool> _revealedKeys = {};
 
   @override
@@ -286,27 +284,51 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
   Widget _buildPinPadView(KeychainState state, KeychainNotifier notifier, bool isDark) {
     String titleText = '';
     String subtitleText = '';
+    IconData headerIcon = Icons.lock_outline_rounded;
+    Color iconColor = AppColors.accent;
 
     if (!state.isPinSet) {
       if (!_confirming) {
         titleText = 'Create Security PIN';
         subtitleText = 'Set a 4-digit PIN to protect your developer keys';
+        headerIcon = Icons.security_rounded;
+        iconColor = const Color(0xFF10B981);
       } else {
         titleText = 'Confirm Security PIN';
         subtitleText = 'Re-enter your 4-digit PIN to confirm';
+        headerIcon = Icons.fact_check_outlined;
+        iconColor = const Color(0xFF38BDF8);
       }
     } else {
       titleText = 'Enter Security PIN';
       subtitleText = 'Enter your 4-digit PIN to access stored keys';
+      headerIcon = Icons.lock_person_outlined;
+      iconColor = AppColors.accent;
     }
 
     return Column(
       key: ValueKey('pin-pad-${_confirming ? "confirm" : "normal"}'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: iconColor.withValues(alpha: 0.2),
+                blurRadius: 24,
+                spreadRadius: 2,
+              )
+            ],
+          ),
+          child: Icon(headerIcon, size: 42, color: iconColor),
+        ),
+        const SizedBox(height: 24),
         Text(
           titleText,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.5),
         ),
         const SizedBox(height: 8),
         Text(
@@ -317,27 +339,32 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
           ),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 40),
         // PIN circles indicator
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(4, (index) {
             final filled = index < _pinBuffer.length;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              width: 16,
-              height: 16,
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutBack,
+              margin: const EdgeInsets.symmetric(horizontal: 14),
+              width: filled ? 20 : 16,
+              height: filled ? 20 : 16,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: filled 
-                    ? AppColors.accent 
+                    ? iconColor 
                     : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
                 border: Border.all(
                   color: filled 
-                      ? AppColors.accent 
+                      ? iconColor 
                       : (isDark ? Colors.white24 : Colors.black12),
-                  width: 2,
+                  width: filled ? 0 : 2,
                 ),
+                boxShadow: filled ? [
+                  BoxShadow(color: iconColor.withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 1)
+                ] : [],
               ),
             );
           }),
@@ -345,7 +372,7 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
         const SizedBox(height: 48),
         // Numeric keypad
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 280),
+          constraints: const BoxConstraints(maxWidth: 300),
           child: Column(
             children: [
               for (var row in [
@@ -355,16 +382,16 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
               ]) ...[
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: row.map((val) => _buildKeypadButton(val, state, notifier)).toList(),
+                  children: row.map((val) => _buildKeypadButton(val, state, notifier, isDark)).toList(),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
               ],
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  const SizedBox(width: 70), // Spacer
-                  _buildKeypadButton('0', state, notifier),
-                  _buildKeypadButton('BACK', state, notifier),
+                  const SizedBox(width: 78), // Spacer
+                  _buildKeypadButton('0', state, notifier, isDark),
+                  _buildKeypadButton('BACK', state, notifier, isDark),
                 ],
               ),
             ],
@@ -372,10 +399,11 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
         ),
         if (state.isPinSet) ...[
           const SizedBox(height: 32),
-          TextButton(
+          TextButton.icon(
             onPressed: () => _confirmWipe(notifier),
-            child: const Text(
-              'Forgot PIN?',
+            icon: const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.danger),
+            label: const Text(
+              'Forgot PIN? Reset Vault',
               style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold),
             ),
           ),
@@ -384,26 +412,35 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
     );
   }
 
-  Widget _buildKeypadButton(String label, KeychainState state, KeychainNotifier notifier) {
+  Widget _buildKeypadButton(String label, KeychainState state, KeychainNotifier notifier, bool isDark) {
     final isBack = label == 'BACK';
-    return InkWell(
-      onTap: () => _handleKeyPress(label, state, notifier),
-      borderRadius: BorderRadius.circular(35),
-      child: Container(
-        width: 70,
-        height: 70,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.03),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _handleKeyPress(label, state, notifier),
+        borderRadius: BorderRadius.circular(40),
+        splashColor: AppColors.accent.withValues(alpha: 0.2),
+        highlightColor: AppColors.accent.withValues(alpha: 0.1),
+        child: Container(
+          width: 78,
+          height: 78,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+            border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05)),
+          ),
+          alignment: Alignment.center,
+          child: isBack
+              ? Icon(Icons.backspace_rounded, size: 24, color: isDark ? Colors.white60 : Colors.black54)
+              : Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 28, 
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
         ),
-        alignment: Alignment.center,
-        child: isBack
-            ? const Icon(Icons.backspace_outlined, size: 20)
-            : Text(
-                label,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
       ),
     );
   }
@@ -467,208 +504,248 @@ class _SecureKeychainScreenState extends ConsumerState<SecureKeychainScreen> {
                     vertical: AppSpacing.md,
                   ),
                   itemCount: state.items.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final item = state.items[index];
                     final revealed = _revealedKeys[item.id] ?? false;
+                    final isActive = activePat == item.token;
 
-                    return AppSurface(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
+                    return Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: isDark
+                              ? [
+                                  const Color(0xFF1E293B).withValues(alpha: 0.8),
+                                  const Color(0xFF0F172A).withValues(alpha: 0.9),
+                                ]
+                              : [
+                                  Colors.white.withValues(alpha: 0.9),
+                                  Colors.grey.shade50.withValues(alpha: 0.95),
+                                ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isActive 
+                              ? AppColors.success.withValues(alpha: 0.4) 
+                              : (isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05)),
+                          width: isActive ? 1.5 : 1,
+                        ),
+                        boxShadow: [
+                          if (isActive)
+                            BoxShadow(
+                              color: AppColors.success.withValues(alpha: 0.1),
+                              blurRadius: 12,
+                              spreadRadius: 1,
+                            )
+                          else
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            )
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: (isActive ? AppColors.success : AppColors.accent).withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        isActive ? Icons.verified_user_rounded : Icons.key_rounded,
+                                        size: 16,
+                                        color: isActive ? AppColors.success : AppColors.accent,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      item.label,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        revealed 
+                                            ? Icons.visibility_off_outlined 
+                                            : Icons.visibility_outlined,
+                                        size: 20,
+                                        color: isDark ? Colors.white60 : Colors.black54,
+                                      ),
+                                      onPressed: () {
+                                        HapticFeedback.lightImpact();
+                                        setState(() {
+                                          _revealedKeys[item.id] = !revealed;
+                                        });
+                                      },
+                                      tooltip: 'Reveal token',
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.copy_rounded, size: 20),
+                                      color: isDark ? Colors.white60 : Colors.black54,
+                                      onPressed: () {
+                                        Clipboard.setData(ClipboardData(text: item.token));
+                                        HapticFeedback.mediumImpact();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Token copied to clipboard.')),
+                                        );
+                                      },
+                                      tooltip: 'Copy token',
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.danger),
+                                      onPressed: () {
+                                        HapticFeedback.mediumImpact();
+                                        notifier.removeItem(item.id);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Token deleted.')),
+                                        );
+                                      },
+                                      tooltip: 'Delete key',
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            if (item.description != null) ...[
+                              const SizedBox(height: 8),
                               Text(
-                                item.label,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                                item.description!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? Colors.white60 : Colors.black54,
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      revealed 
-                                          ? Icons.visibility_off_outlined 
-                                          : Icons.visibility_outlined,
-                                      size: 18,
-                                    ),
-                                    onPressed: () {
-                                      HapticFeedback.lightImpact();
-                                      setState(() {
-                                        _revealedKeys[item.id] = !revealed;
-                                      });
-                                    },
-                                    tooltip: 'Reveal token',
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.copy_rounded, size: 18),
-                                    onPressed: () {
-                                      Clipboard.setData(ClipboardData(text: item.token));
-                                      HapticFeedback.mediumImpact();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Token copied to clipboard.')),
-                                      );
-                                    },
-                                    tooltip: 'Copy token',
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.danger),
-                                    onPressed: () {
-                                      HapticFeedback.mediumImpact();
-                                      notifier.removeItem(item.id);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Token deleted.')),
-                                      );
-                                    },
-                                    tooltip: 'Delete key',
-                                  ),
-                                ],
-                              ),
                             ],
-                          ),
-                          if (item.description != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              item.description!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? Colors.white60 : Colors.black54,
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: isDark ? Colors.black45 : Colors.black.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              child: Text(
+                                revealed ? item.token : _maskToken(item.token),
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 14,
+                                  letterSpacing: 1.5,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ],
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.03),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.05),
-                              ),
-                            ),
-                            child: Text(
-                              revealed ? item.token : _maskToken(item.token),
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 13,
-                                letterSpacing: 0.5,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: (activePat == item.token)
-                                    ? OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: AppColors.success,
-                                          side: const BorderSide(color: AppColors.success, width: 1.5),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(10),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                        ),
-                                        icon: const Icon(Icons.check_circle_rounded, size: 16),
-                                        label: const Text('Currently Active Session'),
-                                        onPressed: () {
-                                          HapticFeedback.lightImpact();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(
-                                              content: Text('This Personal Access Token is already active!'),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: isActive
+                                      ? OutlinedButton.icon(
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.success,
+                                            side: const BorderSide(color: AppColors.success, width: 1.5),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
                                             ),
-                                          );
-                                        },
-                                      )
-                                    : FilledButton.icon(
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: AppColors.accent,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(10),
+                                            padding: const EdgeInsets.symmetric(vertical: 14),
                                           ),
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                        ),
-                                        icon: const Icon(Icons.login_rounded, size: 16),
-                                        label: const Text('Apply & Login as Active PAT'),
-                                        onPressed: () async {
-                                          HapticFeedback.mediumImpact();
-                                          showDialog(
-                                            context: context,
-                                            barrierDismissible: false,
-                                            builder: (context) => const Center(
-                                              child: GlowingIndicator(),
+                                          icon: const Icon(Icons.check_circle_rounded, size: 18),
+                                          label: const Text('Currently Active Session', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          onPressed: () {
+                                            HapticFeedback.lightImpact();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('This Personal Access Token is already active!'),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : FilledButton.icon(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: AppColors.accent,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12),
                                             ),
-                                          );
-
-                                          try {
-                                            final tempDio = Dio(BaseOptions(
-                                              baseUrl: ApiConstants.baseUrl,
-                                              connectTimeout: ApiConstants.requestTimeout,
-                                              receiveTimeout: ApiConstants.requestTimeout,
-                                              headers: {
-                                                'Authorization': 'Bearer ${item.token}',
-                                                'Accept': 'application/vnd.github+json',
-                                                'User-Agent': 'GitExplorer-App',
-                                              },
-                                            ));
-                                            
-                                            final response = await tempDio.get('/user');
-                                            if (context.mounted) Navigator.pop(context);
-
-                                            if (response.statusCode == 200) {
-                                              await ref.read(githubPatProvider.notifier).save(item.token);
-                                              ref.read(demoUsernameProvider.notifier).state = null;
+                                            padding: const EdgeInsets.symmetric(vertical: 14),
+                                          ),
+                                          icon: const Icon(Icons.login_rounded, size: 18),
+                                          label: const Text('Apply & Login as Active PAT', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          onPressed: () async {
+                                            HapticFeedback.mediumImpact();
+                                            showDialog(
+                                              context: context,
+                                              barrierDismissible: false,
+                                              builder: (context) => const Center(
+                                                child: GlowingIndicator(),
+                                              ),
+                                            );
+                                            try {
+                                              final tempDio = Dio(BaseOptions(
+                                                baseUrl: ApiConstants.baseUrl,
+                                                connectTimeout: ApiConstants.requestTimeout,
+                                                receiveTimeout: ApiConstants.requestTimeout,
+                                                headers: {
+                                                  'Authorization': 'Bearer ${item.token}',
+                                                  'Accept': 'application/vnd.github+json',
+                                                  'User-Agent': 'GitExplorer-App',
+                                                },
+                                              ));
                                               
-                                              if (context.mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Successfully authenticated with "${item.label}"!'),
-                                                    backgroundColor: AppColors.success,
-                                                  ),
-                                                );
+                                              final response = await tempDio.get('/user');
+                                              if (context.mounted) Navigator.pop(context);
+                                              if (response.statusCode == 200) {
+                                                await ref.read(githubPatProvider.notifier).save(item.token);
+                                                ref.read(demoUsernameProvider.notifier).state = null;
+                                                
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text('Successfully authenticated with "${item.label}"!'),
+                                                      backgroundColor: AppColors.success,
+                                                    ),
+                                                  );
+                                                }
                                               }
-                                            } else {
+                                            } catch (e) {
+                                              if (context.mounted) Navigator.pop(context);
+                                              String errMsg = 'Failed to authenticate';
                                               if (context.mounted) {
                                                 ScaffoldMessenger.of(context).showSnackBar(
                                                   SnackBar(
-                                                    content: Text('Failed to authenticate: Invalid status code ${response.statusCode}'),
+                                                    content: Text(errMsg),
                                                     backgroundColor: AppColors.danger,
                                                   ),
                                                 );
                                               }
                                             }
-                                          } catch (e) {
-                                            if (context.mounted) Navigator.pop(context);
-                                            
-                                            String errMsg = 'Failed to authenticate: ';
-                                            if (e is DioException) {
-                                              errMsg += e.response?.data is Map 
-                                                  ? (e.response?.data['message'] ?? e.message)
-                                                  : e.message ?? 'Unknown error';
-                                            } else {
-                                              errMsg += e.toString();
-                                            }
-                                            
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(errMsg),
-                                                  backgroundColor: AppColors.danger,
-                                                ),
-                                              );
-                                            }
-                                          }
-                                        },
-                                      ),
-                              ),
-                            ],
-                          ),
-                        ],
+                                          },
+                                        ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

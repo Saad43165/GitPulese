@@ -1,13 +1,13 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/settings_providers.dart';
 import '../auth/auth_dialog.dart';
-import '../home/root_shell.dart';
 import '../../widgets/glowing_indicator.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -35,11 +35,9 @@ class _OnboardingSlide {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     with TickerProviderStateMixin {
-  late final AnimationController _bgCtrl;
   late final AnimationController _contentCtrl;
   late final PageController _slideController;
 
-  late final Animation<double> _bgAnim;
   late final Animation<double> _logoFade;
   late final Animation<Offset> _logoSlide;
   late final Animation<double> _titleFade;
@@ -53,7 +51,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
   late final List<_OnboardingSlide> _slides = [
     _OnboardingSlide(
       icon: Icons.search_rounded,
-      color: const Color(0xFF3B82F6),
+      color: const Color(0xFF6366F1),
       title: 'Smart Git Discovery',
       description: 'Search millions of public repositories, organizations, profiles, and code snippets instantly.',
       preview: _DiscoveryPreview(),
@@ -61,8 +59,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     _OnboardingSlide(
       icon: Icons.psychology_rounded,
       color: const Color(0xFF8B5CF6),
-      title: 'AI PR Reviewer',
-      description: 'Paste any GitHub PR link to automatically analyze diffs for security issues, bugs, and performance tweaks.',
+      title: 'AI PR Reviewer & Security',
+      description: 'Paste any GitHub PR link to automatically analyze diffs for security vulnerabilities and code quality.',
       preview: _PrReviewPreview(),
     ),
     _OnboardingSlide(
@@ -75,15 +73,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     _OnboardingSlide(
       icon: Icons.code_rounded,
       color: const Color(0xFF10B981),
-      title: 'AI Code Editor & Git Patch',
-      description: 'Refactor code files using AI prompts, view side-by-side git diffs, and commit patches directly.',
+      title: 'AI Code Editor & Vault',
+      description: 'Refactor code files using AI prompts, inspect side-by-side git diffs, and save offline codebase snapshots.',
       preview: _EditorPreview(),
     ),
     _OnboardingSlide(
       icon: Icons.bubble_chart_rounded,
       color: const Color(0xFFF59E0B),
-      title: 'Codebase Visualizer',
-      description: 'Explore calculated codebase complexity, test coverage, and visual radial package structure.',
+      title: 'Git Commit Visualizer',
+      description: 'Explore calculated codebase complexity, test coverage, and interactive radial commit trees.',
       preview: _VisualizerPreview(),
     ),
   ];
@@ -93,17 +91,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     super.initState();
     _slideController = PageController();
 
-    _bgCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
-
     _contentCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1000),
     );
-
-    _bgAnim = Tween<double>(begin: 0.0, end: 1.0).animate(_bgCtrl);
 
     _logoFade = CurvedAnimation(
         parent: _contentCtrl,
@@ -136,11 +127,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
             parent: _contentCtrl,
             curve: const Interval(0.65, 1.0, curve: Curves.easeOutCubic)));
 
-    Future.delayed(const Duration(milliseconds: 150), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) _contentCtrl.forward();
     });
 
-    // Watch for sign-in and navigate automatically
     ref.listenManual(githubPatProvider, (_, pat) {
       if (pat != null && pat.isNotEmpty && mounted) {
         _navigateToApp();
@@ -153,21 +143,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     await prefs.setBool('completed_onboarding', true);
     if (!mounted) return;
     HapticFeedback.mediumImpact();
-    Navigator.of(context).pushReplacement(PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 700),
-      pageBuilder: (_, __, ___) => const RootShell(),
-      transitionsBuilder: (_, animation, __, child) {
-        return FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-          child: child,
-        );
-      },
-    ));
+    context.go(AppRoutes.home);
   }
 
   @override
   void dispose() {
-    _bgCtrl.dispose();
     _contentCtrl.dispose();
     _slideController.dispose();
     super.dispose();
@@ -175,286 +155,299 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
-      backgroundColor: const Color(0xFF060A12),
-      body: AnimatedBuilder(
-        animation: Listenable.merge([_bgCtrl, _contentCtrl]),
-        builder: (context, _) {
-          return Stack(
-            fit: StackFit.expand,
+      backgroundColor: AppColors.darkBg, // Pure Obsidian (#090D16) matching icon
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
             children: [
-              // Radial orbits background
-              CustomPaint(
-                painter: _OrbitPainter(animation: _bgAnim),
-                size: size,
+              const Spacer(flex: 2),
+
+              // Clean Logo (Original app icon, seamlessly blending with #090D16)
+              FadeTransition(
+                opacity: _logoFade,
+                child: SlideTransition(
+                  position: _logoSlide,
+                  child: Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/icons/app_icon.png',
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Image.asset(
+                          'assets/icons/icon_1.png',
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
 
-              // Main onboarding content
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
+              const SizedBox(height: 24),
+
+              // Title & Headline
+              FadeTransition(
+                opacity: _titleFade,
+                child: SlideTransition(
+                  position: _titleSlide,
                   child: Column(
                     children: [
-                      const Spacer(flex: 2),
-
-                      // Logo
-                      FadeTransition(
-                        opacity: _logoFade,
-                        child: SlideTransition(
-                          position: _logoSlide,
-                          child: Center(
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  width: 120,
-                                  height: 120,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: RadialGradient(colors: [
-                                      AppColors.accent.withValues(alpha: 0.35),
-                                      Colors.transparent,
-                                    ]),
-                                  ),
-                                ),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(28),
-                                  child: Image.asset(
-                                    'assets/icons/icon_1.png',
-                                    width: 80,
-                                    height: 80,
-                                    errorBuilder: (_, __, ___) => Image.asset(
-                                      'assets/icons/app_icon.png',
-                                      width: 80,
-                                      height: 80,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            'Git',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white,
+                              fontSize: 38,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.2,
                             ),
                           ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Title & Headline
-                      FadeTransition(
-                        opacity: _titleFade,
-                        child: SlideTransition(
-                          position: _titleSlide,
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    'Git',
-                                    style: GoogleFonts.outfit(
-                                      color: Colors.white,
-                                      fontSize: 40,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -1.5,
-                                    ),
-                                  ),
-                                  ShaderMask(
-                                    shaderCallback: (bounds) => const LinearGradient(
-                                      colors: [Color(0xFF60A5FA), Color(0xFF9333EA)],
-                                    ).createShader(bounds),
-                                    child: Text(
-                                      'Pulse',
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white,
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -1.5,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Your complete GitHub command center.\nDiscover, track & analyze — all in one place.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  color: Colors.white.withValues(alpha: 0.55),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // Redesigned Interactive Feature Slider
-                      FadeTransition(
-                        opacity: _featuresFade,
-                        child: Column(
-                          children: [
-                            SizedBox(
-                              height: 230,
-                              child: PageView.builder(
-                                controller: _slideController,
-                                itemCount: _slides.length,
-                                onPageChanged: (index) {
-                                  setState(() {
-                                    _currentIndex = index;
-                                  });
-                                  HapticFeedback.selectionClick();
-                                },
-                                itemBuilder: (context, index) {
-                                  final slide = _slides[index];
-                                  return _OnboardingSlideWidget(slide: slide);
-                                },
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Color(0xFF6366F1), Color(0xFFA5B4FC)],
+                            ).createShader(bounds),
+                            child: Text(
+                              'Pulse',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 38,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.2,
                               ),
                             ),
-                            const SizedBox(height: 16),
-                            // Liquid dot page indicators
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(_slides.length, (index) {
-                                final isSelected = _currentIndex == index;
-                                return AnimatedContainer(
-                                  duration: const Duration(milliseconds: 300),
-                                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                                  height: 6,
-                                  width: isSelected ? 20 : 6,
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppColors.accent
-                                        : Colors.white.withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const Spacer(flex: 3),
-
-                      // Sign in & Browse CTA Group
-                      FadeTransition(
-                        opacity: _buttonsFade,
-                        child: SlideTransition(
-                          position: _buttonsSlide,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Continue with GitHub Button
-                              Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(16),
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF9333EA).withValues(alpha: 0.4),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 8),
-                                    ),
-                                  ],
-                                ),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(16),
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(16),
-                                    onTap: () {
-                                      HapticFeedback.mediumImpact();
-                                      showDialog(
-                                        context: context,
-                                        builder: (_) => const AuthDialog(),
-                                      );
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Image.asset(
-                                            'assets/images/github.png',
-                                            width: 20,
-                                            height: 20,
-                                            color: Colors.white,
-                                            errorBuilder: (_, __, ___) =>
-                                                const Icon(Icons.code_rounded,
-                                                    color: Colors.white, size: 20),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Text(
-                                            'Continue with GitHub',
-                                            style: GoogleFonts.inter(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 10),
-
-                              // Browse without account button
-                              TextButton(
-                                onPressed: () {
-                                  HapticFeedback.lightImpact();
-                                  _navigateToApp();
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                child: Text(
-                                  'Browse without signing in →',
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white.withValues(alpha: 0.45),
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 4),
-
-                              // Privacy legal notice
-                              Text(
-                                'Your Personal Access Token is stored securely on-device only.\nWe never transmit your data.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  color: Colors.white.withValues(alpha: 0.25),
-                                  fontSize: 10,
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Your complete GitHub mobile workspace.\nDiscover code, review PRs & track DevOps — all in one app.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          height: 1.5,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
+
+              const SizedBox(height: 28),
+
+              // Feature Slider
+              FadeTransition(
+                opacity: _featuresFade,
+                child: Column(
+                  children: [
+                    SizedBox(
+                      height: 220,
+                      child: PageView.builder(
+                        controller: _slideController,
+                        itemCount: _slides.length,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _currentIndex = index;
+                          });
+                          HapticFeedback.selectionClick();
+                        },
+                        itemBuilder: (context, index) {
+                          final slide = _slides[index];
+                          return _OnboardingSlideWidget(slide: slide);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Page indicators
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(_slides.length, (index) {
+                        final isSelected = _currentIndex == index;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: 6,
+                          width: isSelected ? 22 : 6,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.accent
+                                : Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(flex: 3),
+
+              // Sign in & Browse CTAs
+              FadeTransition(
+                opacity: _buttonsFade,
+                child: SlideTransition(
+                  position: _buttonsSlide,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Continue with GitHub Button (with Recommended Badge)
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  HapticFeedback.mediumImpact();
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => const AuthDialog(),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/github.png',
+                                        width: 20,
+                                        height: 20,
+                                        color: Colors.white,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(Icons.code_rounded,
+                                                color: Colors.white, size: 20),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        'Continue with GitHub PAT',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: -10,
+                            right: 16,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: const Text(
+                                'RECOMMENDED (5,000 req/hr)',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      const SizedBox(height: 10),
+
+                      // OAuth Login button
+                      TextButton.icon(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          context.push(AppRoutes.login);
+                        },
+                        icon: const Icon(Icons.open_in_browser_rounded, size: 16),
+                        label: const Text('Login with GitHub (OAuth)'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white.withValues(alpha: 0.7),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+
+                      // Browse as Guest button
+                      TextButton(
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          _navigateToApp();
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        child: Text(
+                          'Browse as Guest (Limited to 60 req/hr) →',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        'Connecting a token unlocks 5,000 req/hr, private repos & CI/CD tools.\nToken is stored 100% encrypted on device.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          fontSize: 10,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -470,7 +463,6 @@ class _OnboardingSlideWidget extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Slide header icon and title
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -500,18 +492,17 @@ class _OnboardingSlideWidget extends StatelessWidget {
             slide.description,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.55),
+              color: Colors.white.withValues(alpha: 0.6),
               fontSize: 12,
               height: 1.4,
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        // Custom visual preview widget container
+        const SizedBox(height: 18),
         Container(
           width: double.infinity,
-          height: 100,
-          margin: const EdgeInsets.symmetric(horizontal: 24),
+          height: 95,
+          margin: const EdgeInsets.symmetric(horizontal: 20),
           alignment: Alignment.center,
           child: slide.preview,
         ),
@@ -531,13 +522,13 @@ class _DiscoveryPreview extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
-          child: Row(
-            children: const [
-              Icon(Icons.search_rounded, color: Colors.blueAccent, size: 16),
+          child: const Row(
+            children: [
+              Icon(Icons.search_rounded, color: AppColors.accent, size: 16),
               SizedBox(width: 8),
               Text(
                 'Search libraries, orgs, APIs...',
@@ -550,11 +541,11 @@ class _DiscoveryPreview extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildChip('flutter', Colors.blue),
+            _buildChip('flutter', const Color(0xFF6366F1)),
             const SizedBox(width: 6),
-            _buildChip('ai-reviewer', Colors.purple),
+            _buildChip('ai-reviewer', const Color(0xFF8B5CF6)),
             const SizedBox(width: 6),
-            _buildChip('analytics', Colors.green),
+            _buildChip('devops', const Color(0xFF10B981)),
           ],
         )
       ],
@@ -583,15 +574,15 @@ class _DevOpsPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
-      child: Row(
+      child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            children: const [
+            children: [
               GlowingIndicator(size: 14),
               SizedBox(width: 8),
               Text(
@@ -600,16 +591,9 @@ class _DevOpsPreview extends StatelessWidget {
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.blueAccent.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'Running',
-              style: TextStyle(color: Colors.blueAccent, fontSize: 9, fontWeight: FontWeight.bold),
-            ),
+          Text(
+            'Running',
+            style: TextStyle(color: Color(0xFF0EA5E9), fontSize: 9, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -623,16 +607,16 @@ class _EditorPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.edit_rounded, color: Colors.greenAccent, size: 12),
               SizedBox(width: 6),
               Text('AI Code Refactoring Patch', style: TextStyle(color: Colors.white70, fontSize: 9, fontFamily: 'monospace')),
@@ -661,15 +645,15 @@ class _PrReviewPreview extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: const [
+          const Row(
+            children: [
               Icon(Icons.call_merge_rounded, color: Colors.green, size: 12),
               SizedBox(width: 6),
               Text('PR #12 - Fix Memory Leak', style: TextStyle(color: Colors.white70, fontSize: 9, fontFamily: 'monospace')),
@@ -706,7 +690,7 @@ class _VisualizerPreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
@@ -715,7 +699,7 @@ class _VisualizerPreview extends StatelessWidget {
         children: [
           _buildMetricDial('Complexity', 'Medium', Colors.amberAccent),
           _buildMetricDial('Coverage', '82%', Colors.greenAccent),
-          _buildMetricDial('Security Risk', 'Low', Colors.blueAccent),
+          _buildMetricDial('Security Risk', 'Low', AppColors.accentSoft),
         ],
       ),
     );
@@ -738,46 +722,4 @@ class _VisualizerPreview extends StatelessWidget {
       ],
     );
   }
-}
-
-// ── Animated orbit background painter ─────────────────────────────────────────
-class _OrbitPainter extends CustomPainter {
-  _OrbitPainter({required this.animation}) : super(repaint: animation);
-  final Animation<double> animation;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height * 0.38;
-    final t = animation.value;
-
-    // Draw pulsing glow rings
-    for (int i = 3; i >= 0; i--) {
-      final radius = 80.0 + i * 70.0 + sin(t * 2 * pi + i * 0.8) * 8;
-      final alpha = (0.06 - i * 0.012).clamp(0.0, 1.0);
-      final paint = Paint()
-        ..color = const Color(0xFF8B5CF6).withValues(alpha: alpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0;
-      canvas.drawCircle(Offset(cx, cy), radius, paint);
-    }
-
-    // Draw rotating dots
-    const dotCount = 8;
-    for (int i = 0; i < dotCount; i++) {
-      final angle = (t * 2 * pi) + (i / dotCount) * 2 * pi;
-      final r = 120.0 + (i % 3) * 65.0;
-      final dx = cx + r * cos(angle);
-      final dy = cy + r * sin(angle * 0.6);
-      final dotAlpha = 0.15 + 0.1 * sin(t * 2 * pi * 2 + i);
-      canvas.drawCircle(
-        Offset(dx, dy),
-        2.0,
-        Paint()..color = const Color(0xFF60A5FA).withValues(alpha: dotAlpha),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrbitPainter old) => true;
 }

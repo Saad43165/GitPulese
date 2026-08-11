@@ -51,6 +51,11 @@ export default {
       return json({ error: 'Invalid JSON body' }, 400);
     }
 
+    // GitHub OAuth token exchange — must be before Groq key check
+    if (url.pathname === '/auth/github/token') {
+      return await handleGitHubOAuth(body, env);
+    }
+
     const groqKey = env.GROQ_API_KEY;
     if (!groqKey) {
       return json({ error: 'GROQ_API_KEY secret not configured on Worker' }, 500);
@@ -74,6 +79,32 @@ export default {
 };
 
 // ── Route Handlers ────────────────────────────────────────────────────────────
+
+async function handleGitHubOAuth(body, env) {
+  const { code } = body;
+  if (!code) return json({ error: 'Missing code' }, 400);
+
+  const clientSecret = env.GITHUB_CLIENT_SECRET;
+  if (!clientSecret) return json({ error: 'GITHUB_CLIENT_SECRET not configured' }, 500);
+
+  const resp = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({
+      client_id: 'Ov23li8V48NTssNZnJbA',
+      client_secret: clientSecret,
+      code,
+    }),
+  });
+
+  if (!resp.ok) {
+    return json({ error: `GitHub token exchange failed: ${resp.status}` }, 502);
+  }
+
+  const data = await resp.json();
+  if (data.error) return json({ error: data.error_description || data.error }, 400);
+  return json({ access_token: data.access_token, token_type: data.token_type, scope: data.scope });
+}
 
 async function handleSummarize(body, groqKey) {
   const { repoFullName, description, readme, primaryLanguage, topics } = body;

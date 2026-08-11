@@ -21,6 +21,7 @@ class WidgetManager {
 
       await HomeWidget.updateWidget(
         androidName: androidWidgetName,
+        iOSName: 'GitPulseTrending',
       );
     } catch (e) {
       // Failed to update widget, safe to ignore as it's not critical
@@ -35,7 +36,7 @@ class WidgetManager {
         key: 'overview_image',
         logicalSize: const Size(160, 160),
       );
-      await HomeWidget.updateWidget(androidName: 'OverviewWidgetProvider');
+      await HomeWidget.updateWidget(androidName: 'OverviewWidgetProvider', iOSName: 'GitPulseOverview');
 
       // 2. Top Repo Widget (Medium)
       if (repos.isNotEmpty) {
@@ -46,7 +47,7 @@ class WidgetManager {
           logicalSize: const Size(320, 160),
         );
       }
-      await HomeWidget.updateWidget(androidName: 'TopRepoWidgetProvider');
+      await HomeWidget.updateWidget(androidName: 'TopRepoWidgetProvider', iOSName: 'GitPulseTopRepo');
 
       // 3. Contribution Widget (Large)
       int totalStars = repos.fold(0, (sum, r) => sum + r.stargazersCount);
@@ -56,7 +57,7 @@ class WidgetManager {
         key: 'contrib_image',
         logicalSize: const Size(320, 320),
       );
-      await HomeWidget.updateWidget(androidName: 'ContributionWidgetProvider');
+      await HomeWidget.updateWidget(androidName: 'ContributionWidgetProvider', iOSName: 'GitPulseContribution');
 
       // 4. Language Widget (Medium)
       final langCounts = <String, int>{};
@@ -70,7 +71,7 @@ class WidgetManager {
           logicalSize: const Size(320, 160),
         );
       }
-      await HomeWidget.updateWidget(androidName: 'LanguageWidgetProvider');
+      await HomeWidget.updateWidget(androidName: 'LanguageWidgetProvider', iOSName: 'GitPulseLanguage');
     } catch (e) {
       // Safe to ignore if widget doesn't exist or fails
     }

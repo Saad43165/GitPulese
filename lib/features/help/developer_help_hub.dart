@@ -4,13 +4,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
-import '../compare/compare_screen.dart';
-import '../devops/devops_workflows_screen.dart';
-import '../editor/ai_code_editor_screen.dart';
-import '../architecture/architecture_visualizer_screen.dart';
-import '../portfolio/portfolio_generator_screen.dart';
-import '../vault/offline_codebase_vault_screen.dart';
-import '../repo_detail/ai_pr_review_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../widgets/app_back_button.dart';
 
 class DeveloperHelpHubScreen extends ConsumerStatefulWidget {
@@ -39,11 +34,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Audits Pull Requests for bugs, security holes, and code improvements. It fetches git diff files, parses change sets, and uses LLM agents to provide targeted, constructive feedback.',
       'techStack': ['GitHub PR API', 'Git Diff Parser', 'Groq Llama 3 API', 'Custom Diff Chunking'],
       'flow': ['PR Created', 'Diff Chunks Extracted', 'LLM Security Audit', 'Interactive Review UI'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AiPrReviewScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.prReview),
     },
     {
       'title': 'DevOps Control Center',
@@ -54,11 +45,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Tracks workflow runs, execution durations, average success metrics, and live-streams build console logs with interactive regex keyword search. Includes manual workflow dispatching.',
       'techStack': ['GitHub Actions API', 'ANSI Console Parser', 'fl_chart', 'Workflow Dispatch Trigger'],
       'flow': ['Poll Runs API', 'Live Log Streaming', 'ANSI Code Mapping', 'Manual Pipeline Dispatch'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const DevOpsWorkflowsScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.devops),
     },
     {
       'title': 'AI Code Editor',
@@ -69,11 +56,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Refactor code files, request architectural adjustments, and commit patches directly back to your branch using embedded generative models.',
       'techStack': ['GitHub Contents API', 'Groq Coding Assistant', 'Unified Diff Generator', 'Git Commit Service'],
       'flow': ['Read Source File', 'AI Prompt Analysis', 'Generate Patch / Diff', 'Commit & Push Changes'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AiCodeEditorScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.editor),
     },
     {
       'title': 'Codebase Visualizer',
@@ -84,11 +67,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Extracts codebase structural definitions. Renders interactive dependency maps, file nesting paths, and complexity metrics to simplify navigating unfamiliar projects.',
       'techStack': ['Local/Remote AST Extractor', 'Custom Graph Layout Engine', 'Dart Parser AST Library', 'Directory Tree Mapper'],
       'flow': ['Scan Repository Files', 'Extract Imports & Classes', 'Build Graph Nodes', 'Interactive Tree Render'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ArchitectureVisualizerScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.architecture),
     },
     {
       'title': 'Portfolio Generator',
@@ -99,11 +78,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Mines developer activity, repository profiles, contribution timelines, and language weightings. Compiles a high-impact responsive static site layout ready to deploy.',
       'techStack': ['GitHub Stats Engine', 'SVG Badge Generator', 'Static Markdown Templates', 'Vercel Deployment webhook'],
       'flow': ['Gather Profile Stats', 'Pin Top Repositories', 'Generate Site Template', 'Export Portfolio Bundle'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const PortfolioGeneratorScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.portfolio),
     },
     {
       'title': 'Offline Code Vault',
@@ -114,11 +89,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Downloads codebases as compressed archives, indexes directories locally, and offers regex offline search capability alongside an offline syntax viewer.',
       'techStack': ['Zip Archive Extractor', 'Local File Storage API', 'Local Search Tokenizer', 'Offline Code Highlight CSS'],
       'flow': ['Download Zip Package', 'Extract to Application Storage', 'Tokenize & Index Content', 'Offline Regex Code Search'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const OfflineCodebaseVaultScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.vault),
     },
     {
       'title': 'Repository Compare',
@@ -129,11 +100,7 @@ class _DeveloperHelpHubScreenState extends ConsumerState<DeveloperHelpHubScreen>
       'description': 'Contrasts release velocity, star milestones, issue ratios, and language shares between any two target repositories to help evaluate project dependencies.',
       'techStack': ['GitHub Repository API', 'Release History Scraper', 'Comparative Progress Graphs', 'Language Metric Parser'],
       'flow': ['Fetch Repo A & B Details', 'Aggregate Stars / Issues', 'Format Release Frequency', 'Render Comparison Cards'],
-      'onTap': (BuildContext context) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const CompareScreen()),
-        );
-      }
+      'onTap': (BuildContext context) => context.push(AppRoutes.compare),
     }
   ];
 

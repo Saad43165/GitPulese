@@ -29,6 +29,7 @@ class _ProfileAnalyticsScreenState extends ConsumerState<ProfileAnalyticsScreen>
   final TextEditingController _patController = TextEditingController();
   bool _isSaving = false;
   int _activeTab = 0;
+  bool _isDemoMode = false;
   final ScreenshotController _screenshotController = ScreenshotController();
   bool _isSharing = false;
 
@@ -174,9 +175,40 @@ class _ProfileAnalyticsScreenState extends ConsumerState<ProfileAnalyticsScreen>
 
   @override
   Widget build(BuildContext context) {
-    final userAsync = ref.watch(authenticatedUserProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    if (_isDemoMode) {
+      final demoUserAsync = ref.watch(userDetailProvider('Saad43165'));
+      return SafePage(
+        reserveBottomNav: true,
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PageHeader(
+                title: 'Demo Profile',
+                subtitle: 'Previewing profile analytics',
+                showBackButton: false,
+                trailing: IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => setState(() => _isDemoMode = false),
+                ),
+              ),
+              Expanded(
+                child: demoUserAsync.when(
+                  data: (user) => _buildAnalyticsContent(user, isDark),
+                  loading: () => const Center(child: GlowingIndicator()),
+                  error: (e, _) => Center(child: Text('Failed to load demo profile: $e')),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final userAsync = ref.watch(authenticatedUserProvider);
     return SafePage(
       reserveBottomNav: true,
       child: Material(
@@ -321,13 +353,15 @@ class _ProfileAnalyticsScreenState extends ConsumerState<ProfileAnalyticsScreen>
             ],
           ),
           const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              ref.read(demoUsernameProvider.notifier).state = 'Saad43165';
-            },
-            icon: const Icon(Icons.visibility_rounded),
-            label: const Text('View Demo Profile (Saad43165)'),
+            OutlinedButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                setState(() {
+                  _isDemoMode = true;
+                });
+              },
+              icon: const Icon(Icons.visibility_rounded),
+              label: const Text('View Demo Profile (Saad43165)'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

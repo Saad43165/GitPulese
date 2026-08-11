@@ -1,7 +1,9 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../navigation/deep_link_handler.dart';
 
-/// Thin wrapper around flutter_local_notifications. Every call here shows
-/// a real system notification — nothing is simulated in-app.
+/// Thin wrapper around flutter_local_notifications.
+/// All notifications shown here are real system notifications.
+/// Tapping a notification navigates to the correct screen via DeepLinkHandler.
 class NotificationService {
   NotificationService._internal();
   static final NotificationService instance = NotificationService._internal();
@@ -21,6 +23,8 @@ class NotificationService {
 
     await _plugin.initialize(
       const InitializationSettings(android: androidSettings, iOS: iosSettings),
+      onDidReceiveNotificationResponse: _onTap,
+      onDidReceiveBackgroundNotificationResponse: _onTapBackground,
     );
 
     // Android 13+ requires runtime notification permission.
@@ -32,7 +36,29 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
         ?.requestPermissions(alert: true, badge: true, sound: true);
 
+    // Handle tap on notification that launched the app from terminated state.
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp == true) {
+      final payload = launchDetails?.notificationResponse?.payload;
+      // Delay so the navigator is ready.
+      Future.delayed(const Duration(milliseconds: 800), () {
+        DeepLinkHandler.handleNotificationPayload(payload);
+      });
+    }
+
     _initialized = true;
+  }
+
+  static void _onTap(NotificationResponse response) {
+    DeepLinkHandler.handleNotificationPayload(response.payload);
+  }
+
+  @pragma('vm:entry-point')
+  static void _onTapBackground(NotificationResponse response) {
+    // When tapped from background the isolate may be a fresh one;
+    // DeepLinkHandler will no-op if navigatorKey has no context yet —
+    // the launch-details path above covers the terminated-app case.
+    DeepLinkHandler.handleNotificationPayload(response.payload);
   }
 
   Future<void> showNewReleaseNotification({
@@ -49,11 +75,18 @@ class NotificationService {
       priority: Priority.high,
     );
     const iosDetails = DarwinNotificationDetails();
+    final payload = DeepLinkHandler.buildPayload(
+      subjectUrl: 'https://api.github.com/repos/$repoFullName/releases',
+      type: 'Release',
+      repoFullName: repoFullName,
+      title: 'New release: $tag',
+    );
     await _plugin.show(
       repoId,
       'New release: $repoFullName',
       'Version $tag was just published.',
       const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: payload,
     );
   }
 
@@ -71,11 +104,18 @@ class NotificationService {
       priority: Priority.max,
     );
     const iosDetails = DarwinNotificationDetails();
+    final payload = DeepLinkHandler.buildPayload(
+      subjectUrl: 'https://api.github.com/repos/$repoFullName/releases',
+      type: 'Release',
+      repoFullName: repoFullName,
+      title: summary,
+    );
     await _plugin.show(
-      repoId + 1000000, // offset so release + advisory ids for same repo don't collide
+      repoId + 1000000,
       'Security advisory: $repoFullName',
       summary,
       const NotificationDetails(android: androidDetails, iOS: iosDetails),
+      payload: payload,
     );
   }
 }

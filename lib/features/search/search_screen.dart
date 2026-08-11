@@ -12,15 +12,17 @@ import '../../providers/settings_providers.dart';
 import '../../providers/core_providers.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/repo_card.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../widgets/staggered_fade_item.dart';
 import '../../widgets/state_views.dart';
-import '../repo_detail/repo_detail_screen.dart';
-import '../user_detail/user_detail_screen.dart';
 import 'widgets/code_result_tile.dart';
 import 'widgets/filter_sheet.dart';
 import 'widgets/issue_tile.dart';
 import 'widgets/user_result_tile.dart';
 import '../../widgets/shimmer_skeletons.dart';
+import '../../widgets/adaptive_layout.dart';
+import '../repo_detail/repo_detail_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -87,16 +89,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tab = ref.watch(searchTabProvider);
+    final filters = ref.watch(searchFiltersProvider);
+
     final tabIndex = ref.watch(selectedNavTabProvider);
     if (tabIndex == 1) { // 1 is Search screen index
       _checkAndShowTutorial();
     }
 
-    final tab = ref.watch(searchTabProvider);
-    final filters = ref.watch(searchFiltersProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedSplitRepo = ref.watch(selectedSplitViewRepoProvider);
 
-    return Material(
+    final masterContent = Material(
       color: Colors.transparent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -285,6 +289,43 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           ),
         ],
       ),
+    );
+
+    return AdaptiveLayout(
+      master: masterContent,
+      detail: selectedSplitRepo != null
+          ? Scaffold(
+              key: ValueKey('${selectedSplitRepo.owner}/${selectedSplitRepo.name}'),
+              backgroundColor: Colors.transparent,
+              body: RepoDetailScreen(
+                owner: selectedSplitRepo.owner,
+                repoName: selectedSplitRepo.name,
+              ),
+            )
+          : Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.mouse_rounded,
+                      size: 64,
+                      color: isDark ? Colors.white24 : Colors.black26,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Select a repository to preview details',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white54 : Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -538,14 +579,14 @@ class _RepoResultsView extends ConsumerWidget {
                 child: RepoCard(
                   repo: repo,
                   compact: ref.watch(compactCardsProvider),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RepoDetailScreen(
-                        owner: repo.owner.login,
-                        repoName: repo.name,
-                      ),
-                    ),
-                  ),
+                  onTap: () {
+                    final isWide = MediaQuery.of(context).size.width >= 800;
+                    if (isWide) {
+                      ref.read(selectedSplitViewRepoProvider.notifier).state = (owner: repo.owner.login, name: repo.name);
+                    } else {
+                      context.push(AppRoutes.repoPath(repo.owner.login, repo.name));
+                    }
+                  },
                 ),
               );
             },
@@ -643,11 +684,7 @@ class _UserResultsView extends ConsumerWidget {
               index: i,
               child: UserResultTile(
                 user: res.items[i],
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => UserDetailScreen(username: res.items[i].login),
-                  ),
-                ),
+                onTap: () => context.push(AppRoutes.userPath(res.items[i].login)),
               ),
             ),
           ),

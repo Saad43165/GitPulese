@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../features/repo_detail/ai_pr_review_screen.dart';
-import '../features/devops/devops_workflows_screen.dart';
-import '../features/editor/ai_code_editor_screen.dart';
-import '../features/vault/offline_codebase_vault_screen.dart';
-import '../features/compare/compare_screen.dart';
-import '../core/theme/app_theme.dart';
+import 'package:go_router/go_router.dart';
+import '../core/router/app_router.dart';
 
 class PremiumConsoleSheet extends StatelessWidget {
   const PremiumConsoleSheet({super.key});
@@ -28,37 +24,37 @@ class PremiumConsoleSheet extends StatelessWidget {
       _ConsoleTool(
         title: 'AI PR Reviewer',
         icon: Icons.rate_review_rounded,
-        color: const Color(0xFF6366F1), // Indigo
+        color: const Color(0xFF6366F1),
         description: 'Audit PR links for code quality and bugs',
-        screen: const AiPrReviewScreen(),
+        route: AppRoutes.prReview,
       ),
       _ConsoleTool(
         title: 'DevOps Center',
         icon: Icons.rocket_launch_rounded,
-        color: const Color(0xFF0EA5E9), // Light Blue
+        color: const Color(0xFF0EA5E9),
         description: 'Monitor workflows, jobs, and action logs',
-        screen: const DevOpsWorkflowsScreen(),
+        route: AppRoutes.devops,
       ),
       _ConsoleTool(
         title: 'AI Code Editor',
         icon: Icons.code_rounded,
-        color: const Color(0xFF10B981), // Emerald
+        color: const Color(0xFF10B981),
         description: 'AI code audits, refactoring, and git patches',
-        screen: const AiCodeEditorScreen(),
+        route: AppRoutes.editor,
       ),
       _ConsoleTool(
         title: 'Offline Vault',
         icon: Icons.folder_zip_rounded,
-        color: const Color(0xFFF59E0B), // Amber
+        color: const Color(0xFFF59E0B),
         description: 'Explore offline zipped codebases & local files',
-        screen: const OfflineCodebaseVaultScreen(),
+        route: AppRoutes.vault,
       ),
       _ConsoleTool(
         title: 'Repo Arena',
         icon: Icons.compare_rounded,
-        color: const Color(0xFFEF4444), // Red
+        color: const Color(0xFFEF4444),
         description: 'Side-by-side repository comparison & analytics',
-        screen: const CompareScreen(),
+        route: AppRoutes.compare,
       ),
     ];
 
@@ -135,11 +131,8 @@ class PremiumConsoleSheet extends StatelessWidget {
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
-          Navigator.pop(context); // Close sheet first
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => tool.screen),
-          );
+          Navigator.pop(context);
+          context.push(tool.route);
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -210,13 +203,13 @@ class _ConsoleTool {
   final IconData icon;
   final Color color;
   final String description;
-  final Widget screen;
+  final String route;
 
   const _ConsoleTool({
     required this.title,
     required this.icon,
     required this.color,
     required this.description,
-    required this.screen,
+    required this.route,
   });
 }

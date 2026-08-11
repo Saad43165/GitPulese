@@ -11,14 +11,63 @@ import '../../core/utils/formatters.dart';
 import '../../data/models/repo_model.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/history_providers.dart';
+import '../../providers/settings_providers.dart';
 import '../../widgets/glowing_indicator.dart';
-import '../repo_detail/repo_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
+
+final discoveryCategoryProvider = StateProvider<String>((ref) => 'For You');
+
+/// Derives the user's top languages from their own repos, then fetches
+/// trending repos in those languages for a personalised feed.
+final _userTopLanguagesProvider = FutureProvider.autoDispose<List<String>>((ref) async {
+  final api = ref.watch(githubApiServiceProvider);
+  final authUser = ref.watch(authenticatedUserProvider).valueOrNull;
+  if (authUser == null) return [];
+  try {
+    final repos = await api.getUserRepos(authUser.login, perPage: 50);
+    final counts = <String, int>{};
+    for (final r in repos) {
+      final lang = r.language;
+      if (lang != null && lang.isNotEmpty) counts[lang] = (counts[lang] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return sorted.take(3).map((e) => e.key).toList();
+  } catch (_) {
+    return [];
+  }
+});
 
 final discoveryFeedProvider = FutureProvider.autoDispose<List<GhRepo>>((ref) async {
+  final category = ref.watch(discoveryCategoryProvider);
   final api = ref.watch(githubApiServiceProvider);
-  final result = await api.searchRepositories(
-    query: 'stars:>5000',
-  );
+
+  String query;
+  if (category == 'For You') {
+    final langs = await ref.watch(_userTopLanguagesProvider.future);
+    if (langs.isEmpty) {
+      query = 'stars:>2000';
+    } else {
+      final langQuery = langs.map((l) => 'language:$l').join(' ');
+      query = '$langQuery stars:>500';
+    }
+  } else if (category == 'Flutter') {
+    query = 'topic:flutter stars:>500';
+  } else if (category == 'AI & ML') {
+    query = 'topic:machine-learning stars:>1000';
+  } else if (category == 'Python') {
+    query = 'language:python stars:>1500';
+  } else if (category == 'Rust') {
+    query = 'language:rust stars:>1000';
+  } else if (category == 'Go') {
+    query = 'language:go stars:>1000';
+  } else if (category == 'TypeScript') {
+    query = 'language:typescript stars:>1500';
+  } else {
+    query = 'stars:>2000';
+  }
+
+  final result = await api.searchRepositories(query: query, perPage: 25);
   final items = List<GhRepo>.from(result.items);
   items.shuffle();
   return items;
@@ -35,6 +84,16 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   late PageController _pageController;
   final GlobalKey _swipeKey = GlobalKey();
   bool _tutorialTriggered = false;
+
+  final List<String> _categories = [
+    'For You',
+    'Flutter',
+    'AI & ML',
+    'Python',
+    'Rust',
+    'Go',
+    'TypeScript',
+  ];
 
   @override
   void initState() {
@@ -65,28 +124,27 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   @override
   Widget build(BuildContext context) {
     final tabIndex = ref.watch(selectedNavTabProvider);
-    if (tabIndex == 2) { // 2 is Discovery screen index
+    if (tabIndex == 2) {
       _checkAndShowTutorial();
     }
 
     final feedAsync = ref.watch(discoveryFeedProvider);
+    final currentCategory = ref.watch(discoveryCategoryProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
       color: Colors.transparent,
       child: Stack(
         children: [
-          // Feed Body wrapped in AnimatedSwitcher for seamless cross-fading
+          // Feed Body wrapped in AnimatedSwitcher
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 500),
-            switchInCurve: Curves.easeInOutCubic,
-            switchOutCurve: Curves.easeInOutCubic,
+            duration: const Duration(milliseconds: 400),
             child: feedAsync.when(
               data: (repos) {
                 if (repos.isEmpty) {
                   return const Center(
                     key: ValueKey('empty_state'),
-                    child: Text('No repositories found'),
+                    child: Text('No repositories found for this category'),
                   );
                 }
 
@@ -95,58 +153,43 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                   onRefresh: () async {
                     HapticFeedback.mediumImpact();
                     ref.invalidate(discoveryFeedProvider);
-                    await Future.delayed(const Duration(milliseconds: 800));
+                    await Future.delayed(const Duration(milliseconds: 600));
                   },
-                  child: Scrollbar(
+                  child: PageView.builder(
                     controller: _pageController,
-                    thickness: 6,
-                    radius: const Radius.circular(10),
-                    child: PageView.builder(
-                      controller: _pageController,
-                      scrollDirection: Axis.vertical,
-                      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-                      onPageChanged: (index) {
-                        HapticFeedback.selectionClick();
-                      },
-                      itemBuilder: (context, index) {
-                        final repo = repos[index % repos.length];
-                        
-                        // Animated page transformer (cards scale down/fade out as they exit viewport)
-                        return AnimatedBuilder(
-                          animation: _pageController,
-                          builder: (context, child) {
-                            double value = 1.0;
-                            if (_pageController.position.haveDimensions) {
-                              value = _pageController.page! - index;
-                              // Scale down to 88% and fade out slightly
-                              value = (1 - (value.abs() * 0.12)).clamp(0.0, 1.0);
-                            } else {
-                              if (index != 0) {
-                                value = 0.88;
-                              }
-                            }
-                            final opacity = Curves.easeOut.transform(value);
-                            if (opacity <= 0.01) {
-                              return const SizedBox.shrink();
-                            }
-                            if (opacity >= 0.99 && value >= 0.99) {
-                              return child!;
-                            }
-                            return Opacity(
-                              opacity: opacity,
-                              child: Transform.scale(
-                                scale: value,
-                                alignment: Alignment.center,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: RepaintBoundary(
-                            child: _DiscoveryCard(repo: repo),
-                          ),
-                        );
-                      },
-                    ),
+                    scrollDirection: Axis.vertical,
+                    physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+                    onPageChanged: (_) => HapticFeedback.selectionClick(),
+                    itemBuilder: (context, index) {
+                      final repo = repos[index % repos.length];
+                      
+                      return AnimatedBuilder(
+                        animation: _pageController,
+                        builder: (context, child) {
+                          double value = 1.0;
+                          if (_pageController.position.haveDimensions) {
+                            value = _pageController.page! - index;
+                            value = (1 - (value.abs() * 0.12)).clamp(0.0, 1.0);
+                          } else {
+                            if (index != 0) value = 0.88;
+                          }
+                          final opacity = Curves.easeOut.transform(value);
+                          if (opacity <= 0.01) return const SizedBox.shrink();
+
+                          return Opacity(
+                            opacity: opacity,
+                            child: Transform.scale(
+                              scale: value,
+                              alignment: Alignment.center,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: RepaintBoundary(
+                          child: _DiscoveryCard(repo: repo),
+                        ),
+                      );
+                    },
                   ),
                 );
               },
@@ -155,10 +198,10 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    GlowingIndicator(),
+                    GlowingIndicator(size: 32),
                     SizedBox(height: 16),
                     Text(
-                      'Curating your feed...', 
+                      'Curating discovery feed...', 
                       style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
                     ),
                   ],
@@ -170,52 +213,165 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
               ),
             ),
           ),
-          
-          // Swipe Guide Hint Overlay
+
+          // Top Glassmorphic Header & Category Filter Bar
           Positioned(
-            bottom: 100,
+            top: 0,
             left: 0,
             right: 0,
-            child: Showcase(
-              key: _swipeKey,
-              title: 'Infinite Discovery Swipe',
-              description: 'Swipe vertically (up/down) like a feed of reels/TikToks to discover trending, highly-starred repositories customized to your language interests.',
-              titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-              descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-              tooltipBackgroundColor: const Color(0xFF1E293B),
-              tooltipBorderRadius: BorderRadius.circular(12),
-              blurValue: 2,
-              child: IgnorePointer(
-                child: Column(
-                  children: [
-                    const Icon(Icons.keyboard_double_arrow_up_rounded, color: AppColors.accent, size: 32),
-                    const SizedBox(height: 4),
-                    Text(
-                      'SWIPE UP',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.black54,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                        fontSize: 12,
+            child: ClipRRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 46, 16, 12),
+                  decoration: BoxDecoration(
+                    color: (isDark ? AppColors.darkBg : Colors.white).withValues(alpha: 0.9),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                        width: 1,
                       ),
                     ),
-                  ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.local_fire_department_rounded, color: Colors.orange, size: 22),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Discover',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          _AnimatedRefreshButton(
+                            onPressed: () async {
+                              HapticFeedback.mediumImpact();
+                              ref.invalidate(discoveryFeedProvider);
+                              await Future.delayed(const Duration(milliseconds: 600));
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Category Filter Pills (Distinct contrast)
+                      SizedBox(
+                        height: 34,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: _categories.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, i) {
+                            final cat = _categories[i];
+                            final isSelected = currentCategory == cat;
+
+                            return GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                ref.read(discoveryCategoryProvider.notifier).state = cat;
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.accent
+                                      : (isDark
+                                          ? AppColors.darkSurfaceElevated
+                                          : Colors.grey.shade200),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.accent
+                                        : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                                    width: isSelected ? 1.5 : 1.0,
+                                  ),
+                                  boxShadow: isSelected
+                                      ? [
+                                          BoxShadow(
+                                            color: AppColors.accent.withValues(alpha: 0.35),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (cat == 'For You') ...[
+                                      Icon(
+                                        Icons.auto_awesome_rounded,
+                                        size: 12,
+                                        color: isSelected ? Colors.white : AppColors.accent,
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Text(
+                                      cat,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
           
-          // Premium Animated Refresh Button (Top Right)
+          // Swipe Guide Hint Overlay
           Positioned(
-            top: 48,
-            right: 16,
-            child: _AnimatedRefreshButton(
-              onPressed: () async {
-                HapticFeedback.mediumImpact();
-                ref.invalidate(discoveryFeedProvider);
-                // Hold rotation for at least 800ms for visual polish
-                await Future.delayed(const Duration(milliseconds: 800));
-              },
+            bottom: 95,
+            left: 0,
+            right: 0,
+            child: Showcase(
+              key: _swipeKey,
+              title: 'Infinite Discovery Swipe',
+              description: 'Swipe vertically (up/down) to discover trending GitHub repositories.',
+              titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+              descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
+              tooltipBackgroundColor: AppColors.darkSurfaceElevated,
+              tooltipBorderRadius: BorderRadius.circular(12),
+              blurValue: 2,
+              child: const IgnorePointer(
+                child: Column(
+                  children: [
+                    Icon(Icons.keyboard_double_arrow_up_rounded, color: AppColors.accent, size: 28),
+                    SizedBox(height: 2),
+                    Text(
+                      'SWIPE UP',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -224,9 +380,6 @@ class _DiscoveryScreenState extends ConsumerState<DiscoveryScreen> {
   }
 }
 
-// -------------------------------------------------------------
-// Custom Animated Refresh Button with rotation transitions
-// -------------------------------------------------------------
 class _AnimatedRefreshButton extends StatefulWidget {
   const _AnimatedRefreshButton({required this.onPressed});
   final Future<void> Function() onPressed;
@@ -256,60 +409,44 @@ class _AnimatedRefreshButtonState extends State<_AnimatedRefreshButton> with Sin
 
   Future<void> _triggerRefresh() async {
     if (_isLoading) return;
-    setState(() {
-      _isLoading = true;
-    });
-    
-    // Repeat spin during load
+    setState(() => _isLoading = true);
     _rotationController.repeat();
     
     await widget.onPressed();
     
     if (mounted) {
       _rotationController.stop();
-      // Smoothly snap rotation back to center
       await _rotationController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic);
       _rotationController.reset();
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipOval(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-            child: IconButton(
-              icon: RotationTransition(
-                turns: _rotationController,
-                child: Icon(
-                  Icons.refresh_rounded, 
-                  color: isDark ? Colors.white : AppColors.accent,
-                  size: 22,
-                ),
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+      ),
+      child: ClipOval(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+          child: IconButton(
+            icon: RotationTransition(
+              turns: _rotationController,
+              child: Icon(
+                Icons.shuffle_rounded, 
+                color: AppColors.accent,
+                size: 18,
               ),
-              style: IconButton.styleFrom(
-                backgroundColor: isDark ? const Color(0xCC161B22) : const Color(0xCCFFFFFF),
-                padding: const EdgeInsets.all(10),
-              ),
-              onPressed: _triggerRefresh,
             ),
+            style: IconButton.styleFrom(
+              backgroundColor: isDark ? AppColors.darkSurfaceElevated.withValues(alpha: 0.9) : Colors.white.withValues(alpha: 0.9),
+              padding: const EdgeInsets.all(8),
+            ),
+            onPressed: _triggerRefresh,
           ),
         ),
       ),
@@ -317,9 +454,6 @@ class _AnimatedRefreshButtonState extends State<_AnimatedRefreshButton> with Sin
   }
 }
 
-// -------------------------------------------------------------
-// Discovery Card Design
-// -------------------------------------------------------------
 class _DiscoveryCard extends ConsumerWidget {
   const _DiscoveryCard({required this.repo});
   final GhRepo repo;
@@ -334,344 +468,249 @@ class _DiscoveryCard extends ConsumerWidget {
         : '${repo.size} KB';
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 64, 16, 110),
+      margin: const EdgeInsets.fromLTRB(16, 134, 16, 85),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F141C) : Colors.white,
-        borderRadius: BorderRadius.circular(32),
+        color: isDark ? AppColors.darkSurfaceElevated : Colors.white,
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+          color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+            blurRadius: 25,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(30),
-        child: Stack(
-          children: [
-            // Ambient glow effect
-            Positioned(
-              top: -80,
-              right: -80,
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.accent.withValues(alpha: isDark ? 0.18 : 0.12),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -60,
-              left: -60,
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFF9333EA).withValues(alpha: isDark ? 0.12 : 0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        borderRadius: BorderRadius.circular(26),
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.accent, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withValues(alpha: 0.35),
-                              blurRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: CachedNetworkImage(
-                            imageUrl: repo.owner.avatarUrl,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.accent, width: 2),
+                    ),
+                    child: ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: repo.owner.avatarUrl,
+                        fit: BoxFit.cover,
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '@${repo.owner.login}',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDark ? Colors.white60 : Colors.black54,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              repo.name,
-                              style: const TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w900,
-                                height: 1.15,
-                                letterSpacing: -0.5,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        if (repo.language != null) ...[
-                          _buildTag(Icons.code_rounded, repo.language!, AppColors.accent),
-                          const SizedBox(width: 6),
-                        ],
-                        _buildTag(Icons.star_rounded, formatCount(repo.stargazersCount), const Color(0xFFF59E0B)),
-                        const SizedBox(width: 6),
-                        _buildTag(
-                          Icons.favorite_rounded,
-                          '${repo.healthLabel} (${repo.healthScore})',
-                          repo.healthScore >= 75 
-                              ? AppColors.success 
-                              : (repo.healthScore >= 55 ? AppColors.warning : AppColors.danger),
-                        ),
-                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          repo.description ?? 'No description provided.',
+                          '@${repo.owner.login}',
                           style: TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                            fontWeight: FontWeight.w400,
+                            fontSize: 12,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                            fontWeight: FontWeight.bold,
                           ),
-                          maxLines: 5,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          repo.name,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                            letterSpacing: -0.5,
+                          ),
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                        ),
-                        const Spacer(),
-                        
-                        if (repo.topics.isNotEmpty) ...[
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: repo.topics.take(4).map((topic) {
-                              return Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
-                                  ),
-                                ),
-                                child: Text(
-                                  topic,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark ? Colors.white60 : Colors.black54,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isDark ? Colors.black38 : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.04),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.sd_storage_outlined, size: 14, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    sizeStr,
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Icon(Icons.gavel_rounded, size: 14, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    repo.license?.spdxId ?? repo.license?.name ?? 'No License',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const Icon(Icons.history_rounded, size: 14, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    timeago.format(repo.pushedAt),
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF161C24) : Colors.grey[50],
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _buildMetricItem(Icons.fork_right_rounded, formatCount(repo.forksCount), 'Forks', AppColors.accent),
-                              _buildMetricItem(Icons.visibility_rounded, formatCount(repo.watchersCount), 'Watchers', AppColors.success),
-                              _buildMetricItem(Icons.error_outline_rounded, formatCount(repo.openIssuesCount), 'Issues', AppColors.warning),
-                            ],
-                          ),
                         ),
                       ],
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 14),
 
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            HapticFeedback.mediumImpact();
-                            ref.read(bookmarkActionsProvider).toggle(repo);
-                          },
-                          icon: Icon(
-                            isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                            size: 18,
-                            color: isBookmarked ? AppColors.accent : (isDark ? Colors.white70 : Colors.black87),
-                          ),
-                          label: Text(
-                            isBookmarked ? 'Bookmarked' : 'Save',
-                            style: TextStyle(
-                              color: isBookmarked ? AppColors.accent : (isDark ? Colors.white70 : Colors.black87),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(
-                              color: isBookmarked 
-                                  ? AppColors.accent.withValues(alpha: 0.5) 
-                                  : (isDark ? Colors.white12 : Colors.black12),
-                              width: 1.5,
-                            ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                        ),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    if (repo.language != null) ...[
+                      _buildTag(Icons.code_rounded, repo.language!, AppColors.accent),
+                      const SizedBox(width: 6),
+                    ],
+                    _buildTag(Icons.star_rounded, formatCount(repo.stargazersCount), const Color(0xFFF59E0B)),
+                    const SizedBox(width: 6),
+                    _buildTag(
+                      Icons.favorite_rounded,
+                      '${repo.healthLabel} (${repo.healthScore})',
+                      repo.healthScore >= 75 
+                          ? AppColors.success 
+                          : (repo.healthScore >= 55 ? AppColors.warning : AppColors.danger),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      repo.description ?? 'No description provided.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        color: isDark ? Colors.white70 : Colors.black87,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    
+                    if (repo.topics.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: repo.topics.take(4).map((topic) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
                             ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF9333EA).withValues(alpha: 0.25),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              )
-                            ],
-                          ),
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              HapticFeedback.mediumImpact();
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => RepoDetailScreen(owner: repo.owner.login, repoName: repo.name),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.explore_rounded, color: Colors.white, size: 18),
-                            label: const Text(
-                              'Explore', 
-                              style: TextStyle(
+                            child: Text(
+                              '#$topic',
+                              style: const TextStyle(
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                fontSize: 13,
+                                color: AppColors.accent,
                               ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.black26 : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.sd_storage_outlined, size: 14, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(
+                                sizeStr,
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ),
+                          Row(
+                            children: [
+                              const Icon(Icons.gavel_rounded, size: 14, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(
+                                repo.license?.spdxId ?? repo.license?.name ?? 'No License',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.history_rounded, size: 14, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Text(
+                                timeago.format(repo.pushedAt),
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        ref.read(bookmarkActionsProvider).toggle(repo);
+                      },
+                      icon: Icon(
+                        isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                        size: 18,
+                        color: isBookmarked ? AppColors.accent : (isDark ? Colors.white70 : Colors.black87),
+                      ),
+                      label: Text(
+                        isBookmarked ? 'Saved' : 'Save',
+                        style: TextStyle(
+                          color: isBookmarked ? AppColors.accent : (isDark ? Colors.white70 : Colors.black87),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
                       ),
-                    ],
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(
+                          color: isBookmarked 
+                              ? AppColors.accent.withValues(alpha: 0.5) 
+                              : (isDark ? Colors.white12 : Colors.black12),
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        context.push(AppRoutes.repoPath(repo.owner.login, repo.name));
+                      },
+                      icon: const Icon(Icons.explore_rounded, size: 18),
+                      label: const Text(
+                        'Explore', 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -681,9 +720,9 @@ class _DiscoveryCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -700,23 +739,6 @@ class _DiscoveryCard extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildMetricItem(IconData icon, String value, String label, Color color) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 18),
-        const SizedBox(height: 2),
-        Text(
-          value, 
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        Text(
-          label, 
-          style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w500),
-        ),
-      ],
     );
   }
 }

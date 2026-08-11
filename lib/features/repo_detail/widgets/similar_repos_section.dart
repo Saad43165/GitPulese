@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/repo_model.dart';
 import '../../../providers/ai_providers.dart';
 import '../../../widgets/repo_card.dart';
-import '../repo_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/router/app_router.dart';
 
 class SimilarReposSection extends ConsumerWidget {
   const SimilarReposSection({super.key, required this.repo});
@@ -37,9 +38,7 @@ class SimilarReposSection extends ConsumerWidget {
                   child: RepoCard(
                     repo: r,
                     compact: true,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => RepoDetailScreen(owner: r.owner.login, repoName: r.name)),
-                    ),
+                    onTap: () => context.push(AppRoutes.repoPath(r.owner.login, r.name)),
                   ),
                 ),
               );

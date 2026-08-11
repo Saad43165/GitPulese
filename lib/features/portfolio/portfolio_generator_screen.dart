@@ -1,10 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
@@ -1119,51 +1117,22 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
                             ),
                           ),
                           if (_customizeSectionIndex == 0) ...[
-                            TextField(
-                              controller: _nameController,
-                              decoration: const InputDecoration(labelText: 'Display Name', prefixIcon: Icon(Icons.person_rounded)),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _roleController,
-                              decoration: const InputDecoration(labelText: 'Role / Bio Headline', prefixIcon: Icon(Icons.work_rounded)),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _locationController,
-                              decoration: const InputDecoration(labelText: 'Location', prefixIcon: Icon(Icons.location_on_rounded)),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _emailController,
-                              decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_rounded)),
-                            ),
+                            _buildTextField(controller: _nameController, label: 'Display Name', icon: Icons.person_rounded),
+                            _buildTextField(controller: _roleController, label: 'Role / Bio Headline', icon: Icons.work_rounded),
+                            _buildTextField(controller: _locationController, label: 'Location', icon: Icons.location_on_rounded),
+                            _buildTextField(controller: _emailController, label: 'Email Address', icon: Icons.email_rounded),
                           ] else if (_customizeSectionIndex == 1) ...[
-                            TextField(
+                            _buildTextField(
                               controller: _skillsController,
+                              label: 'Skills & Tech Stack (Comma separated)',
+                              icon: Icons.bolt_rounded,
                               maxLines: 4,
-                              decoration: const InputDecoration(
-                                labelText: 'Skills & Tech Stack (Comma separated)',
-                                hintText: 'e.g. Flutter, Dart, Go, SQLite, Firebase, Python',
-                                prefixIcon: Icon(Icons.bolt_rounded),
-                                alignLabelWithHint: true,
-                              ),
+                              hintText: 'e.g. Flutter, Dart, Go, SQLite, Firebase, Python',
                             ),
                           ] else ...[
-                            TextField(
-                              controller: _websiteController,
-                              decoration: const InputDecoration(labelText: 'Personal Website URL', prefixIcon: Icon(Icons.language_rounded)),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _linkedinController,
-                              decoration: const InputDecoration(labelText: 'LinkedIn URL', prefixIcon: Icon(Icons.link_rounded)),
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _twitterController,
-                              decoration: const InputDecoration(labelText: 'Twitter/X URL', prefixIcon: Icon(Icons.alternate_email_rounded)),
-                            ),
+                            _buildTextField(controller: _websiteController, label: 'Personal Website URL', icon: Icons.language_rounded),
+                            _buildTextField(controller: _linkedinController, label: 'LinkedIn URL', icon: Icons.link_rounded),
+                            _buildTextField(controller: _twitterController, label: 'Twitter/X URL', icon: Icons.alternate_email_rounded),
                           ],
                         ],
                       ),
@@ -1188,54 +1157,65 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
                               thumbColor: AppColors.accent.withValues(alpha: 0.6),
                               radius: const Radius.circular(4),
                               thickness: 4,
-                              child: ListView.separated(
+                              child: ListView.builder(
                                 controller: _repoListScrollController,
                                 shrinkWrap: true,
                                 itemCount: repos.length,
-                                separatorBuilder: (_, __) => Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
+                                padding: const EdgeInsets.symmetric(vertical: 4),
                                 itemBuilder: (context, index) {
                                   final repo = repos[index];
                                   final isSelected = _selectedRepoNames.contains(repo.fullName);
-                                  return CheckboxListTile(
-                                    dense: true,
-                                    title: Text(repo.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Row(
-                                      children: [
-                                        if (repo.language != null) ...[
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: BoxDecoration(
-                                              color: _getLanguageColor(repo.language),
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(repo.language!, style: const TextStyle(fontSize: 11)),
-                                          const SizedBox(width: 12),
-                                        ],
-                                        const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
-                                        const SizedBox(width: 2),
-                                        Text('${repo.stargazersCount}', style: const TextStyle(fontSize: 11)),
-                                      ],
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? AppColors.accent.withValues(alpha: 0.1) : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                                      border: Border.all(
+                                        color: isSelected ? AppColors.accent : (isDark ? Colors.white12 : Colors.black12),
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                    value: isSelected,
-                                    activeColor: AppColors.accent,
-                                    onChanged: (val) {
-                                      setState(() {
-                                        if (val == true) {
-                                          if (_selectedRepoNames.length < 6) {
-                                            _selectedRepoNames.add(repo.fullName);
+                                    child: CheckboxListTile(
+                                      dense: true,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      title: Text(repo.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                      subtitle: Row(
+                                        children: [
+                                          if (repo.language != null) ...[
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(
+                                                color: _getLanguageColor(repo.language),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(repo.language!, style: const TextStyle(fontSize: 11)),
+                                            const SizedBox(width: 12),
+                                          ],
+                                          const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                                          const SizedBox(width: 2),
+                                          Text('${repo.stargazersCount}', style: const TextStyle(fontSize: 11)),
+                                        ],
+                                      ),
+                                      value: isSelected,
+                                      activeColor: AppColors.accent,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            if (_selectedRepoNames.length < 6) {
+                                              _selectedRepoNames.add(repo.fullName);
+                                            } else {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                const SnackBar(content: Text('You can showcase up to 6 repositories.')),
+                                              );
+                                            }
                                           } else {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('You can showcase up to 6 repositories.')),
-                                            );
+                                            _selectedRepoNames.remove(repo.fullName);
                                           }
-                                        } else {
-                                          _selectedRepoNames.remove(repo.fullName);
-                                        }
-                                      });
-                                    },
+                                        });
+                                      },
+                                    ),
                                   );
                                 },
                               ),
@@ -1653,6 +1633,47 @@ class _PortfolioGeneratorScreenState extends ConsumerState<PortfolioGeneratorScr
       case 'swift': return Colors.deepOrangeAccent;
       default: return Colors.blueGrey;
     }
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    int maxLines = 1,
+    String? hintText,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hintText,
+          hintStyle: TextStyle(fontSize: 12, color: isDark ? Colors.white30 : Colors.black38),
+          labelStyle: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : Colors.black87),
+          prefixIcon: Icon(icon, color: AppColors.accent, size: 20),
+          filled: true,
+          fillColor: isDark ? const Color(0xFF1E293B) : Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: isDark ? Colors.white12 : Colors.black12),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.accent, width: 2),
+          ),
+          alignLabelWithHint: maxLines > 1,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
   }
 }
 

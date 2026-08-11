@@ -13,7 +13,6 @@ import '../../providers/repo_detail_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../data/models/user_and_search_models.dart';
-import '../../data/models/repo_model.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_back_button.dart';
 
@@ -34,16 +33,9 @@ class AiCodeEditorScreen extends ConsumerStatefulWidget {
 }
 
 class _AiCodeEditorScreenState extends ConsumerState<AiCodeEditorScreen> {
-  final _codeController = TextEditingController(text: '''// Existing Code
-void calculateSum() {
-  int total = 0;
-  for (int i = 0; i < 100; i++) {
-    total += i;
-  }
-  print(total);
-}''');
+  final _codeController = TextEditingController();
 
-  final _promptController = TextEditingController(text: 'Refactor this code to be more Dart-idiomatic and performant.');
+  final _promptController = TextEditingController();
   final _ownerController = TextEditingController();
   final _repoController = TextEditingController();
   final _pathController = TextEditingController();
@@ -198,17 +190,11 @@ void calculateSum() {
     final branch = _branchController.text.trim();
 
     if (!_isFileLoaded || _loadedFileSha == null) {
-      // Fallback/Mock commit if they edited the default scratchpad file
-      setState(() {
-        _isLoading = true;
-      });
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() {
-        _isLoading = false;
-        _isCommitted = true;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Scratchpad patch simulated successfully! Connect to a repository to commit for real.')),
+        const SnackBar(
+          content: Text('No file loaded. Use "Fetch Remote File" to load a file from GitHub before committing.'),
+          backgroundColor: Colors.orangeAccent,
+        ),
       );
       return;
     }
@@ -251,7 +237,7 @@ void calculateSum() {
         owner: owner,
         repo: repo,
         path: path,
-        content: _diffOutput, // the refactored code output
+        content: _codeController.text, // always commit what's in the editor
         sha: _loadedFileSha!,
         message: message,
         branch: branch,
@@ -261,7 +247,6 @@ void calculateSum() {
 
       setState(() {
         _loadedFileSha = newSha;
-        _codeController.text = _diffOutput;
         _showDiff = false;
         _isCommitted = true;
       });
@@ -755,6 +740,8 @@ void calculateSum() {
                     keyboardType: TextInputType.multiline,
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.4),
                     decoration: const InputDecoration(
+                      hintText: 'Load a file from GitHub above, or paste code here to get started.',
+                      hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
@@ -782,6 +769,8 @@ void calculateSum() {
                   child: TextField(
                     controller: _promptController,
                     decoration: const InputDecoration(
+                      hintText: 'e.g. "Refactor to be more idiomatic", "Add error handling", "Optimize loops"',
+                      hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,

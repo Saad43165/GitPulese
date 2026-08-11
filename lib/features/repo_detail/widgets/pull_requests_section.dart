@@ -6,7 +6,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../providers/repo_detail_providers.dart';
 import '../../../../widgets/app_surface.dart';
 import '../../../../widgets/glowing_indicator.dart';
-import '../ai_pr_reader_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 
 class PullRequestsSection extends ConsumerWidget {
   const PullRequestsSection({
@@ -46,16 +47,7 @@ class PullRequestsSection extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: AppSurface(
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => AiPrReaderScreen(
-                        owner: owner,
-                        repoName: repoName,
-                        pullNumber: number,
-                        title: title,
-                      ),
-                    ),
-                  );
+                  context.push(AppRoutes.prPath(owner, repoName, number, title));
                 },
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Row(

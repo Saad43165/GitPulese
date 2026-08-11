@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +14,7 @@ import '../../widgets/glowing_indicator.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
 import '../../widgets/app_markdown.dart';
+import 'widgets/pr_security_scanner.dart';
 
 class AiPrReviewScreen extends ConsumerStatefulWidget {
   const AiPrReviewScreen({super.key});
@@ -789,6 +789,10 @@ class _AiPrReviewScreenState extends ConsumerState<AiPrReviewScreen> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+
+        // Security Leak Scanner Card
+        PrSecurityScanner(codeOrDiff: result.rawDiff),
         const SizedBox(height: 16),
 
         // Review markdown card

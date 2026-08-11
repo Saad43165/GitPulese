@@ -3,9 +3,12 @@ class ApiConstants {
   ApiConstants._();
 
   /// URL of your deployed backend proxy (see /gitexplorer-backend README).
-  /// Replace this with your real Render/Railway URL before shipping —
-  /// leaving it as-is will make every network call fail.
   static const String backendBaseUrl = 'https://gitpulse-ai.gitpulse-ai.workers.dev';
+
+  /// Must match the GITPULSE_APP_SECRET Cloudflare Worker env secret.
+  /// Set this to a random string (e.g. from `openssl rand -hex 32`) and keep it
+  /// out of version control — use --dart-define=GITPULSE_APP_SECRET=xxx at build time.
+  static const String appSecret = String.fromEnvironment('GITPULSE_APP_SECRET', defaultValue: '');
 
   static const String baseUrl = 'https://api.github.com';
 

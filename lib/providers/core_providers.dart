@@ -1,9 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../core/network/dio_client.dart';
 import '../data/local/database_helper.dart';
 import '../data/remote/github_api_service.dart';
+
+/// True when the device has no active network connection.
+final isOfflineProvider = StreamProvider<bool>((ref) {
+  return Connectivity().onConnectivityChanged.map(
+    (results) => results.isEmpty || results.every((r) => r == ConnectivityResult.none),
+  );
+});
 
 /// Singleton GitHub API service, backed by the real dio client.
 final githubApiServiceProvider = Provider<GitHubApiService>((ref) {
@@ -53,10 +62,12 @@ class RateLimitState {
 }
 
 class RateLimitWatcher extends StateNotifier<RateLimitState> {
+  late final StreamSubscription<RateLimitInfo> _sub;
+
   RateLimitWatcher() : super(const RateLimitState()) {
-    RateLimitNotifier.instance.addListener(_onUpdate);
-    final latest = RateLimitNotifier.instance.latest;
-    if (latest != null) _onUpdate(latest);
+    final notifier = RateLimitNotifier.instance;
+    if (notifier.latest != null) _onUpdate(notifier.latest!);
+    _sub = notifier.stream.listen(_onUpdate);
   }
 
   void _onUpdate(RateLimitInfo info) {
@@ -69,7 +80,7 @@ class RateLimitWatcher extends StateNotifier<RateLimitState> {
 
   @override
   void dispose() {
-    RateLimitNotifier.instance.removeListener(_onUpdate);
+    _sub.cancel();
     super.dispose();
   }
 }

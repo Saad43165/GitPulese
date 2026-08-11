@@ -6,7 +6,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../providers/repo_detail_providers.dart';
 import '../../../../widgets/app_surface.dart';
 import '../../../../widgets/glowing_indicator.dart';
-import '../file_viewer_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/router/app_router.dart';
 
 class SourceCodeSection extends ConsumerStatefulWidget {
   const SourceCodeSection({super.key, required this.owner, required this.repoName});
@@ -121,7 +122,6 @@ class _SourceCodeSectionState extends ConsumerState<SourceCodeSection> {
                             // Handle files
                             final fileName = item['name'] as String;
                             final ext = fileName.split('.').last.toLowerCase();
-                            const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'];
                             // Binary/office formats: open in GitHub's browser viewer instead of trying to decode bytes as text
                             const binaryExts = [
                               'zip', 'tar', 'gz', 'exe', 'dll', 'so', 'dylib',
@@ -138,15 +138,7 @@ class _SourceCodeSectionState extends ConsumerState<SourceCodeSection> {
                               return;
                             }
 
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => FileViewerScreen(
-                                  owner: widget.owner,
-                                  repoName: widget.repoName,
-                                  filePath: item['path'] as String,
-                                ),
-                              ),
-                            );
+                            context.push(AppRoutes.filePath(widget.owner, widget.repoName, item['path'] as String));
                           }
                         },
                       );

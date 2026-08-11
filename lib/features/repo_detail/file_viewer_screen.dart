@@ -2,10 +2,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/core_providers.dart';
@@ -17,6 +17,7 @@ import '../../widgets/app_markdown.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/safe_page.dart';
 import '../editor/ai_code_editor_screen.dart';
+import '../file_browser/file_editor_screen.dart';
 
 final fileContentProvider = FutureProvider.autoDispose.family<String, ({String owner, String repo, String path})>((ref, args) async {
   final api = ref.watch(githubApiServiceProvider);
@@ -326,6 +327,37 @@ class _FileViewerScreenState extends ConsumerState<FileViewerScreen> {
                   ),
                 ),
               ),
+            ),
+          if (!isImage && !isBinary)
+            IconButton(
+              icon: const Icon(Icons.share_rounded),
+              tooltip: 'Share Code',
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                final content = ref.read(fileContentProvider((owner: widget.owner, repo: widget.repoName, path: widget.filePath))).value;
+                if (content != null && content.isNotEmpty) {
+                  Share.share(content, subject: widget.filePath);
+                }
+              },
+            ),
+          if (!isImage && !isBinary)
+            IconButton(
+              icon: const Icon(Icons.edit_rounded),
+              tooltip: 'Edit file on GitHub',
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                final content = ref.read(fileContentProvider((owner: widget.owner, repo: widget.repoName, path: widget.filePath))).valueOrNull;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FileEditorScreen(
+                      owner: widget.owner,
+                      repoName: widget.repoName,
+                      filePath: widget.filePath,
+                      initialContent: content,
+                    ),
+                  ),
+                );
+              },
             ),
           if (!isImage && !isBinary)
             IconButton(

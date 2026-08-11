@@ -5,6 +5,7 @@ import '../../core/constants/api_constants.dart';
 import '../../core/network/dio_client.dart';
 import '../models/repo_model.dart';
 import '../models/user_and_search_models.dart';
+import '../local/database_helper.dart';
 
 enum RepoSort { bestMatch, stars, forks, updated }
 enum SearchPeriod { allTime, today, thisWeek, thisMonth, thisYear }
@@ -242,31 +243,59 @@ class GitHubApiService {
   }
 
   Future<GhRepo> getRepoDetail(String owner, String repo) async {
+    final fullName = '$owner/$repo';
     try {
       final response = await _dio.get(ApiConstants.repoDetail(owner, repo));
-      return GhRepo.fromJson(response.data as Map<String, dynamic>);
+      final repoObj = GhRepo.fromJson(response.data as Map<String, dynamic>);
+      try {
+        DatabaseHelper.instance.cacheRepo(fullName, json.encode(response.data));
+      } catch (_) {}
+      return repoObj;
     } on DioException catch (e) {
+      try {
+        final cached = await DatabaseHelper.instance.getCachedRepo(fullName);
+        if (cached != null) {
+          final jsonMap = json.decode(cached['jsonContent'] as String) as Map<String, dynamic>;
+          return GhRepo.fromJson(jsonMap);
+        }
+      } catch (_) {}
       throw GitHubApiException.fromDioError(e);
     }
   }
+
   /// Returns decoded README markdown as plain text (decoded from base64).
   Future<String?> getRepoReadme(String owner, String repo) async {
+    final fullName = '$owner/$repo';
     try {
       final response = await _dio.get(
         ApiConstants.repoReadme(owner, repo),
         options: Options(headers: {'Accept': 'application/vnd.github.v3.raw'}),
       );
-      if (response.data is String) return response.data;
-      // Fallback: base64 content field
-      final content = response.data['content'] as String?;
-      if (content == null) return null;
-      try {
-        return utf8.decode(base64.decode(content.replaceAll(RegExp(r'\s+'), '')));
-      } catch (_) {
-        return null;
+      String? readmeText;
+      if (response.data is String) {
+        readmeText = response.data as String;
+      } else {
+        final content = response.data['content'] as String?;
+        if (content != null) {
+          try {
+            readmeText = utf8.decode(base64.decode(content.replaceAll(RegExp(r'\s+'), '')));
+          } catch (_) {}
+        }
       }
+      if (readmeText != null) {
+        try {
+          DatabaseHelper.instance.cacheRepo(fullName, '{}', readmeContent: readmeText);
+        } catch (_) {}
+      }
+      return readmeText;
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) return null;
+      try {
+        final cached = await DatabaseHelper.instance.getCachedRepo(fullName);
+        if (cached != null && cached['readmeContent'] != null) {
+          return cached['readmeContent'] as String;
+        }
+      } catch (_) {}
       throw GitHubApiException.fromDioError(e);
     }
   }
@@ -528,6 +557,29 @@ class GitHubApiService {
     }
   }
 
+  /// Returns SHA, size, and encoding for a single file — used before editing.
+  /// Returns null if the path is a directory or doesn't exist.
+  Future<Map<String, dynamic>?> getFileMeta(String owner, String repo, String path) async {
+    try {
+      final response = await _dio.get('/repos/$owner/$repo/contents/$path');
+      if (response.data is Map) return response.data as Map<String, dynamic>;
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return null;
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  /// Fetches the default branch name for a repo.
+  Future<String> getDefaultBranch(String owner, String repo) async {
+    try {
+      final response = await _dio.get('/repos/$owner/$repo');
+      return (response.data as Map<String, dynamic>)['default_branch'] as String? ?? 'main';
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
   /// Fetches the contents of a directory in a repository.
   /// If path is empty, it fetches the root directory.
   Future<List<Map<String, dynamic>>> getRepoContents(String owner, String repo, [String path = '']) async {
@@ -748,19 +800,26 @@ class GitHubApiService {
     }
   }
 
-  Future<bool> checkFork(String owner, String repo) async {
+  Future<bool> checkFork(String owner, String repo, {String authLogin = ''}) async {
     try {
-      final authUserResponse = await _dio.get('/user');
-      final authLogin = (authUserResponse.data as Map<String, dynamic>)['login'] as String? ?? '';
-      if (authLogin.isEmpty) return false;
-      // Check if the authenticated user has a fork of this repo
-      final response = await _dio.get('/repos/$authLogin/$repo');
+      final login = authLogin.isNotEmpty ? authLogin : await _fetchAuthLogin();
+      if (login.isEmpty) return false;
+      final response = await _dio.get('/repos/$login/$repo');
       final data = response.data as Map<String, dynamic>?;
       final isFork = data?['fork'] as bool? ?? false;
       final parentName = (data?['parent'] as Map<String, dynamic>?)?['full_name'] as String?;
       return isFork && parentName == '$owner/$repo';
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<String> _fetchAuthLogin() async {
+    try {
+      final res = await _dio.get('/user');
+      return (res.data as Map<String, dynamic>)['login'] as String? ?? '';
+    } catch (_) {
+      return '';
     }
   }
 
@@ -970,4 +1029,153 @@ class GitHubApiService {
       throw GitHubApiException.fromDioError(e);
     }
   }
+
+  Future<List<Map<String, dynamic>>> getNotifications({bool all = false, bool participating = false}) async {
+    try {
+      final response = await _dio.get(
+        '/notifications',
+        queryParameters: {
+          'all': all ? 'true' : 'false',
+          'participating': participating ? 'true' : 'false',
+        },
+      );
+      if (response.data is List) {
+        return (response.data as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<void> markNotificationRead(String threadId) async {
+    try {
+      await _dio.patch('/notifications/threads/$threadId');
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getPublicGists({int page = 1, int perPage = 30}) async {
+    try {
+      final response = await _dio.get(
+        '/gists/public',
+        queryParameters: {'page': page, 'per_page': perPage},
+      );
+      if (response.data is List) {
+        return (response.data as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } on DioException catch (e) {
+      throw GitHubApiException.fromDioError(e);
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRepoIssues(String owner, String repo, {String state = 'open', String filter = 'all', int perPage = 30}) async {
+    try {
+      final response = await _dio.get(
+        '/repos/$owner/$repo/issues',
+        queryParameters: {'state': state, 'per_page': perPage, 'filter': filter},
+      );
+      if (response.data is! List) return [];
+      return (response.data as List).cast<Map<String, dynamic>>();
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<Map<String, dynamic>> getIssueDetail(String owner, String repo, int number) async {
+    try {
+      final response = await _dio.get('/repos/$owner/$repo/issues/$number');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<List<Map<String, dynamic>>> getIssueComments(String owner, String repo, int number, {int perPage = 50}) async {
+    try {
+      final response = await _dio.get(
+        '/repos/$owner/$repo/issues/$number/comments',
+        queryParameters: {'per_page': perPage},
+      );
+      if (response.data is! List) return [];
+      return (response.data as List).cast<Map<String, dynamic>>();
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<Map<String, dynamic>> createIssue(String owner, String repo, {required String title, String body = '', List<String> labels = const []}) async {
+    try {
+      final response = await _dio.post(
+        '/repos/$owner/$repo/issues',
+        data: {'title': title, 'body': body, if (labels.isNotEmpty) 'labels': labels},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<Map<String, dynamic>> createIssueComment(String owner, String repo, int number, String body) async {
+    try {
+      final response = await _dio.post('/repos/$owner/$repo/issues/$number/comments', data: {'body': body});
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<Map<String, dynamic>> createPullRequest(String owner, String repo, {required String title, String body = '', required String head, required String base}) async {
+    try {
+      final response = await _dio.post(
+        '/repos/$owner/$repo/pulls',
+        data: {'title': title, 'body': body, 'head': head, 'base': base},
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<Map<String, dynamic>> mergePullRequest(String owner, String repo, int number, {String? commitTitle, String mergeMethod = 'merge'}) async {
+    try {
+      final response = await _dio.put(
+        '/repos/$owner/$repo/pulls/$number/merge',
+        data: {
+          if (commitTitle != null) 'commit_title': commitTitle,
+          'merge_method': mergeMethod,
+        },
+      );
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<List<String>> getRepoBranches(String owner, String repo, {int perPage = 30}) async {
+    try {
+      final response = await _dio.get('/repos/$owner/$repo/branches', queryParameters: {'per_page': perPage});
+      if (response.data is! List) return [];
+      return (response.data as List).map((b) => (b as Map<String, dynamic>)['name'] as String).toList();
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<List<Map<String, dynamic>>> getUserOrgs() async {
+    try {
+      final response = await _dio.get('/user/orgs', queryParameters: {'per_page': 30});
+      if (response.data is! List) return [];
+      return (response.data as List).cast<Map<String, dynamic>>();
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<List<GhRepo>> getOrgRepos(String org, {int perPage = 30}) async {
+    try {
+      final response = await _dio.get('/orgs/$org/repos', queryParameters: {'per_page': perPage, 'sort': 'updated'});
+      if (response.data is! List) return [];
+      return (response.data as List).map((e) => GhRepo.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<List<GhUser>> getOrgMembers(String org, {int perPage = 30}) async {
+    try {
+      final response = await _dio.get('/orgs/$org/members', queryParameters: {'per_page': perPage});
+      if (response.data is! List) return [];
+      return (response.data as List).map((e) => GhUser.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await _dio.put('/notifications', data: {'read': true});
+    } on DioException catch (e) { throw GitHubApiException.fromDioError(e); }
+  }
+
 }

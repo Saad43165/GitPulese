@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../providers/history_providers.dart';
@@ -11,7 +10,8 @@ import '../../widgets/app_surface.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/state_views.dart';
 import '../../widgets/shimmer_skeletons.dart';
-import '../repo_detail/repo_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../widgets/safe_page.dart';
 
 class BookmarksScreen extends ConsumerWidget {
@@ -116,22 +116,13 @@ class BookmarksScreen extends ConsumerWidget {
                               final parts = (item['fullName'] as String).split('/');
                               final repoName = parts.length == 2 ? parts[1] : item['fullName'] as String;
                               final owner = parts.length == 2 ? parts[0] : '';
-                              final language = item['language'] as String?;
-
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: AppSurface(
                                   onTap: () {
                                     HapticFeedback.lightImpact();
                                     if (parts.length == 2) {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => RepoDetailScreen(
-                                            owner: owner,
-                                            repoName: repoName,
-                                          ),
-                                        ),
-                                      );
+                                      context.push(AppRoutes.repoPath(owner, repoName));
                                     }
                                   },
                                   padding: EdgeInsets.symmetric(

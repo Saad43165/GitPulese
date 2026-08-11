@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import 'package:dio_cache_interceptor/dio_cache_interceptor.dart';
 import '../../core/constants/api_constants.dart';
+
+// Header name must match worker.js APP_SECRET_HEADER constant.
+const _kAppSecretHeader = 'x-gitpulse-secret';
 
 /// Tracks the most recent rate-limit headers GitHub sent back, so the UI
 /// can show a real, live "X requests remaining" indicator.
@@ -37,21 +41,15 @@ class RateLimitNotifier {
   static final RateLimitNotifier instance = RateLimitNotifier._internal();
 
   RateLimitInfo? _latest;
-  final _listeners = <void Function(RateLimitInfo)>[];
+  final _controller = StreamController<RateLimitInfo>.broadcast();
 
   RateLimitInfo? get latest => _latest;
+  Stream<RateLimitInfo> get stream => _controller.stream;
 
   void update(RateLimitInfo info) {
     _latest = info;
-    for (final l in _listeners) {
-      l(info);
-    }
+    _controller.add(info);
   }
-
-  void addListener(void Function(RateLimitInfo) listener) =>
-      _listeners.add(listener);
-  void removeListener(void Function(RateLimitInfo) listener) =>
-      _listeners.remove(listener);
 }
 
 class DioClient {
@@ -66,7 +64,9 @@ class DioClient {
         headers: {
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
-          'User-Agent': 'GitExplorer-App',
+          'User-Agent': 'GitPulse-App',
+          if (ApiConstants.appSecret.isNotEmpty)
+            _kAppSecretHeader: ApiConstants.appSecret,
         },
       ),
     );
@@ -90,7 +90,6 @@ class DioClient {
           // IMPORTANT: We preserve the Authorization header so that authenticated
           // endpoints like /user/following/* and /user/starred/* continue to work.
           final requestOptions = error.requestOptions;
-          final statusCode = error.response?.statusCode;
 
           // Retry on any proxy error (including 405 Method Not Allowed, 5xx, or 403 rate limits)
           // by falling back directly to the public GitHub API on the user's IP.

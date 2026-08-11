@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,7 +11,6 @@ import '../../providers/settings_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../data/models/user_and_search_models.dart';
-import '../../data/models/repo_model.dart';
 import '../editor/ai_code_editor_screen.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_back_button.dart';

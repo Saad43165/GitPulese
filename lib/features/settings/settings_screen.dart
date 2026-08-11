@@ -12,21 +12,14 @@ import '../../providers/history_providers.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/search_providers.dart';
 import '../../providers/settings_providers.dart';
-import '../../providers/ai_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
 import '../auth/auth_dialog.dart';
-import '../tracked_repos/tracked_repos_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../data/models/repo_model.dart';
 import '../../widgets/repo_card.dart';
-import '../user_detail/user_detail_screen.dart';
-import '../bookmarks/bookmarks_screen.dart';
-import 'widgets_configuration_screen.dart';
-import 'secure_keychain_screen.dart';
-import '../../widgets/github_analytics_section.dart';
-import '../repo_detail/ai_pr_review_screen.dart';
-import '../devops/devops_workflows_screen.dart';
 import '../../widgets/aurora_background.dart';
 import '../../widgets/glowing_indicator.dart';
 
@@ -46,12 +39,12 @@ class SettingsScreen extends ConsumerWidget {
 
     final mockRepoForPreview = GhRepo(
       id: 0,
-      name: 'gitpulse-app',
-      fullName: 'saad43165/gitpulse-app',
+      name: 'awesome-project',
+      fullName: 'developer/awesome-project',
       owner: GhOwner(
         id: 0,
-        login: 'saad43165',
-        avatarUrl: 'https://avatars.githubusercontent.com/u/14101776?v=4',
+        login: 'developer',
+        avatarUrl: 'https://avatars.githubusercontent.com/u/9919?s=200&v=4',
         htmlUrl: '',
         type: 'User',
       ),
@@ -123,11 +116,7 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: const Color(0xFF8B5CF6),
                   title: 'Secure Token Keychain',
                   subtitle: 'Store & apply Personal Access Tokens securely',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SecureKeychainScreen()),
-                    );
-                  },
+                  onTap: () => context.push(AppRoutes.keychain),
                 ),
               ],
             ),
@@ -146,11 +135,7 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: const Color(0xFF8B5CF6),
                   title: 'AI Pull Request Reviewer',
                   subtitle: 'Audit PR links for bugs, security, and fixes',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AiPrReviewScreen()),
-                    );
-                  },
+                  onTap: () => context.push(AppRoutes.prReview),
                 ),
                 _buildDivider(isDark),
                 _buildListTile(
@@ -159,11 +144,7 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: const Color(0xFF0EA5E9),
                   title: 'DevOps Control Center',
                   subtitle: 'Trigger manual workflows and monitor build run logs',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const DevOpsWorkflowsScreen()),
-                    );
-                  },
+                  onTap: () => context.push(AppRoutes.devops),
                 ),
                 _buildDivider(isDark),
                 _buildListTile(
@@ -172,11 +153,7 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: const Color(0xFF3B82F6),
                   title: 'Configure Home Widgets',
                   subtitle: 'Preview, customize, and add GitPulse widgets',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const WidgetsConfigurationScreen()),
-                    );
-                  },
+                  onTap: () => context.push(AppRoutes.widgetsConfig),
                 ),
               ],
             ),
@@ -190,6 +167,16 @@ class SettingsScreen extends ConsumerWidget {
               context,
               children: [
                 _buildThemeSelector(context, ref, themeMode),
+                _buildDivider(isDark),
+                _buildSwitchTile(
+                  context,
+                  icon: Icons.speed_rounded,
+                  iconColor: const Color(0xFF38BDF8),
+                  title: 'Low-End Device Performance Mode',
+                  subtitle: 'Disables complex background blurs for 60/120 FPS smoothness',
+                  value: ref.watch(performanceModeProvider),
+                  onChanged: (v) => ref.read(performanceModeProvider.notifier).setEnabled(v),
+                ),
                 _buildDivider(isDark),
                 _buildSwitchTile(
                   context,
@@ -269,11 +256,7 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: const Color(0xFFEC4899),
                   title: 'Tracked Repositories',
                   subtitle: 'Manage repositories you get release notifications for',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const TrackedReposScreen()),
-                    );
-                  },
+                  onTap: () => context.push(AppRoutes.tracked),
                 ),
                 _buildDivider(isDark),
                 _buildListTile(
@@ -282,11 +265,7 @@ class SettingsScreen extends ConsumerWidget {
                   iconColor: const Color(0xFFF43F5E),
                   title: 'Saved Repositories',
                   subtitle: 'View your bookmarked repositories archive',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const BookmarksScreen()),
-                    );
-                  },
+                  onTap: () => context.push(AppRoutes.bookmarks),
                 ),
               ],
             ),
@@ -350,7 +329,7 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.info_outline_rounded,
                   iconColor: Colors.grey,
                   title: 'GitPulse Info',
-                  subtitle: 'Version 1.0.0 · Developed by Saad Ikram',
+                  subtitle: 'Version 1.0.0',
                 ),
                 _buildDivider(isDark),
                 _buildListTile(
@@ -1215,11 +1194,7 @@ class _ProfileCard extends StatelessWidget {
             children: [
               Expanded(
                 child: TextButton.icon(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => UserDetailScreen(username: user.login as String),
-                    ),
-                  ),
+                  onPressed: () => context.push(AppRoutes.userPath(user.login as String)),
                   icon: const Icon(Icons.person_rounded, size: 14),
                   label: const Text('View Profile'),
                   style: TextButton.styleFrom(
@@ -1249,42 +1224,6 @@ class _ProfileCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _StatBadge extends StatelessWidget {
-  const _StatBadge({required this.label, required this.value});
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value >= 1000 ? '${(value / 1000).toStringAsFixed(1)}k' : value.toString(),
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

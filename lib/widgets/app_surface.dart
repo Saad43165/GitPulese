@@ -34,12 +34,6 @@ class AppSurface extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final stripe = accentColor ?? Theme.of(context).colorScheme.primary;
 
-    // Glass base fill
-    final baseFill = backgroundColor ??
-        (isDark
-            ? const Color(0xFF0D1117).withValues(alpha: 0.72)
-            : Colors.white.withValues(alpha: 0.78));
-
     // Gradient border — bright top-left, dim bottom-right
     final borderGradient = LinearGradient(
       begin: Alignment.topLeft,
@@ -138,6 +132,6 @@ class AppSurface extends StatelessWidget {
       );
     }
 
-    return content;
+    return RepaintBoundary(child: content);
   }
 }

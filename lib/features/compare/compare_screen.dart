@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_spacing.dart';
@@ -51,8 +50,6 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   int _selectedMode = 0; // 0 = Repos, 1 = Accounts, 2 = Code
 
   // State for Account Compare
-  GhUser? _accountUser1;
-  GhUser? _accountUser2;
   String? _accountAiResult;
   String? _accountErrorMsg;
   bool _isAccountAnalyzing = false;
@@ -646,22 +643,35 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
   }
 
   Widget _buildEmptySlot(bool isDark) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.02)
-            : Colors.black.withValues(alpha: 0.06), // Darker for light mode
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.15), // Stronger border
-          width: 1.5,
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _searchFocusNode.requestFocus();
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.02)
+              : Colors.black.withValues(alpha: 0.02),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08),
+            width: 1.5,
+          ),
         ),
-      ),
-      child: Center(
-        child: Icon(
-          Icons.add_rounded,
-          color: isDark ? Colors.white38 : Colors.black45,
-          size: 28,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+            ),
+            child: Icon(
+              Icons.add_rounded,
+              color: isDark ? Colors.white38 : Colors.black45,
+              size: 24,
+            ),
+          ),
         ),
       ),
     );
@@ -852,6 +862,39 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
       ),
     );
   }
+
+  Widget _buildVsBadge(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.15),
+                blurRadius: 8,
+                spreadRadius: 1,
+              )
+            ],
+          ),
+          child: const Text(
+            'VS',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: AppColors.accent,
+              fontStyle: FontStyle.italic,
+              letterSpacing: 2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   Widget _buildAccountSlot(GhUser? user, bool isDark, String hintText, Color iconColor) {
     if (user != null) {
       return Container(
@@ -960,20 +1003,8 @@ class _CompareScreenState extends ConsumerState<CompareScreen> {
         ),
         const SizedBox(height: AppSpacing.xl),
         _buildAccountSlot(user1, isDark, 'Search first account (e.g. yyx990803)', Colors.blue),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Center(
-            child: Text(
-              'VS',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white24 : Colors.black26,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        ),
+        _buildVsBadge(isDark),
+
         _buildAccountSlot(user2, isDark, 'Search second account (e.g. gaearon)', Colors.purple),
         const SizedBox(height: AppSpacing.xxl),
         if (_isAccountAnalyzing)
@@ -1079,56 +1110,87 @@ Act as an expert technical recruiter and open-source analyst. Provide a brief, f
         const SizedBox(height: AppSpacing.xl),
         Container(
           height: 250,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
           ),
-          child: TextField(
-            controller: _code1Controller,
-            maxLines: null,
-            expands: true,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            decoration: InputDecoration(
-              hintText: 'Paste Code Snippet A here...',
-              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
-              border: InputBorder.none,
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Center(
-            child: Text(
-              'VS',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                color: isDark ? Colors.white24 : Colors.black26,
-                fontStyle: FontStyle.italic,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.code_rounded, size: 14, color: Colors.blueAccent),
+                    const SizedBox(width: 6),
+                    Text('Snippet A', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87)),
+                  ],
+                ),
               ),
-            ),
+              Expanded(
+                child: TextField(
+                  controller: _code1Controller,
+                  maxLines: null,
+                  expands: true,
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: isDark ? const Color(0xFFA7F3D0) : Colors.black87),
+                  decoration: InputDecoration(
+                    hintText: '// Paste Code Snippet A here...',
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
+        _buildVsBadge(isDark),
         Container(
           height: 250,
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
           ),
-          child: TextField(
-            controller: _code2Controller,
-            maxLines: null,
-            expands: true,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-            decoration: InputDecoration(
-              hintText: 'Paste Code Snippet B here...',
-              hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
-              border: InputBorder.none,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05),
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.code_rounded, size: 14, color: Colors.purpleAccent),
+                    const SizedBox(width: 6),
+                    Text('Snippet B', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? Colors.white70 : Colors.black87)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _code2Controller,
+                  maxLines: null,
+                  expands: true,
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: isDark ? const Color(0xFFE9D5FF) : Colors.black87),
+                  decoration: InputDecoration(
+                    hintText: '// Paste Code Snippet B here...',
+                    hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.xxl),

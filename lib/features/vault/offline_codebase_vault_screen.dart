@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
@@ -292,7 +291,7 @@ class _OfflineCodebaseVaultScreenState extends ConsumerState<OfflineCodebaseVaul
       }
 
       final filesCount = treeList.where((item) => item['type'] == 'blob').length;
-      final sizeMb = ((detail.size ?? 1200) / 1024).toStringAsFixed(1);
+      final sizeMb = (detail.size / 1024).toStringAsFixed(1);
 
       final newRepo = OfflineVaultRepo(
         name: detail.name,
@@ -1146,8 +1145,6 @@ class OfflineCodebaseReaderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return SafePage(
       useAurora: true,
       child: Scaffold(

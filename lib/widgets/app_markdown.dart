@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/app_theme.dart';
-import '../core/theme/app_spacing.dart';
 
 class AppMarkdown extends StatelessWidget {
   const AppMarkdown({
@@ -26,7 +25,6 @@ class AppMarkdown extends StatelessWidget {
 
     final textColor = isDark ? Colors.white70 : Colors.black87;
     final headerColor = isDark ? Colors.white : Colors.black87;
-    final codeBgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
     final codeTextColor = isDark ? const Color(0xFFF472B6) : const Color(0xFFDB2777); // Soft pink for inline code
     final blockBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final borderLight = isDark ? Colors.white10 : Colors.black12;

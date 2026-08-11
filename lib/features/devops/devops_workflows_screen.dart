@@ -1,36 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:fl_chart/fl_chart.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:timeago/timeago.dart' as timeago;
+import '../../core/network/dio_client.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/settings_providers.dart';
-import '../../widgets/app_surface.dart';
 import '../../widgets/safe_page.dart';
 import '../../data/models/user_and_search_models.dart';
-import '../../data/models/repo_model.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_back_button.dart';
-import '../auth/auth_dialog.dart';
+import '../../widgets/state_views.dart';
 
-final workflowsFutureProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, ({String owner, String repo})>((ref, args) async {
+final workflowsFutureProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, ({String owner, String repo})>((ref, args) async {
   final api = ref.watch(githubApiServiceProvider);
-  return await api.getWorkflows(args.owner, args.repo);
+  return api.getWorkflows(args.owner, args.repo);
 });
 
-final workflowRunsFutureProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, ({String owner, String repo})>((ref, args) async {
+final workflowRunsFutureProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, ({String owner, String repo})>((ref, args) async {
   final api = ref.watch(githubApiServiceProvider);
-  return await api.getWorkflowRuns(args.owner, args.repo);
+  return api.getWorkflowRuns(args.owner, args.repo);
 });
 
 class DevOpsWorkflowsScreen extends ConsumerStatefulWidget {
-  const DevOpsWorkflowsScreen({
-    super.key,
-    this.owner,
-    this.repoName,
-  });
+  const DevOpsWorkflowsScreen({super.key, this.owner, this.repoName});
 
   final String? owner;
   final String? repoName;
@@ -39,7 +38,8 @@ class DevOpsWorkflowsScreen extends ConsumerStatefulWidget {
   ConsumerState<DevOpsWorkflowsScreen> createState() => _DevOpsWorkflowsScreenState();
 }
 
-class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> with SingleTickerProviderStateMixin {
+class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen>
+    with SingleTickerProviderStateMixin {
   late final TextEditingController _ownerController;
   late final TextEditingController _repoController;
   late TabController _tabController;
@@ -55,7 +55,7 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
     _ownerController = TextEditingController(text: widget.owner ?? '');
     _repoController = TextEditingController(text: widget.repoName ?? '');
     _tabController = TabController(length: 2, vsync: this);
-    if (widget.owner != null && widget.repoName != null) {
+    if ((widget.owner?.isNotEmpty ?? false) && (widget.repoName?.isNotEmpty ?? false)) {
       _hasSearched = true;
     }
 
@@ -65,11 +65,7 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
       if (!seen && mounted) {
         await Future.delayed(const Duration(milliseconds: 600));
         if (mounted) {
-          ShowcaseView.get().startShowCase([
-            _ownerKey,
-            _repoKey,
-            _connectKey,
-          ]);
+          ShowcaseView.get().startShowCase([_ownerKey, _repoKey, _connectKey]);
           await prefs.setBool('seen_devops_tutorial', true);
         }
       }
@@ -85,28 +81,123 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
   }
 
   void _search() {
+    FocusScope.of(context).unfocus();
     if (_ownerController.text.trim().isEmpty || _repoController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter both owner and repository name')),
       );
       return;
     }
-    setState(() {
-      _hasSearched = true;
-    });
+    HapticFeedback.mediumImpact();
+    setState(() => _hasSearched = true);
     ref.invalidate(workflowsFutureProvider);
     ref.invalidate(workflowRunsFutureProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pat = ref.watch(githubPatProvider);
+    final isLoggedIn = pat != null && pat.isNotEmpty;
+
+    return SafePage(
+      useAurora: true,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          leading: const AppBackButton(),
+          title: Text(
+            _hasSearched
+                ? '${_ownerController.text}/${_repoController.text}'
+                : 'DevOps Control Center',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.help_outline_rounded),
+              onPressed: () => _showHelpDialog(context),
+              tooltip: 'DevOps Guide',
+            ),
+          ],
+          bottom: _hasSearched
+              ? TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'Workflow Runs'),
+                    Tab(text: 'Workflows'),
+                  ],
+                  indicatorColor: AppColors.accent,
+                  labelColor: AppColors.accent,
+                  unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                )
+              : null,
+        ),
+        body: !isLoggedIn
+            ? _NoAuthView(onSetup: () {})
+            : Column(
+                children: [
+                  _SearchBar(
+                    ownerController: _ownerController,
+                    repoController: _repoController,
+                    ownerKey: _ownerKey,
+                    repoKey: _repoKey,
+                    connectKey: _connectKey,
+                    onSearch: _search,
+                  ),
+                  if (!_hasSearched)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          children: [
+                            _PresetSelector(
+                              authUser: ref.watch(authenticatedUserProvider).valueOrNull,
+                              onSelected: (owner, repo) {
+                                _ownerController.text = owner;
+                                _repoController.text = repo;
+                                _search();
+                              },
+                            ),
+                            const SizedBox(height: 32),
+                            const _EmptyHint(),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _RunsTab(
+                            owner: _ownerController.text.trim(),
+                            repo: _repoController.text.trim(),
+                          ),
+                          _WorkflowsTab(
+                            owner: _ownerController.text.trim(),
+                            repo: _repoController.text.trim(),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+      ),
+    );
   }
 
   void _showHelpDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0D1117),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.rocket_launch_rounded, color: AppColors.accent),
             SizedBox(width: 8),
-            Text('DevOps Control Center'),
+            Text('DevOps Control Center', style: TextStyle(color: Colors.white)),
           ],
         ),
         content: const SingleChildScrollView(
@@ -114,38 +205,22 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'What is this feature?',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
+              Text('What is this feature?',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
               SizedBox(height: 4),
               Text(
-                'This screen lets you monitor and run your GitHub Actions workflows directly. You can inspect pipeline runs, see Avg success durations, and review execution trend indicators.',
-                style: TextStyle(fontSize: 12, height: 1.4),
+                'Monitor and trigger your GitHub Actions CI/CD workflows on mobile. Inspect build logs, track success ratios, and stream live execution outputs.',
+                style: TextStyle(fontSize: 12, height: 1.4, color: Colors.white70),
               ),
               SizedBox(height: 12),
-              Text(
-                'Under the Hood:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
+              Text('Features:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
               SizedBox(height: 4),
               Text(
-                '• Uses GitHub Actions API to stream runs and jobs.\n'
-                '• Streams console logs using custom ANSI formatting engines.\n'
-                '• Triggers workflows manually via the workflow_dispatch trigger API.',
-                style: TextStyle(fontSize: 12, height: 1.4),
-              ),
-              SizedBox(height: 12),
-              Text(
-                'How to use:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              SizedBox(height: 4),
-              Text(
-                '1. Enter the Repository Owner/Org name & Repository name.\n'
-                '2. Click "Connect DevOps Suite".\n'
-                '3. View list of runs or click the Play icon under "Workflows" to run a pipeline.',
-                style: TextStyle(fontSize: 12, height: 1.4),
+                '• Real-time CI/CD workflow telemetry & success ratios.\n'
+                '• Stream live console logs with ANSI formatting.\n'
+                '• Trigger workflows manually via workflow_dispatch API.',
+                style: TextStyle(fontSize: 12, height: 1.4, color: Colors.white70),
               ),
             ],
           ),
@@ -153,289 +228,206 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
+            child: const Text('Got it', style: TextStyle(color: AppColors.accent)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Sub-widgets ────────────────────────────────────────────────────────────────
+
+class _NoAuthView extends StatelessWidget {
+  const _NoAuthView({required this.onSetup});
+  final VoidCallback onSetup;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline_rounded, size: 56, color: theme.colorScheme.onSurface.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            Text(
+              'Sign in to view CI/CD pipelines',
+              style: TextStyle(
+                  color: theme.colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'A GitHub token is required to access workflow runs and dispatch actions.',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13, height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({
+    required this.ownerController,
+    required this.repoController,
+    required this.ownerKey,
+    required this.repoKey,
+    required this.connectKey,
+    required this.onSearch,
+  });
+
+  final TextEditingController ownerController;
+  final TextEditingController repoController;
+  final GlobalKey ownerKey;
+  final GlobalKey repoKey;
+  final GlobalKey connectKey;
+  final VoidCallback onSearch;
+
+  static InputDecoration _fieldDecoration(BuildContext context, String label, String hint) {
+    final theme = Theme.of(context);
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      isDense: true,
+      filled: true,
+      fillColor: theme.colorScheme.surfaceContainerHighest,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.dividerColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: theme.dividerColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return SafePage(
-      useAurora: true,
-      child: Scaffold(
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            leading: const AppBackButton(),
-            title: const Text('DevOps Control Center'),
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.help_outline_rounded),
-                onPressed: () => _showHelpDialog(context),
-                tooltip: 'How to use this feature',
-              ),
-            ],
-            bottom: _hasSearched
-                ? TabBar(
-                    controller: _tabController,
-                    tabs: const [
-                      Tab(text: 'Workflow Runs'),
-                      Tab(text: 'Workflows'),
-                    ],
-                    indicatorColor: AppColors.accent,
-                    labelColor: isDark ? Colors.white : Colors.black,
-                    unselectedLabelColor: isDark ? Colors.white54 : Colors.black54,
-                  )
-                : null,
-          ),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: AppSurface(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Column(
-                    children: [
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final useColumn = constraints.maxWidth < 450;
-                          final ownerField = Showcase(
-                            key: _ownerKey,
-                            title: 'Repository Owner / Organization',
-                            description: 'Enter the GitHub username or organization name that owns the target repository (e.g., "flutter").',
-                            titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                            descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-                            tooltipBackgroundColor: const Color(0xFF1E293B),
-                            tooltipBorderRadius: BorderRadius.circular(12),
-                            blurValue: 2,
-                            child: TextField(
-                              controller: _ownerController,
-                              decoration: const InputDecoration(
-                                labelText: 'Owner / Org',
-                                hintText: 'e.g. flutter',
-                                prefixIcon: Icon(Icons.business_rounded),
-                              ),
-                            ),
-                          );
-
-                          final repoField = Showcase(
-                            key: _repoKey,
-                            title: 'Repository Name',
-                            description: 'Enter the specific name of the repository you want to integrate (e.g., "flutter").',
-                            titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                            descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-                            tooltipBackgroundColor: const Color(0xFF1E293B),
-                            tooltipBorderRadius: BorderRadius.circular(12),
-                            blurValue: 2,
-                            child: TextField(
-                              controller: _repoController,
-                              decoration: const InputDecoration(
-                                labelText: 'Repository',
-                                hintText: 'e.g. flutter',
-                                prefixIcon: Icon(Icons.code_rounded),
-                              ),
-                            ),
-                          );
-
-                          if (useColumn) {
-                            return Column(
-                              children: [
-                                ownerField,
-                                const SizedBox(height: AppSpacing.sm),
-                                repoField,
-                              ],
-                            );
-                          } else {
-                            return Row(
-                              children: [
-                                Expanded(child: ownerField),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(child: repoField),
-                              ],
-                            );
-                          }
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Showcase(
-                        key: _connectKey,
-                        title: 'Connect DevOps Suite',
-                        description: 'Establish connection to pull live workflow lists, manual pipeline trigger states, and telemetry data.',
-                        titleTextStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
-                        descTextStyle: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.4),
-                        tooltipBackgroundColor: const Color(0xFF1E293B),
-                        tooltipBorderRadius: BorderRadius.circular(12),
-                        blurValue: 2,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _search,
-                            icon: const Icon(Icons.rocket_launch_rounded),
-                            label: const Text('Connect DevOps Suite'),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (!_hasSearched)
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        _buildRepositorySelector(isDark, ref.watch(authenticatedUserProvider).valueOrNull),
-                        const SizedBox(height: 32),
-                        Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.settings_system_daydream_rounded,
-                                size: 64,
-                                color: isDark ? Colors.white24 : Colors.black.withValues(alpha: 0.24),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Select a repository above or search to monitor build logs',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: isDark ? Colors.white60 : Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                  child: Showcase(
+                    key: ownerKey,
+                    title: 'Repository Owner',
+                    description: 'Enter username or organization (e.g. flutter).',
+                    child: TextField(
+                      controller: ownerController,
+                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
+                      decoration: _fieldDecoration(context, 'Owner / Org', 'e.g. flutter'),
                     ),
                   ),
-                )
-              else
+                ),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _RunsTab(owner: _ownerController.text.trim(), repo: _repoController.text.trim()),
-                      _WorkflowsTab(owner: _ownerController.text.trim(), repo: _repoController.text.trim()),
-                    ],
+                  child: Showcase(
+                    key: repoKey,
+                    title: 'Repository Name',
+                    description: 'Enter target repository name (e.g. flutter).',
+                    child: TextField(
+                      controller: repoController,
+                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
+                      decoration: _fieldDecoration(context, 'Repository', 'e.g. flutter'),
+                    ),
                   ),
                 ),
-            ],
-          ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Showcase(
+              key: connectKey,
+              title: 'Connect DevOps Suite',
+              description: 'Pull live workflow runs & telemetry data.',
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onSearch,
+                  icon: const Icon(Icons.rocket_launch_rounded, size: 18),
+                  label: const Text(
+                    'Connect CI/CD Pipeline',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
+}
 
-  Widget _buildRepositorySelector(bool isDark, GhUser? authUser) {
-    final List<Map<String, dynamic>> popularRepos = [
-      {'owner': 'flutter', 'name': 'flutter', 'label': 'Flutter', 'icon': Icons.flutter_dash_rounded},
-      {'owner': 'facebook', 'name': 'react', 'label': 'React', 'icon': Icons.code_rounded},
-      {'owner': 'dart-lang', 'name': 'sdk', 'label': 'Dart SDK', 'icon': Icons.terminal_rounded},
-      {'owner': 'microsoft', 'name': 'vscode', 'label': 'VS Code', 'icon': Icons.desktop_mac_rounded},
-    ];
+class _PresetSelector extends ConsumerWidget {
+  const _PresetSelector({required this.authUser, required this.onSelected});
+  final GhUser? authUser;
+  final void Function(String owner, String repo) onSelected;
 
+  static const _popularRepos = [
+    {'owner': 'flutter', 'name': 'flutter', 'label': 'Flutter Engine'},
+    {'owner': 'facebook', 'name': 'react', 'label': 'React Core'},
+    {'owner': 'dart-lang', 'name': 'sdk', 'label': 'Dart SDK'},
+    {'owner': 'microsoft', 'name': 'vscode', 'label': 'VS Code'},
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Select a Repository to Monitor CI/CD',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          Text(
+            'Quick Repository Presets',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 8),
           SizedBox(
-            height: 90,
+            height: 36,
             child: ListView(
               scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
               children: [
-                ...popularRepos.map((repo) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: InkWell(
-                      onTap: () {
-                        _ownerController.text = repo['owner'] as String;
-                        _repoController.text = repo['name'] as String;
-                        _search();
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        width: 90,
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.black12,
-                          ),
-                        ),
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(repo['icon'] as IconData, color: AppColors.accent, size: 24),
-                            const SizedBox(height: 6),
-                            Text(
-                              repo['label'] as String,
-                              style: const TextStyle(
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
+                ..._popularRepos.map((repo) => _PresetChip(
+                      label: repo['label']!,
+                      icon: Icons.rocket_rounded,
+                      iconColor: AppColors.accent,
+                      onTap: () => onSelected(repo['owner']!, repo['name']!),
+                    )),
                 if (authUser != null)
-                  ...ref.watch(userReposProvider(authUser.login)).maybeWhen(
-                    data: (repos) {
-                      return repos.map((repo) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: InkWell(
-                            onTap: () {
-                              _ownerController.text = authUser.login;
-                              _repoController.text = repo.name;
-                              _search();
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              width: 90,
-                              decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isDark ? Colors.white10 : Colors.black12,
-                                ),
-                              ),
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.person_pin_rounded, color: AppColors.accent, size: 24),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    repo.name,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList();
-                    },
+                  ...ref.watch(userReposProvider(authUser!.login)).maybeWhen(
+                    data: (repos) => repos.map((repo) => _PresetChip(
+                          label: repo.name,
+                          icon: Icons.person_pin_rounded,
+                          iconColor: AppColors.success,
+                          onTap: () => onSelected(authUser!.login, repo.name),
+                        )),
                     orElse: () => <Widget>[],
                   ),
               ],
@@ -447,265 +439,66 @@ class _DevOpsWorkflowsScreenState extends ConsumerState<DevOpsWorkflowsScreen> w
   }
 }
 
-class _WorkflowTelemetryDashboard extends StatelessWidget {
-  const _WorkflowTelemetryDashboard({required this.runs});
-  final List runs;
+class _PresetChip extends StatelessWidget {
+  const _PresetChip({
+    required this.label,
+    required this.icon,
+    required this.iconColor,
+    required this.onTap,
+  });
+  final String label;
+  final IconData icon;
+  final Color iconColor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    int total = runs.length;
-    int success = 0;
-    int failure = 0;
-    int running = 0;
-    int queued = 0;
-    double totalDurationSec = 0;
-    int completedWithDuration = 0;
-
-    for (final run in runs) {
-      final status = run['status'] as String? ?? '';
-      final conclusion = run['conclusion'] as String? ?? '';
-      
-      if (status == 'queued') {
-        queued++;
-      } else if (status == 'in_progress') {
-        running++;
-      } else if (status == 'completed') {
-        if (conclusion == 'success') {
-          success++;
-        } else if (conclusion == 'failure') {
-          failure++;
-        }
-      }
-
-      final startStr = run['run_started_at'] as String?;
-      final endStr = run['updated_at'] as String?;
-      if (startStr != null && endStr != null) {
-        final start = DateTime.tryParse(startStr);
-        final end = DateTime.tryParse(endStr);
-        if (start != null && end != null) {
-          final diff = end.difference(start).inSeconds;
-          if (diff > 0) {
-            totalDurationSec += diff;
-            completedWithDuration++;
-          }
-        }
-      }
-    }
-
-    final successRate = total > 0 ? (success / (success + failure == 0 ? 1 : success + failure)) : 0.0;
-    final avgDurationSec = completedWithDuration > 0 ? (totalDurationSec / completedWithDuration).round() : 0;
-    final avgDurationStr = avgDurationSec > 60 
-        ? '${avgDurationSec ~/ 60}m ${avgDurationSec % 60}s'
-        : '${avgDurationSec}s';
-
-    final trendRuns = runs.take(10).toList().reversed.toList();
-
-    return AppSurface(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 360;
-
-          final chartWidget = SizedBox(
-            width: 80,
-            height: 80,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 26,
-                    startDegreeOffset: 270,
-                    sections: [
-                      PieChartSectionData(
-                        color: Colors.green,
-                        value: success.toDouble() == 0 && failure.toDouble() == 0 ? 1 : success.toDouble(),
-                        radius: 6,
-                        showTitle: false,
-                      ),
-                      PieChartSectionData(
-                        color: Colors.red,
-                        value: failure.toDouble(),
-                        radius: 6,
-                        showTitle: false,
-                      ),
-                      if (running > 0 || queued > 0)
-                        PieChartSectionData(
-                          color: Colors.amber,
-                          value: (running + queued).toDouble(),
-                          radius: 6,
-                          showTitle: false,
-                        ),
-                    ],
-                  ),
-                ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${(successRate * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    const Text(
-                      'Success',
-                      style: TextStyle(fontSize: 8, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-
-          final statsGrid = Column(
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: theme.dividerColor),
+          ),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  _buildStatBox('Total Runs', '$total', Icons.playlist_play_rounded, Colors.blueAccent),
-                  const SizedBox(width: AppSpacing.sm),
-                  _buildStatBox('Avg Duration', avgDurationStr, Icons.timer_outlined, Colors.purpleAccent),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Row(
-                children: [
-                  _buildStatBox('Succeeded', '$success', Icons.check_circle_rounded, Colors.green),
-                  const SizedBox(width: AppSpacing.sm),
-                  _buildStatBox('Failed', '$failure', Icons.cancel_rounded, Colors.red),
-                ],
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
               ),
             ],
-          );
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Workflow Telemetry',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.sensors_rounded, color: Colors.greenAccent, size: 12),
-                        SizedBox(width: 4),
-                        Text('Live Metrics', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (isNarrow) ...[
-                Center(child: chartWidget),
-                const SizedBox(height: AppSpacing.md),
-                statsGrid,
-              ] else ...[
-                Row(
-                  children: [
-                    chartWidget,
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(child: statsGrid),
-                  ],
-                ),
-              ],
-              if (trendRuns.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                const Divider(height: 1),
-                const SizedBox(height: 8),
-                const Text(
-                  'Build Success History Trend (Last 10 Runs)',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 35,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: trendRuns.map((run) {
-                        final conclusion = run['conclusion'] as String? ?? '';
-                        final status = run['status'] as String? ?? '';
-                        Color dotColor = Colors.grey;
-                        if (status == 'completed') {
-                          dotColor = conclusion == 'success' ? Colors.green : Colors.red;
-                        } else {
-                          dotColor = Colors.amber;
-                        }
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: Tooltip(
-                            message: '${run['name']} #${run['run_number']} - ${conclusion.isEmpty ? status : conclusion}',
-                            child: Container(
-                              width: 22,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                color: dotColor.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: dotColor, width: 1.5),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  '#${run['run_number']}',
-                                  style: TextStyle(color: dotColor, fontSize: 8, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          );
-        },
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _buildStatBox(String label, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.1), width: 1),
-        ),
-        child: Row(
+class _EmptyHint extends StatelessWidget {
+  const _EmptyHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 14),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    label,
-                    style: const TextStyle(fontSize: 8, color: Colors.grey),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
+            Icon(Icons.precision_manufacturing_rounded, size: 54, color: theme.colorScheme.onSurface.withValues(alpha: 0.15)),
+            const SizedBox(height: 12),
+            Text(
+              'Select a preset or enter owner & repo above to view CI/CD pipelines',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -713,6 +506,8 @@ class _WorkflowTelemetryDashboard extends StatelessWidget {
     );
   }
 }
+
+// ── Runs Tab ───────────────────────────────────────────────────────────────────
 
 class _RunsTab extends ConsumerWidget {
   const _RunsTab({required this.owner, required this.repo});
@@ -725,220 +520,168 @@ class _RunsTab extends ConsumerWidget {
 
     return runsAsync.when(
       data: (data) {
-        final List runs = data['workflow_runs'] ?? [];
+        final runs = (data['workflow_runs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         if (runs.isEmpty) {
-          return const Center(child: Text('No workflow runs found.'));
+          return const EmptyStateView(
+            icon: Icons.play_circle_outline_rounded,
+            title: 'No workflow runs',
+            subtitle: 'This repository has no recorded CI/CD runs yet',
+          );
         }
         return RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(workflowRunsFutureProvider((owner: owner, repo: repo)));
-          },
-          child: ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.md),
+          onRefresh: () async => ref.invalidate(workflowRunsFutureProvider((owner: owner, repo: repo))),
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            physics: const BouncingScrollPhysics(),
             itemCount: runs.length + 1,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
-              if (index == 0) {
-                return _WorkflowTelemetryDashboard(runs: runs);
-              }
-              final run = runs[index - 1];
-              final status = run['status'] as String? ?? '';
-              final conclusion = run['conclusion'] as String? ?? '';
-              final headCommit = run['head_commit'] ?? {};
-              final message = headCommit['message'] as String? ?? 'No commit message';
-              final author = headCommit['author']?['name'] as String? ?? 'Unknown';
-              final branch = run['head_branch'] as String? ?? 'main';
-              final runNumber = run['run_number'] ?? 0;
-              final workflowName = run['name'] as String? ?? 'Workflow';
-
-              // Calculate run duration
-              final startTimeStr = run['run_started_at'] as String?;
-              final endTimeStr = run['updated_at'] as String?;
-              String durationText = '';
-              if (startTimeStr != null && endTimeStr != null) {
-                final startTime = DateTime.tryParse(startTimeStr);
-                final endTime = DateTime.tryParse(endTimeStr);
-                if (startTime != null && endTime != null) {
-                  final diff = endTime.difference(startTime);
-                  if (diff.inMinutes > 0) {
-                    durationText = '${diff.inMinutes}m ${diff.inSeconds % 60}s';
-                  } else {
-                    durationText = '${diff.inSeconds}s';
-                  }
-                }
-              }
-
-              Color statusColor = Colors.grey;
-              IconData statusIcon = Icons.help_outline_rounded;
-              bool spinning = false;
-
-              if (status == 'queued') {
-                statusColor = Colors.amber;
-                statusIcon = Icons.hourglass_empty_rounded;
-              } else if (status == 'in_progress') {
-                statusColor = Colors.blue;
-                statusIcon = Icons.sync_rounded;
-                spinning = true;
-              } else if (status == 'completed') {
-                if (conclusion == 'success') {
-                  statusColor = Colors.green;
-                  statusIcon = Icons.check_circle_rounded;
-                } else if (conclusion == 'failure') {
-                  statusColor = Colors.red;
-                  statusIcon = Icons.cancel_rounded;
-                } else if (conclusion == 'cancelled') {
-                  statusColor = Colors.grey;
-                  statusIcon = Icons.block_rounded;
-                }
-              }
-
-              return AppSurface(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => WorkflowRunDetailsScreen(
-                        owner: owner,
-                        repo: repo,
-                        runId: run['id'],
-                        runNumber: runNumber,
-                        workflowName: workflowName,
-                        commitMessage: message,
-                        status: status,
-                        conclusion: conclusion,
-                      ),
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (spinning)
-                        const GlowingIndicator(size: 20)
-                      else
-                        Icon(statusIcon, color: statusColor, size: 22),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              message.split('\n').first,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  '$workflowName #$runNumber • $branch',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                if (durationText.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.timer_outlined, size: 12, color: Colors.grey),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    durationText,
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Triggered by $author',
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.grey),
-                    ],
-                  ),
-                ),
-              );
+              if (index == 0) return _TelemetryDashboard(runs: runs);
+              return _RunCard(run: runs[index - 1]);
             },
           ),
         );
       },
-      loading: () => const Center(child: GlowingIndicator()),
-      error: (e, _) => Center(child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text('Error: ${e.toString()}', textAlign: TextAlign.center,),
-      )),
+      loading: () => const Center(child: GlowingIndicator(size: 32)),
+      error: (e, _) => ErrorStateView(
+        message: e is GitHubApiException ? e.message : 'Failed to load workflow runs',
+        onRetry: () => ref.invalidate(workflowRunsFutureProvider((owner: owner, repo: repo))),
+      ),
     );
   }
 }
+
+class _RunCard extends StatelessWidget {
+  const _RunCard({required this.run});
+  final Map<String, dynamic> run;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = run['status'] as String? ?? '';
+    final conclusion = run['conclusion'] as String? ?? '';
+    final name = run['name'] as String? ?? 'Workflow Run';
+    final runNumber = run['run_number']?.toString() ?? '';
+    final headBranch = run['head_branch'] as String? ?? 'main';
+    final commitMsg = run['head_commit']?['message'] as String? ?? 'No commit message';
+    final actorAvatar = run['actor']?['avatar_url'] as String?;
+    final actorName = run['actor']?['login'] as String? ?? 'GitHub';
+    final createdAt = run['created_at'] as String?;
+    final createdDate = createdAt != null ? DateTime.tryParse(createdAt) : null;
+
+    final (statusColor, statusIcon) = _resolveStatus(status, conclusion);
+
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(statusIcon, color: statusColor, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '$name #$runNumber',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    conclusion.isNotEmpty ? conclusion.toUpperCase() : status.toUpperCase(),
+                    style: TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              commitMsg,
+              style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                if (actorAvatar != null) ...[
+                  CircleAvatar(
+                    radius: 10,
+                    backgroundImage: CachedNetworkImageProvider(actorAvatar),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  '@$actorName',
+                  style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    headBranch,
+                    style: const TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.accent),
+                  ),
+                ),
+                const Spacer(),
+                if (createdDate != null)
+                  Text(
+                    timeago.format(createdDate),
+                    style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  (Color, IconData) _resolveStatus(String status, String conclusion) {
+    if (status == 'completed') {
+      return switch (conclusion) {
+        'success' => (AppColors.success, Icons.check_circle_rounded),
+        'failure' => (AppColors.danger, Icons.cancel_rounded),
+        'cancelled' => (Colors.orange, Icons.cancel_outlined),
+        _ => (Colors.orange, Icons.remove_circle_outline_rounded),
+      };
+    }
+    return switch (status) {
+      'in_progress' => (AppColors.accent, Icons.sync_rounded),
+      'queued' => (Colors.amber, Icons.hourglass_top_rounded),
+      _ => (Colors.grey, Icons.help_outline_rounded),
+    };
+  }
+}
+
+// ── Workflows Tab ──────────────────────────────────────────────────────────────
 
 class _WorkflowsTab extends ConsumerWidget {
   const _WorkflowsTab({required this.owner, required this.repo});
   final String owner;
   final String repo;
-
-  void _showTriggerDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> workflow) {
-    final name = workflow['name'] as String? ?? 'Workflow';
-    final workflowId = workflow['id'];
-    final refController = TextEditingController(text: 'main');
-    final Map<String, String> inputs = {};
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Trigger $name'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: refController,
-                decoration: const InputDecoration(
-                  labelText: 'Branch/Tag/Commit Ref',
-                  hintText: 'e.g. main',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              const Text(
-                'Note: Standard inputs for manual trigger can be supplied if required by your workflow.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                final api = ref.read(githubApiServiceProvider);
-                await api.triggerWorkflowDispatch(
-                  owner,
-                  repo,
-                  workflowId,
-                  ref: refController.text.trim(),
-                  inputs: inputs,
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Workflow dispatch triggered successfully!')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to trigger workflow: ${e.toString()}')),
-                );
-              }
-            },
-            child: const Text('Trigger Dispatch'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -946,542 +689,377 @@ class _WorkflowsTab extends ConsumerWidget {
 
     return workflowsAsync.when(
       data: (data) {
-        final List workflows = data['workflows'] ?? [];
+        final workflows = (data['workflows'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         if (workflows.isEmpty) {
-          return const Center(child: Text('No workflows found in this repo.'));
+          return const EmptyStateView(
+            icon: Icons.settings_suggest_rounded,
+            title: 'No active workflows',
+            subtitle: 'No GitHub Actions workflows found for this repository',
+          );
         }
-        return ListView.separated(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          itemCount: workflows.length,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-          itemBuilder: (context, index) {
-            final w = workflows[index];
-            final name = w['name'] as String? ?? 'Workflow';
-            final path = w['path'] as String? ?? '';
-            final state = w['state'] as String? ?? 'active';
-
-            return AppSurface(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  children: [
-                    const Icon(Icons.settings_suggest_rounded, color: AppColors.accent, size: 24),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          const SizedBox(height: 2),
-                          Text(path, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                    if (state == 'active')
-                      Consumer(
-                        builder: (context, ref, _) {
-                          final pat = ref.watch(githubPatProvider);
-                          final isLoggedIn = pat != null && pat.isNotEmpty;
-                          return IconButton(
-                            icon: Icon(
-                              isLoggedIn ? Icons.play_circle_fill_rounded : Icons.lock_outline_rounded,
-                              color: isLoggedIn ? Colors.green : Colors.grey,
-                              size: 30,
-                            ),
-                            onPressed: () {
-                              if (!isLoggedIn) {
-                                showDialog(context: context, builder: (_) => const AuthDialog());
-                              } else {
-                                _showTriggerDialog(context, ref, w);
-                              }
-                            },
-                            tooltip: isLoggedIn ? 'Trigger manually (workflow_dispatch)' : 'Login to trigger workflow',
-                          );
-                        },
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(workflowsFutureProvider((owner: owner, repo: repo))),
+          child: ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            physics: const BouncingScrollPhysics(),
+            itemCount: workflows.length,
+            itemBuilder: (context, index) => _WorkflowCard(
+              workflow: workflows[index],
+              owner: owner,
+              repo: repo,
+            ),
+          ),
         );
       },
-      loading: () => const Center(child: GlowingIndicator()),
-      error: (e, _) => Center(child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text('Error: ${e.toString()}', textAlign: TextAlign.center,),
-      )),
-    );
-  }
-}
-
-class WorkflowRunDetailsScreen extends ConsumerStatefulWidget {
-  const WorkflowRunDetailsScreen({
-    super.key,
-    required this.owner,
-    required this.repo,
-    required this.runId,
-    required this.runNumber,
-    required this.workflowName,
-    required this.commitMessage,
-    required this.status,
-    required this.conclusion,
-  });
-
-  final String owner;
-  final String repo;
-  final dynamic runId;
-  final int runNumber;
-  final String workflowName;
-  final String commitMessage;
-  final String status;
-  final String conclusion;
-
-  @override
-  ConsumerState<WorkflowRunDetailsScreen> createState() => _WorkflowRunDetailsScreenState();
-}
-
-class _WorkflowRunDetailsScreenState extends ConsumerState<WorkflowRunDetailsScreen> {
-  late Future<Map<String, dynamic>> _jobsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchJobs();
-  }
-
-  void _fetchJobs() {
-    _jobsFuture = ref.read(githubApiServiceProvider).getWorkflowRunJobs(widget.owner, widget.repo, widget.runId);
-  }
-
-  Future<void> _rerun() async {
-    final pat = ref.read(githubPatProvider);
-    final isLoggedIn = pat != null && pat.isNotEmpty;
-    if (!isLoggedIn) {
-      showDialog(context: context, builder: (_) => const AuthDialog());
-      return;
-    }
-    try {
-      await ref.read(githubApiServiceProvider).rerunWorkflow(widget.owner, widget.repo, widget.runId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Workflow re-run requested!')),
-      );
-      setState(() {
-        _fetchJobs();
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to re-run: ${e.toString()}')),
-      );
-    }
-  }
-
-  Future<void> _cancel() async {
-    final pat = ref.read(githubPatProvider);
-    final isLoggedIn = pat != null && pat.isNotEmpty;
-    if (!isLoggedIn) {
-      showDialog(context: context, builder: (_) => const AuthDialog());
-      return;
-    }
-    try {
-      await ref.read(githubApiServiceProvider).cancelWorkflow(widget.owner, widget.repo, widget.runId);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Workflow run cancellation requested!')),
-      );
-      setState(() {
-        _fetchJobs();
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to cancel: ${e.toString()}')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return SafePage(
-      child: Scaffold(
-        backgroundColor: isDark ? AppColors.darkBg : AppColors.lightBg,
-        appBar: AppBar(
-          leading: const AppBackButton(),
-          title: Text('${widget.workflowName} #${widget.runNumber}'),
-          actions: [
-            if (widget.status == 'in_progress' || widget.status == 'queued')
-              IconButton(
-                icon: const Icon(Icons.cancel_outlined, color: Colors.red),
-                onPressed: _cancel,
-                tooltip: 'Cancel Run',
-              )
-            else
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded, color: Colors.green),
-                onPressed: _rerun,
-                tooltip: 'Re-run Jobs',
-              )
-          ],
-        ),
-        body: FutureBuilder<Map<String, dynamic>>(
-          future: _jobsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: GlowingIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(child: Text('Error loading jobs: ${snapshot.error}'));
-            }
-
-            final List jobs = snapshot.data?['jobs'] ?? [];
-            if (jobs.isEmpty) {
-              return const Center(child: Text('No jobs found for this run.'));
-            }
-
-            return ListView.separated(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              itemCount: jobs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) {
-                final job = jobs[index];
-                final jobName = job['name'] as String? ?? 'Job';
-                final jobStatus = job['status'] as String? ?? '';
-                final jobConclusion = job['conclusion'] as String? ?? '';
-                final List steps = job['steps'] ?? [];
-
-                return AppSurface(
-                  child: ExpansionTile(
-                    title: Row(
-                      children: [
-                        _getStatusIcon(jobStatus, jobConclusion),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(child: Text(jobName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    childrenPadding: const EdgeInsets.all(AppSpacing.md),
-                    expandedAlignment: Alignment.topLeft,
-                    children: [
-                      const Text(
-                        'Steps:',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      ...steps.map((step) {
-                        final stepName = step['name'] as String? ?? 'Step';
-                        final stepStatus = step['status'] as String? ?? '';
-                        final stepConclusion = step['conclusion'] as String? ?? '';
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              _getStatusIcon(stepStatus, stepConclusion, size: 16),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: Text(
-                                  stepName,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: AppSpacing.md),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => JobLogsScreen(
-                                  owner: widget.owner,
-                                  repo: widget.repo,
-                                  jobId: job['id'],
-                                  jobName: jobName,
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.terminal_rounded),
-                          label: const Text('View Build Logs'),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        ),
+      loading: () => const Center(child: GlowingIndicator(size: 32)),
+      error: (e, _) => ErrorStateView(
+        message: e is GitHubApiException ? e.message : 'Failed to load workflows',
+        onRetry: () => ref.invalidate(workflowsFutureProvider((owner: owner, repo: repo))),
       ),
     );
   }
-
-  Widget _getStatusIcon(String status, String conclusion, {double size = 20}) {
-    Color statusColor = Colors.grey;
-    IconData statusIcon = Icons.help_outline_rounded;
-
-    if (status == 'queued') {
-      statusColor = Colors.amber;
-      statusIcon = Icons.hourglass_empty_rounded;
-    } else if (status == 'in_progress') {
-      return GlowingIndicator(size: size);
-    } else if (status == 'completed') {
-      if (conclusion == 'success') {
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle_rounded;
-      } else if (conclusion == 'failure') {
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel_rounded;
-      } else if (conclusion == 'cancelled') {
-        statusColor = Colors.grey;
-        statusIcon = Icons.block_rounded;
-      }
-    }
-
-    return Icon(statusIcon, color: statusColor, size: size);
-  }
 }
 
-class JobLogsScreen extends ConsumerStatefulWidget {
-  const JobLogsScreen({
-    super.key,
+class _WorkflowCard extends ConsumerWidget {
+  const _WorkflowCard({
+    required this.workflow,
     required this.owner,
     required this.repo,
-    required this.jobId,
-    required this.jobName,
   });
-
+  final Map<String, dynamic> workflow;
   final String owner;
   final String repo;
-  final dynamic jobId;
-  final String jobName;
 
   @override
-  ConsumerState<JobLogsScreen> createState() => _JobLogsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = workflow['name'] as String? ?? 'Workflow';
+    final path = workflow['path'] as String? ?? '';
+    final state = workflow['state'] as String? ?? '';
+    final isActive = state == 'active';
 
-class _JobLogsScreenState extends ConsumerState<JobLogsScreen> {
-  late Future<String> _logsFuture;
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _logsFuture = ref.read(githubApiServiceProvider).getJobLogs(widget.owner, widget.repo, widget.jobId);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafePage(
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A), // Dark slate console background
-        appBar: AppBar(
-          leading: const AppBackButton(),
-          backgroundColor: const Color(0xFF1E293B),
-          elevation: 0,
-          title: _isSearching
-              ? TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.white, fontFamily: 'monospace', fontSize: 14),
-                  decoration: const InputDecoration(
-                    hintText: 'Search logs...',
-                    hintStyle: TextStyle(color: Colors.white30),
-                    border: InputBorder.none,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: Color(0xFF6366F1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.settings_suggest_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14, color: theme.colorScheme.onSurface),
                   ),
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val.trim();
-                    });
-                  },
-                )
-              : Text(widget.jobName, style: const TextStyle(fontFamily: 'monospace')),
-          actions: [
-            IconButton(
-              icon: Icon(_isSearching ? Icons.close_rounded : Icons.search_rounded),
-              onPressed: () {
-                setState(() {
-                  if (_isSearching) {
-                    _isSearching = false;
-                    _searchController.clear();
-                    _searchQuery = '';
-                  } else {
-                    _isSearching = true;
-                  }
-                });
-              },
+                  const SizedBox(height: 2),
+                  Text(
+                    path,
+                    style: TextStyle(
+                        fontSize: 11, color: theme.colorScheme.onSurfaceVariant, fontFamily: 'monospace'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!isActive)
+                    const Text(
+                      'DISABLED',
+                      style: TextStyle(
+                          fontSize: 9, color: Colors.orangeAccent, fontWeight: FontWeight.bold),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: isActive
+                  ? () {
+                      HapticFeedback.mediumImpact();
+                      _showDispatchDialog(context, ref, name, workflow['id']);
+                    }
+                  : null,
+              icon: const Icon(Icons.play_arrow_rounded, size: 16),
+              label: const Text('Dispatch',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                disabledBackgroundColor: Colors.white12,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
             ),
           ],
         ),
-        body: FutureBuilder<String>(
-          future: _logsFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: GlowingIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Error loading logs: ${snapshot.error}',
-                    style: const TextStyle(color: Colors.redAccent, fontFamily: 'monospace'),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              );
-            }
-
-            final logText = snapshot.data ?? 'No logs available.';
-            final spans = _parseAnsiToTextSpans(
-              logText,
-              const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                height: 1.4,
-                color: Color(0xFFE2E8F0),
-              ),
-            );
-
-            return SelectionArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                physics: const BouncingScrollPhysics(),
-                child: Text.rich(
-                  TextSpan(children: spans),
-                ),
-              ),
-            );
-          },
-        ),
       ),
     );
   }
 
-  List<InlineSpan> _highlightSearchMatches(String segment, TextStyle style) {
-    if (_searchQuery.isEmpty) {
-      final lower = segment.toLowerCase();
-      Color? textCol;
-      if (lower.contains('error') || lower.contains('failed') || lower.contains('exception') || lower.contains('fail')) {
-        textCol = Colors.redAccent;
-      } else if (lower.contains('warning') || lower.contains('warn')) {
-        textCol = Colors.amberAccent;
-      }
-      return [
-        TextSpan(
-          text: segment,
-          style: style.copyWith(color: textCol),
-        ),
-      ];
-    }
+  void _showDispatchDialog(
+      BuildContext context, WidgetRef ref, String name, dynamic workflowId) {
+    final branchController = TextEditingController(text: 'main');
+    bool dispatching = false;
 
-    final List<InlineSpan> spans = [];
-    final lowerSegment = segment.toLowerCase();
-    final lowerQuery = _searchQuery.toLowerCase();
-    int start = 0;
-    int index = lowerSegment.indexOf(lowerQuery, start);
-
-    while (index != -1) {
-      if (index > start) {
-        final prefix = segment.substring(start, index);
-        spans.add(TextSpan(text: prefix, style: style));
-      }
-
-      final matchText = segment.substring(index, index + _searchQuery.length);
-      spans.add(TextSpan(
-        text: matchText,
-        style: style.copyWith(
-          backgroundColor: Colors.yellow.withValues(alpha: 0.35),
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ));
-
-      start = index + _searchQuery.length;
-      index = lowerSegment.indexOf(lowerQuery, start);
-    }
-
-    if (start < segment.length) {
-      final suffix = segment.substring(start);
-      spans.add(TextSpan(text: suffix, style: style));
-    }
-
-    return spans;
-  }
-
-  List<InlineSpan> _parseAnsiToTextSpans(String text, TextStyle defaultStyle) {
-    final List<InlineSpan> spans = [];
-    final RegExp ansiRegex = RegExp(r'\u001b\[([0-9;]*)m');
-
-    int lastIndex = 0;
-    Color currentColor = const Color(0xFFE2E8F0);
-    bool isBold = false;
-
-    for (final match in ansiRegex.allMatches(text)) {
-      if (match.start > lastIndex) {
-        final part = text.substring(lastIndex, match.start);
-        spans.addAll(_highlightSearchMatches(
-          part,
-          defaultStyle.copyWith(
-            color: currentColor,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF0D1117),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.rocket_launch_rounded, color: AppColors.accent, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Dispatch: $name',
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-        ));
-      }
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Trigger workflow_dispatch on branch:',
+                style: TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: branchController,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Branch',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  hintText: 'main',
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  prefixIcon: const Icon(Icons.fork_right_rounded, color: Colors.white54, size: 18),
+                  filled: true,
+                  fillColor: const Color(0xFF161B22),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: AppColors.accent),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Note: The workflow must have a workflow_dispatch trigger.',
+                style: TextStyle(fontSize: 11, color: Colors.white38, height: 1.4),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: dispatching ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            FilledButton.icon(
+              onPressed: dispatching
+                  ? null
+                  : () async {
+                      final branch = branchController.text.trim();
+                      if (branch.isEmpty) return;
+                      setDialogState(() => dispatching = true);
+                      try {
+                        await ref.read(githubApiServiceProvider).triggerWorkflowDispatch(
+                          owner,
+                          repo,
+                          workflowId,
+                          ref: branch,
+                        );
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Workflow "$name" triggered on $branch'),
+                              backgroundColor: Colors.green.shade700,
+                            ),
+                          );
+                          // Refresh runs tab to show the new run
+                          ref.invalidate(workflowRunsFutureProvider);
+                        }
+                      } catch (e) {
+                        setDialogState(() => dispatching = false);
+                        if (ctx.mounted) {
+                          final msg = e is GitHubApiException ? e.message : 'Dispatch failed — check write permissions';
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
+                          );
+                          Navigator.pop(ctx);
+                        }
+                      }
+                    },
+              icon: dispatching
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.play_arrow_rounded, size: 16),
+              label: Text(dispatching ? 'Dispatching…' : 'Run Workflow'),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.accent),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-      final code = match.group(1) ?? '';
-      if (code.isEmpty || code == '0') {
-        currentColor = const Color(0xFFE2E8F0);
-        isBold = false;
-      } else {
-        final parts = code.split(';');
-        for (final p in parts) {
-          final val = int.tryParse(p);
-          if (val == null) continue;
-          if (val == 1) {
-            isBold = true;
-          } else if (val >= 30 && val <= 37) {
-            currentColor = _ansiColorMap[val] ?? currentColor;
-          } else if (val == 39) {
-            currentColor = const Color(0xFFE2E8F0);
-          }
+// ── Telemetry Dashboard ────────────────────────────────────────────────────────
+
+class _TelemetryDashboard extends StatelessWidget {
+  const _TelemetryDashboard({required this.runs});
+  final List<Map<String, dynamic>> runs;
+
+  @override
+  Widget build(BuildContext context) {
+    var total = runs.length;
+    var success = 0;
+    var failure = 0;
+    var running = 0;
+    var queued = 0;
+    double totalDurationSec = 0;
+    var completedWithDuration = 0;
+
+    for (final run in runs) {
+      final status = run['status'] as String? ?? '';
+      final conclusion = run['conclusion'] as String? ?? '';
+      if (status == 'queued') {
+        queued++;
+      } else if (status == 'in_progress') {
+        running++;
+      } else if (status == 'completed') {
+        if (conclusion == 'success') success++;
+        if (conclusion == 'failure') failure++;
+      }
+      final start = DateTime.tryParse(run['run_started_at'] as String? ?? '');
+      final end = DateTime.tryParse(run['updated_at'] as String? ?? '');
+      if (start != null && end != null) {
+        final diff = end.difference(start).inSeconds;
+        if (diff > 0) {
+          totalDurationSec += diff;
+          completedWithDuration++;
         }
       }
-      lastIndex = match.end;
     }
 
-    if (lastIndex < text.length) {
-      final part = text.substring(lastIndex);
-      spans.addAll(_highlightSearchMatches(
-        part,
-        defaultStyle.copyWith(
-          color: currentColor,
-          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-        ),
-      ));
-    }
+    final successRate =
+        (success + failure) > 0 ? success / (success + failure) : 0.0;
+    final avgSec = completedWithDuration > 0
+        ? (totalDurationSec / completedWithDuration).round()
+        : 0;
+    final avgStr = avgSec > 60 ? '${avgSec ~/ 60}m ${avgSec % 60}s' : '${avgSec}s';
 
-    return spans;
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.analytics_rounded, color: AppColors.accent, size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Telemetry Summary',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onSurface),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  'LIVE METRICS',
+                  style: TextStyle(
+                      fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.success),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _kpi(context, 'Success', '${(successRate * 100).toStringAsFixed(0)}%', AppColors.success),
+              const SizedBox(width: 8),
+              _kpi(context, 'In Progress', '$running', Colors.orangeAccent),
+              const SizedBox(width: 8),
+              _kpi(context, 'Queued', '$queued', Colors.blueAccent),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _kpi(context, 'Avg Duration', avgStr, AppColors.accent),
+              const SizedBox(width: 8),
+              _kpi(context, 'Total Runs', '$total', Colors.purpleAccent),
+              const SizedBox(width: 8),
+              _kpi(context, 'Failures', '$failure', AppColors.danger),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
-  static const Map<int, Color> _ansiColorMap = {
-    30: Colors.black,
-    31: Colors.redAccent,
-    32: Colors.greenAccent,
-    33: Colors.amberAccent,
-    34: Colors.blueAccent,
-    35: Colors.purpleAccent,
-    36: Colors.cyanAccent,
-    37: Colors.white,
-  };
+  Widget _kpi(BuildContext context, String label, String value, Color color) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          children: [
+            Text(value,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+            const SizedBox(height: 2),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 9, color: theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
 }

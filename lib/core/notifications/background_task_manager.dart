@@ -1,7 +1,10 @@
+import 'package:home_widget/home_widget.dart';
 import 'package:workmanager/workmanager.dart';
 import 'tracked_repo_checker.dart';
+import 'github_notification_sync.dart';
 
 const String kTrackedReposCheckTask = 'tracked_repos_check_task';
+const String kGitHubNotificationsTask = 'github_notifications_sync_task';
 
 /// This top-level function is the actual background entry point Workmanager
 /// calls on Android. iOS background execution via Workmanager is far less
@@ -14,9 +17,12 @@ void backgroundTaskDispatcher() {
     if (task == kTrackedReposCheckTask) {
       try {
         await TrackedRepoChecker.checkAllTrackedRepos();
-      } catch (_) {
-        // Swallow errors in the background task — nothing to surface to.
-      }
+      } catch (_) {}
+    }
+    if (task == kGitHubNotificationsTask) {
+      try {
+        await GitHubNotificationSync.run();
+      } catch (_) {}
     }
     return true;
   });
@@ -27,6 +33,18 @@ class BackgroundTaskManager {
 
   static Future<void> initialize() async {
     await Workmanager().initialize(backgroundTaskDispatcher);
+  }
+
+  /// Syncs daily trending repo & stars telemetry to native home widgets.
+  static Future<void> updateHomeWidgetData({required String repoName, required String starsCount}) async {
+    try {
+      await HomeWidget.saveWidgetData<String>('widget_repo_title', repoName);
+      await HomeWidget.saveWidgetData<String>('widget_stars_count', starsCount);
+      await HomeWidget.updateWidget(
+        name: 'GitPulseHomeWidget',
+        iOSName: 'GitPulseHomeWidget',
+      );
+    } catch (_) {}
   }
 
   /// Registers a periodic check. Android enforces a minimum interval of
@@ -43,5 +61,22 @@ class BackgroundTaskManager {
 
   static Future<void> cancelPeriodicCheck() async {
     await Workmanager().cancelByUniqueName(kTrackedReposCheckTask);
+  }
+
+  /// Polls GitHub notifications every 15 minutes (Android minimum).
+  /// Shows local push notifications for new unread items.
+  static Future<void> scheduleGitHubNotificationSync() async {
+    await Workmanager().registerPeriodicTask(
+      kGitHubNotificationsTask,
+      kGitHubNotificationsTask,
+      frequency: const Duration(minutes: 15),
+      initialDelay: const Duration(seconds: 30),
+      constraints: Constraints(networkType: NetworkType.connected),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+    );
+  }
+
+  static Future<void> cancelGitHubNotificationSync() async {
+    await Workmanager().cancelByUniqueName(kGitHubNotificationsTask);
   }
 }

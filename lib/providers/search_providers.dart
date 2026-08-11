@@ -177,3 +177,7 @@ final issueSearchProvider =
 
 /// Pagination cursor for "load more" on repo search (used by the search screen).
 final repoSearchPageProvider = StateProvider.autoDispose<int>((ref) => 1);
+
+/// Selected repository for wide-screen tablet / desktop multi-pane view.
+final selectedSplitViewRepoProvider = StateProvider<({String owner, String name})?>((ref) => null);
+

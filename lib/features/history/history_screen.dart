@@ -15,12 +15,11 @@ import '../../providers/search_providers.dart';
 import '../../providers/zip_download_provider.dart';
 import '../../providers/settings_providers.dart';
 import '../../widgets/shimmer_skeletons.dart';
-import '../../widgets/app_surface.dart';
 import '../../widgets/page_header.dart';
 import '../../widgets/safe_page.dart';
 import '../../widgets/state_views.dart';
-import '../repo_detail/repo_detail_screen.dart';
-import '../user_detail/user_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 
 enum _HistoryFilter { all, searches, viewed }
 
@@ -77,17 +76,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   String _labelFor(String type) {
     switch (type) {
       case 'search_repo':
-        return 'Search';
+        return 'Repo Search';
       case 'search_code':
-        return 'Code';
+        return 'Code Search';
       case 'search_user':
-        return 'User';
+        return 'User Search';
       case 'search_issue':
-        return 'Issue';
+        return 'Issue Search';
       case 'viewed_repo':
-        return 'Repo';
+        return 'Visited Repo';
       case 'viewed_user':
-        return 'Profile';
+        return 'Visited Profile';
       default:
         return 'Activity';
     }
@@ -95,12 +94,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   Color _badgeColor(String type) {
     if (type.startsWith('search_')) {
-      return const Color(0xFF9333EA); // Purple for searches
+      return const Color(0xFF8B5CF6);
     }
     if (type == 'viewed_repo') {
-      return AppColors.accent; // Blue for repos
+      return AppColors.accent;
     }
-    return AppColors.success; // Green for profiles
+    return AppColors.success;
   }
 
   List<HistoryEntry> _applyFilters(List<HistoryEntry> entries) {
@@ -123,7 +122,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     return filtered;
   }
 
-  List<InlineSpan> _highlightText(String text, TextStyle baseStyle) {
+  List<InlineSpan> _highlightText(String text, TextStyle baseStyle, bool isDark) {
     if (_searchQuery.isEmpty) {
       return [TextSpan(text: text, style: baseStyle)];
     }
@@ -140,9 +139,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       spans.add(TextSpan(
         text: text.substring(index, index + _searchQuery.length),
         style: baseStyle.copyWith(
-          backgroundColor: Colors.yellow.withValues(alpha: 0.35),
+          backgroundColor: AppColors.accent.withValues(alpha: 0.25),
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          color: AppColors.accent,
         ),
       ));
       start = index + _searchQuery.length;
@@ -158,6 +157,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   Widget build(BuildContext context) {
     final historyAsync = ref.watch(historyListProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
 
     return Material(
       color: Colors.transparent,
@@ -178,7 +178,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   Expanded(
                     child: EmptyStateView(
                       icon: Icons.timeline_rounded,
-                      title: 'Trace logs empty',
+                      title: 'History log is empty',
                       subtitle: 'Repositories, code, and profiles you interact with will map here',
                     ),
                   ),
@@ -204,7 +204,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             }
             flatItems.add(_FooterItem());
 
-            // Calculate telemetry metrics
             final totalCount = entries.length;
             final searchCount = entries.where((e) => e.isSearch).length;
             final viewedCount = entries.where((e) => !e.isSearch).length;
@@ -215,16 +214,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 PageHeader(
                   title: 'History Log',
                   subtitle: filtered.isEmpty
-                      ? 'No matching logs found'
-                      : '${filtered.length} active logs traced',
+                      ? 'No matching activity'
+                      : '${filtered.length} activities logged',
                   showBackButton: false,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: Icon(_showTelemetry ? Icons.analytics_rounded : Icons.analytics_outlined),
-                        color: _showTelemetry ? AppColors.accent : null,
-                        tooltip: 'Toggle Metrics Dashboard',
+                        color: _showTelemetry ? AppColors.accent : (isDark ? Colors.white70 : Colors.black54),
+                        tooltip: 'Toggle Telemetry Metrics',
                         onPressed: () => setState(() => _showTelemetry = !_showTelemetry),
                       ),
                       IconButton(
@@ -237,7 +236,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   ),
                 ),
 
-                // 1. Sleek Telemetry stats banner
+                // 1. Telemetry Stats Dashboard
                 AnimatedSize(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
@@ -249,14 +248,20 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                             bottom: AppSpacing.md
                           ),
                           child: Container(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF161B22) : Colors.grey[50],
+                              color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: isDark ? Colors.white12 : Colors.black12,
-                                width: 1.2,
+                                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -265,13 +270,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                   children: [
                                     _buildStatPill('Total Events', totalCount.toString(), Icons.timeline_rounded, AppColors.accent, isDark),
                                     const SizedBox(width: 8),
-                                    _buildStatPill('Searches', searchCount.toString(), Icons.search_rounded, const Color(0xFF9333EA), isDark),
+                                    _buildStatPill('Searches', searchCount.toString(), Icons.search_rounded, const Color(0xFF8B5CF6), isDark),
                                     const SizedBox(width: 8),
                                     _buildStatPill('Visited', viewedCount.toString(), Icons.explore_rounded, AppColors.success, isDark),
                                   ],
                                 ),
                                 if (totalCount > 0) ...[
-                                  const SizedBox(height: AppSpacing.md),
+                                  const SizedBox(height: 12),
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
                                     child: SizedBox(
@@ -279,11 +284,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                       child: Row(
                                         children: [
                                           Expanded(
-                                            flex: searchCount,
-                                            child: Container(color: const Color(0xFF9333EA)),
+                                            flex: searchCount == 0 ? 1 : searchCount,
+                                            child: Container(color: const Color(0xFF8B5CF6)),
                                           ),
                                           Expanded(
-                                            flex: viewedCount,
+                                            flex: viewedCount == 0 ? 1 : viewedCount,
                                             child: Container(color: AppColors.success),
                                           ),
                                         ],
@@ -291,11 +296,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  const Row(
+                                  Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('Searches Ratio', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
-                                      Text('Views Ratio', style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+                                      Text(
+                                        'Searches ${(searchCount / totalCount * 100).toStringAsFixed(0)}%',
+                                        style: TextStyle(fontSize: 9, color: isDark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(
+                                        'Views ${(viewedCount / totalCount * 100).toStringAsFixed(0)}%',
+                                        style: TextStyle(fontSize: 9, color: isDark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.bold),
+                                      ),
                                     ],
                                   ),
                                 ],
@@ -306,7 +317,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       : const SizedBox.shrink(),
                 ),
 
-                // 2. Compact Glass Search + Pill Filter Row
+                // 2. Search & Pill Filters
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
                   child: Column(
@@ -314,9 +325,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       TextField(
                         controller: _searchController,
                         onChanged: (v) => setState(() => _searchQuery = v.trim()),
+                        style: TextStyle(fontSize: 14, color: textColor),
                         decoration: InputDecoration(
-                          hintText: 'Filter logs...',
-                          prefixIcon: const Icon(Icons.filter_list_rounded, size: 18),
+                          hintText: 'Filter history by name or query...',
+                          hintStyle: TextStyle(fontSize: 13, color: isDark ? Colors.white38 : Colors.black38),
+                          prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.accent),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.close_rounded, size: 16),
@@ -327,51 +340,48 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                 )
                               : null,
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          filled: true,
+                          fillColor: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                           ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      // Row of Filter Pills
+                      const SizedBox(height: 10),
                       Row(
                         children: [
-                          _buildFilterPill('All Logs', _HistoryFilter.all),
-                          const SizedBox(width: 6),
-                          _buildFilterPill('Searches Only', _HistoryFilter.searches),
-                          const SizedBox(width: 6),
-                          _buildFilterPill('Viewed Items', _HistoryFilter.viewed),
+                          _buildFilterPill('All Logs', _HistoryFilter.all, isDark),
+                          const SizedBox(width: 8),
+                          _buildFilterPill('Searches', _HistoryFilter.searches, isDark),
+                          const SizedBox(width: 8),
+                          _buildFilterPill('Viewed Items', _HistoryFilter.viewed, isDark),
                         ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: 14),
 
-                // 3. Interactive Trace Timeline (Flat ListView)
+                // 3. Interactive Timeline List
                 Expanded(
                   child: filtered.isEmpty
                       ? const EmptyStateView(
                           icon: Icons.filter_list_off_rounded,
                           title: 'No matching logs',
-                          subtitle: 'Try adjusting your filters or search keywords',
+                          subtitle: 'Try adjusting your search query or filters',
                         )
                       : AnimationLimiter(
                           child: ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.pageHorizontal,
-                              0,
-                              AppSpacing.pageHorizontal,
-                              0,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.pageHorizontal),
                             itemCount: flatItems.length,
                             itemBuilder: (context, index) {
                               final item = flatItems[index];
 
                               if (item is _HeaderItem) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
+                                  padding: const EdgeInsets.only(top: 14, bottom: 8),
                                   child: Row(
                                     children: [
                                       Container(
@@ -388,7 +398,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.w900,
                                           fontSize: 11,
-                                          letterSpacing: 1.5,
+                                          letterSpacing: 1.2,
                                           color: isDark ? Colors.white60 : Colors.black54,
                                         ),
                                       ),
@@ -399,27 +409,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
                               if (item is _FooterItem) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: AppSpacing.xl, bottom: 100),
+                                  padding: const EdgeInsets.only(top: 24, bottom: 100),
                                   child: Column(
                                     children: [
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Expanded(
                                             child: Container(
                                               height: 1,
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [
-                                                    Colors.transparent,
-                                                    isDark ? Colors.white10 : Colors.black12,
-                                                  ],
-                                                ),
-                                              ),
+                                              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                                             ),
                                           ),
                                           Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                                            padding: const EdgeInsets.symmetric(horizontal: 14),
                                             child: Icon(
                                               Icons.history_toggle_off_rounded,
                                               size: 16,
@@ -429,26 +431,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                                           Expanded(
                                             child: Container(
                                               height: 1,
-                                              decoration: BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: [
-                                                    isDark ? Colors.white10 : Colors.black12,
-                                                    Colors.transparent,
-                                                  ],
-                                                ),
-                                              ),
+                                              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                                             ),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Activity trace limited to the last 100 events',
+                                        'History log tracks your latest 100 developer events',
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
                                           color: isDark ? Colors.white30 : Colors.black38,
-                                          letterSpacing: 0.5,
                                         ),
                                       ),
                                     ],
@@ -465,139 +459,147 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
                               return AnimationConfiguration.staggeredList(
                                 position: index,
-                                duration: const Duration(milliseconds: 375),
+                                duration: const Duration(milliseconds: 300),
                                 child: SlideAnimation(
-                                  verticalOffset: 30.0,
+                                  verticalOffset: 20.0,
                                   child: FadeInAnimation(
                                     child: Dismissible(
                                       key: ValueKey(entry.id),
                                       direction: DismissDirection.endToStart,
                                       background: Container(
                                         alignment: Alignment.centerRight,
-                                        padding: const EdgeInsets.only(right: AppSpacing.xl),
+                                        padding: const EdgeInsets.only(right: 20),
+                                        margin: const EdgeInsets.symmetric(vertical: 4),
                                         decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [Colors.orange, AppColors.danger],
-                                          ),
-                                          borderRadius: BorderRadius.circular(20),
+                                          color: AppColors.danger,
+                                          borderRadius: BorderRadius.circular(16),
                                         ),
-                                        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 24),
+                                        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 22),
                                       ),
                                       onDismissed: (_) => _deleteWithUndo(context, ref, entry),
                                       child: IntrinsicHeight(
                                         child: Row(
                                           crossAxisAlignment: CrossAxisAlignment.stretch,
                                           children: [
-                                            // Timeline Vertical Trace Line
+                                            // Timeline Line & Node
                                             Container(
-                                              width: 32,
+                                              width: 28,
                                               margin: const EdgeInsets.only(right: 8),
                                               child: Stack(
                                                 alignment: Alignment.topCenter,
                                                 children: [
-                                                  // Vertical Connector Line
                                                   if (!isLast || indexInSec > 0)
                                                     Positioned(
-                                                      top: indexInSec == 0 ? 26 : 0,
+                                                      top: indexInSec == 0 ? 24 : 0,
                                                       bottom: isLast ? null : 0,
-                                                      height: isLast ? 26 : null,
-                                                      width: 1.8,
+                                                      height: isLast ? 24 : null,
+                                                      width: 1.5,
                                                       child: Container(
-                                                        color: isDark ? Colors.white12 : Colors.black12,
+                                                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                                                       ),
                                                     ),
-                                                  // Glowing indicator node
                                                   Positioned(
                                                     top: 14,
                                                     child: Container(
-                                                      width: 26,
-                                                      height: 26,
+                                                      width: 24,
+                                                      height: 24,
                                                       decoration: BoxDecoration(
                                                         shape: BoxShape.circle,
-                                                        color: isDark ? const Color(0xFF0F141C) : Colors.white,
+                                                        color: isDark ? AppColors.darkBg : Colors.white,
                                                         border: Border.all(color: nodeColor, width: 2),
-                                                        boxShadow: [
-                                                          BoxShadow(
-                                                            color: nodeColor.withValues(alpha: 0.35),
-                                                            blurRadius: 8,
-                                                          )
-                                                        ],
                                                       ),
-                                                      child: Icon(nodeIcon, size: 12, color: nodeColor),
+                                                      child: Icon(nodeIcon, size: 11, color: nodeColor),
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
 
-                                            // Glass Card Content
+                                            // Log Card Item
                                             Expanded(
                                               child: Padding(
-                                                padding: const EdgeInsets.symmetric(vertical: 6.0),
-                                                child: AppSurface(
-                                                  onTap: () => _handleTap(context, ref, entry),
-                                                  padding: const EdgeInsets.all(AppSpacing.md),
-                                                  child: Row(
-                                                    children: [
-                                                      _HistoryAvatar(entry: entry, fallbackIcon: nodeIcon),
-                                                      const SizedBox(width: AppSpacing.md),
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                                          children: [
-                                                            Row(
-                                                              children: [
-                                                                _TypeBadge(
-                                                                  label: _labelFor(entry.type),
-                                                                  color: nodeColor,
-                                                                ),
-                                                                const SizedBox(width: 8),
-                                                                Expanded(
-                                                                  child: Text.rich(
-                                                                    TextSpan(
-                                                                      children: _highlightText(
-                                                                        entry.query,
-                                                                        const TextStyle(
-                                                                          fontWeight: FontWeight.bold,
-                                                                          fontSize: 13.5,
+                                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                                child: GestureDetector(
+                                                  onTap: () {
+                                                    HapticFeedback.lightImpact();
+                                                    _handleTap(context, ref, entry);
+                                                  },
+                                                  child: Container(
+                                                    padding: const EdgeInsets.all(12),
+                                                    decoration: BoxDecoration(
+                                                      color: isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface,
+                                                      borderRadius: BorderRadius.circular(16),
+                                                      border: Border.all(
+                                                        color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        _HistoryAvatar(entry: entry, fallbackIcon: nodeIcon),
+                                                        const SizedBox(width: 12),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Row(
+                                                                children: [
+                                                                  _TypeBadge(
+                                                                    label: _labelFor(entry.type),
+                                                                    color: nodeColor,
+                                                                  ),
+                                                                  const SizedBox(width: 8),
+                                                                  Expanded(
+                                                                    child: Text.rich(
+                                                                      TextSpan(
+                                                                        children: _highlightText(
+                                                                          entry.query,
+                                                                          TextStyle(
+                                                                            fontWeight: FontWeight.bold,
+                                                                            fontSize: 13,
+                                                                            color: textColor,
+                                                                          ),
+                                                                          isDark,
                                                                         ),
                                                                       ),
+                                                                      maxLines: 1,
+                                                                      overflow: TextOverflow.ellipsis,
                                                                     ),
-                                                                    maxLines: 1,
-                                                                    overflow: TextOverflow.ellipsis,
                                                                   ),
+                                                                ],
+                                                              ),
+                                                              if (entry.subtitle != null && entry.subtitle!.isNotEmpty) ...[
+                                                                const SizedBox(height: 4),
+                                                                Text.rich(
+                                                                  TextSpan(
+                                                                    children: _highlightText(
+                                                                      entry.subtitle!,
+                                                                      TextStyle(
+                                                                        fontSize: 11,
+                                                                        color: isDark ? Colors.white60 : Colors.black54,
+                                                                      ),
+                                                                      isDark,
+                                                                    ),
+                                                                  ),
+                                                                  maxLines: 1,
+                                                                  overflow: TextOverflow.ellipsis,
                                                                 ),
                                                               ],
-                                                            ),
-                                                            if (entry.subtitle != null && entry.subtitle!.isNotEmpty) ...[
                                                               const SizedBox(height: 4),
-                                                              Text.rich(
-                                                                TextSpan(
-                                                                  children: _highlightText(
-                                                                    entry.subtitle!,
-                                                                    TextStyle(
-                                                                      fontSize: 11,
-                                                                      color: isDark ? Colors.white60 : Colors.black54,
-                                                                    ),
-                                                                  ),
+                                                              Text(
+                                                                timeago.format(entry.timestamp),
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  color: isDark ? Colors.white38 : Colors.black38,
+                                                                  fontWeight: FontWeight.w500,
                                                                 ),
-                                                                maxLines: 2,
-                                                                overflow: TextOverflow.ellipsis,
                                                               ),
                                                             ],
-                                                            const SizedBox(height: 4),
-                                                            Text(
-                                                              timeago.format(entry.timestamp),
-                                                              style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                                            ),
-                                                          ],
+                                                          ),
                                                         ),
-                                                      ),
-                                                      const SizedBox(width: AppSpacing.sm),
-                                                      
-                                                      // Quick Actions based on type
-                                                      _buildCardQuickAction(context, ref, entry, isDark),
-                                                    ],
+                                                        const SizedBox(width: 8),
+                                                        _buildCardQuickAction(context, ref, entry, isDark),
+                                                      ],
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -638,53 +640,64 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     );
   }
 
-  // Mini metric capsule builder
   Widget _buildStatPill(String label, String value, IconData icon, Color color, bool isDark) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
-          color: isDark ? Colors.black26 : Colors.white,
+          color: isDark ? Colors.black26 : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: color.withValues(alpha: 0.15),
+            color: color.withValues(alpha: 0.2),
             width: 1,
           ),
         ),
         child: Column(
           children: [
             Icon(icon, size: 16, color: color),
-            const SizedBox(height: 4),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-            Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 4),
+            Text(
+              value, 
+              style: TextStyle(
+                fontWeight: FontWeight.w900, 
+                fontSize: 14,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            Text(
+              label, 
+              style: TextStyle(
+                fontSize: 9, 
+                color: isDark ? Colors.white54 : Colors.black54, 
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Pill filter tab builder
-  Widget _buildFilterPill(String label, _HistoryFilter value) {
+  Widget _buildFilterPill(String label, _HistoryFilter value, bool isDark) {
     final isSelected = _filter == value;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTap: () {
         HapticFeedback.lightImpact();
         setState(() => _filter = value);
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected 
-              ? AppColors.accent.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+              ? AppColors.accent
+              : (isDark ? AppColors.darkSurfaceElevated : AppColors.lightSurface),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected 
-                ? AppColors.accent.withValues(alpha: 0.5) 
-                : (isDark ? Colors.white12 : Colors.black12),
-            width: 1.2,
+                ? AppColors.accent 
+                : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
           ),
         ),
         child: Text(
@@ -692,20 +705,19 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.bold,
-            color: isSelected ? AppColors.accent : (isDark ? Colors.white70 : Colors.black87),
+            color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
           ),
         ),
       ),
     );
   }
 
-  // Quick Action Buttons inside cards
   Widget _buildCardQuickAction(BuildContext context, WidgetRef ref, HistoryEntry entry, bool isDark) {
     if (entry.type == 'viewed_repo') {
       return IconButton(
         icon: const Icon(Icons.download_rounded, size: 18),
         color: AppColors.accent,
-        tooltip: 'Quick ZIP Download',
+        tooltip: 'Download ZIP',
         onPressed: () {
           HapticFeedback.mediumImpact();
           final parts = entry.query.split('/');
@@ -722,12 +734,12 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     } else if (entry.isSearch) {
       return IconButton(
         icon: const Icon(Icons.search_rounded, size: 18),
-        color: const Color(0xFF9333EA),
-        tooltip: 'Re-run search query',
+        color: const Color(0xFF8B5CF6),
+        tooltip: 'Re-run search',
         onPressed: () => _handleTap(context, ref, entry),
       );
     }
-    return const Icon(Icons.chevron_right_rounded, size: 20, color: Colors.grey);
+    return Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? Colors.white30 : Colors.black38);
   }
 
   void _handleTap(BuildContext context, WidgetRef ref, HistoryEntry entry) {
@@ -735,17 +747,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       case 'viewed_repo':
         final parts = entry.query.split('/');
         if (parts.length == 2) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RepoDetailScreen(owner: parts[0], repoName: parts[1]),
-            ),
-          );
+          context.push(AppRoutes.repoPath(parts[0], parts[1]));
         }
         break;
       case 'viewed_user':
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => UserDetailScreen(username: entry.query)),
-        );
+        context.push(AppRoutes.userPath(entry.query));
         break;
       default:
         ref.read(searchQueryProvider.notifier).state = entry.query;
@@ -757,7 +763,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           _ => SearchTab.repositories,
         };
         ref.read(searchTabProvider.notifier).state = tab;
-        // Navigate to the Search tab (index 1) via the shared nav provider
         ref.read(selectedNavTabProvider.notifier).state = 1;
     }
   }
@@ -783,8 +788,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Clear all trace logs?'),
-        content: const Text('This action will permanently wipe your local activity history.'),
+        title: const Text('Clear all history logs?'),
+        content: const Text('This action will permanently remove your activity trace logs.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           FilledButton(
@@ -801,73 +806,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 }
 
-class _HistoryAvatar extends StatelessWidget {
-  const _HistoryAvatar({required this.entry, required this.fallbackIcon});
-
-  final HistoryEntry entry;
-  final IconData fallbackIcon;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = entry.avatarUrl;
-    if (url != null && url.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: CachedNetworkImage(
-          imageUrl: url,
-          width: 36,
-          height: 36,
-          fit: BoxFit.cover,
-          errorWidget: (_, __, ___) => _iconBox(context),
-        ),
-      );
-    }
-    return _iconBox(context);
-  }
-
-  Widget _iconBox(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(fallbackIcon, size: 18, color: Theme.of(context).colorScheme.primary),
-    );
-  }
-}
-
-class _TypeBadge extends StatelessWidget {
-  const _TypeBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 8.5,
-          fontWeight: FontWeight.w900,
-          color: color,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-}
-
-abstract class _FlatHistoryItem {}
-
 class _HeaderItem extends _FlatHistoryItem {
   final String title;
   _HeaderItem(this.title);
@@ -882,3 +820,60 @@ class _EntryItem extends _FlatHistoryItem {
 
 class _FooterItem extends _FlatHistoryItem {}
 
+abstract class _FlatHistoryItem {}
+
+class _TypeBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _TypeBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryAvatar extends StatelessWidget {
+  final HistoryEntry entry;
+  final IconData fallbackIcon;
+
+  const _HistoryAvatar({required this.entry, required this.fallbackIcon});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (entry.avatarUrl != null && entry.avatarUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundImage: CachedNetworkImageProvider(entry.avatarUrl!),
+      );
+    }
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05),
+      ),
+      child: Icon(fallbackIcon, size: 16, color: isDark ? Colors.white70 : Colors.black54),
+    );
+  }
+}

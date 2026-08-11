@@ -1,15 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
-import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/notification_providers.dart';
 import '../../providers/settings_providers.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/state_views.dart';
-import '../repo_detail/repo_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/shimmer_skeletons.dart';
@@ -202,7 +203,9 @@ class _TrackedReposScreenState extends ConsumerState<TrackedReposScreen> {
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      'Queries GitHub API every ~6 hours',
+                      Platform.isIOS
+                          ? 'Queries GitHub API every ~6 hours. On iOS, background execution is managed by the system and may run less frequently.'
+                          : 'Queries GitHub API every ~6 hours',
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white38 : Colors.black38),
                     ),
                     value: backgroundEnabled,
@@ -274,11 +277,7 @@ class _TrackedReposScreenState extends ConsumerState<TrackedReposScreen> {
                         onTap: () {
                           HapticFeedback.lightImpact();
                           if (parts.length == 2) {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => RepoDetailScreen(owner: parts[0], repoName: parts[1]),
-                              ),
-                            );
+                            context.push(AppRoutes.repoPath(parts[0], parts[1]));
                           }
                         },
                         showAccentStripe: true,

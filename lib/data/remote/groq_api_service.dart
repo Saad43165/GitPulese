@@ -15,7 +15,11 @@ class GroqApiService {
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 60),
     sendTimeout: const Duration(seconds: 15),
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      if (ApiConstants.appSecret.isNotEmpty)
+        'x-gitpulse-secret': ApiConstants.appSecret,
+    },
   ));
 
   Future<String> summarizeRepo({

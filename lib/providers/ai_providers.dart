@@ -238,20 +238,22 @@ class StarNotifier extends StateNotifier<AsyncValue<bool>> {
 // ---------- Repository Forking ----------
 
 final repoForkProvider = StateNotifierProvider.family<ForkNotifier, AsyncValue<bool>, ({String owner, String repo})>((ref, args) {
-  return ForkNotifier(ref.watch(githubApiServiceProvider), args);
+  final authLogin = ref.read(authenticatedUserProvider).valueOrNull?.login ?? '';
+  return ForkNotifier(ref.watch(githubApiServiceProvider), args, authLogin: authLogin);
 });
 
 class ForkNotifier extends StateNotifier<AsyncValue<bool>> {
   final GitHubApiService api;
   final ({String owner, String repo}) args;
+  final String authLogin;
 
-  ForkNotifier(this.api, this.args) : super(const AsyncValue.loading()) {
+  ForkNotifier(this.api, this.args, {this.authLogin = ''}) : super(const AsyncValue.loading()) {
     _checkStatus();
   }
 
   Future<void> _checkStatus() async {
     try {
-      final isForked = await api.checkFork(args.owner, args.repo);
+      final isForked = await api.checkFork(args.owner, args.repo, authLogin: authLogin);
       if (mounted) state = AsyncValue.data(isForked);
     } catch (_) {
       if (mounted) state = const AsyncValue.data(false);
@@ -264,16 +266,16 @@ class ForkNotifier extends StateNotifier<AsyncValue<bool>> {
     state = const AsyncValue.loading();
     try {
       await api.forkRepo(args.owner, args.repo);
-      
+
       // Poll GitHub API until the fork is actually created and visible
       bool isForked = false;
       int attempts = 0;
       while (attempts < 10 && !isForked) {
         await Future.delayed(const Duration(seconds: 1));
-        isForked = await api.checkFork(args.owner, args.repo);
+        isForked = await api.checkFork(args.owner, args.repo, authLogin: authLogin);
         attempts++;
       }
-      
+
       if (mounted) state = AsyncValue.data(isForked);
     } catch (e) {
       if (mounted) state = const AsyncValue.data(false); // Revert on fail
@@ -608,6 +610,8 @@ class PrReviewResult {
     required this.branchName,
     required this.diff,
   });
+
+  String get rawDiff => diff;
 }
 
 class PrReviewNotifier extends StateNotifier<AsyncValue<PrReviewResult?>> {

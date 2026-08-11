@@ -1,14 +1,11 @@
-import 'package:dio/dio.dart';
 import '../../core/network/dio_client.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme/app_theme.dart';
@@ -27,9 +24,8 @@ import '../../widgets/app_back_button.dart';
 import '../../widgets/app_surface.dart';
 import '../../widgets/detail_section.dart';
 import '../../widgets/state_views.dart';
-import '../compare/compare_screen.dart';
-import '../user_detail/user_detail_screen.dart';
-import '../devops/devops_workflows_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../auth/auth_dialog.dart';
 import 'widgets/ai_summary_card.dart';
 import 'widgets/recent_commits_section.dart';
@@ -100,6 +96,8 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
           }
           // (Removed root-level watch to prevent global rebuilds)
 
+          final isOffline = ref.watch(isOfflineProvider).valueOrNull ?? false;
+
           return Stack(
             children: [
               RefreshIndicator(
@@ -127,9 +125,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       if (!compareList.any((r) => r.id == repo.id) && compareList.length < 3) {
                         ref.read(compareListProvider.notifier).add(repo);
                       }
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const CompareScreen()),
-                      );
+                      context.push(AppRoutes.compare);
                     },
                   ),
                   IconButton(
@@ -192,11 +188,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                                 const SizedBox(width: AppSpacing.md),
                                 Expanded(
                                   child: GestureDetector(
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => UserDetailScreen(username: repo.owner.login),
-                                      ),
-                                    ),
+                                    onTap: () => context.push(AppRoutes.userPath(repo.owner.login)),
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
@@ -246,6 +238,59 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       _StatsRow(repo: repo),
+                      const SizedBox(height: AppSpacing.md),
+                      // Quick-access chips: Issues, PRs, Files
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => context.push(
+                                AppRoutes.issuesPath(widget.owner, widget.repoName),
+                              ),
+                              icon: const Icon(Icons.bug_report_rounded, size: 16),
+                              label: const Text('Issues'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.greenAccent,
+                                side: const BorderSide(color: Colors.green, width: 1),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => context.push(
+                                AppRoutes.pullsPath(widget.owner, widget.repoName),
+                              ),
+                              icon: const Icon(Icons.call_merge_rounded, size: 16),
+                              label: const Text('PRs'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.accentSoft,
+                                side: BorderSide(color: AppColors.accent.withValues(alpha: 0.6), width: 1),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => context.push(
+                                AppRoutes.fileBrowserPath(widget.owner, widget.repoName),
+                              ),
+                              icon: const Icon(Icons.folder_open_rounded, size: 16),
+                              label: const Text('Files'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFF0C040),
+                                side: const BorderSide(color: Color(0xFFF0C040), width: 1),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: AppSpacing.lg),
                       _HealthCard(repo: repo),
                       const SizedBox(height: AppSpacing.lg),
@@ -331,16 +376,7 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                         icon: Icons.rocket_launch_rounded,
                         wrapInSurface: true,
                         child: InkWell(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => DevOpsWorkflowsScreen(
-                                  owner: widget.owner,
-                                  repoName: widget.repoName,
-                                ),
-                              ),
-                            );
-                          },
+                          onTap: () => context.push(AppRoutes.devopsPath(owner: widget.owner, repoName: widget.repoName)),
                           child: Padding(
                             padding: const EdgeInsets.all(AppSpacing.md),
                             child: Row(
@@ -404,6 +440,29 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                   child: _GlassmorphicActionBar(repo: repo, owner: widget.owner, repoName: widget.repoName),
                 ),
               ),
+              if (isOffline)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      color: Colors.orangeAccent.withValues(alpha: 0.92),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.cloud_off_rounded, size: 14, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text(
+                            'Offline — showing cached data',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         },
@@ -460,8 +519,6 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
     final downloadState = ref.watch(zipDownloadProvider);
     final isDownloadingCurrent = downloadState.isDownloading && downloadState.repoName == widget.repoName;
 
-    final inCompare = ref.watch(compareListProvider).any((r) => r.id == widget.repo.id);
-    final compareFull = ref.watch(compareListProvider).length >= 3;
     final trackedAsync = ref.watch(isTrackedProvider(widget.repo.id));
     final starAsync = ref.watch(repoStarProvider((owner: widget.owner, repo: widget.repoName)));
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -556,6 +613,18 @@ class _GlassmorphicActionBarState extends ConsumerState<_GlassmorphicActionBar> 
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          actionButton(
+            'Ask AI',
+            Icons.auto_awesome_rounded,
+            () => context.push(AppRoutes.askPath(
+              widget.owner,
+              widget.repoName,
+              desc: widget.repo.description,
+              lang: widget.repo.language,
+            )),
+            isActive: true,
+          ),
+          const SizedBox(width: 8),
           actionButton(
             'GitHub', 
             Icons.open_in_new_rounded, 
@@ -845,7 +914,7 @@ class _ContributorsSection extends ConsumerWidget {
                 itemBuilder: (context, i) {
                   final c = contributors[i] as dynamic;
                   return GestureDetector(
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => UserDetailScreen(username: c.login))),
+                    onTap: () => context.push(AppRoutes.userPath(c.login as String)),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(28),
                       child: CachedNetworkImage(imageUrl: c.avatarUrl, width: 44, height: 44, fit: BoxFit.cover),

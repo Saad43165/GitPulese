@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/remote/github_api_service.dart';
 import '../core/notifications/widget_manager.dart';
@@ -8,9 +9,8 @@ enum TrendingPeriod { daily, weekly, monthly }
 final trendingPeriodProvider = StateProvider<TrendingPeriod>((ref) => TrendingPeriod.weekly);
 final trendingLanguageProvider = StateProvider<String?>((ref) => null);
 
-/// "Trending" isn't a real GitHub REST endpoint, so this builds a genuine
-/// trending-style query using the actual search API: repos created/pushed
-/// recently, sorted by stars. Every result is real, live data.
+/// "Trending" search provider. Fetches live GitHub repos.
+/// Uses random page indexing (1..5) so pull-to-refresh fetches fresh new repos every time!
 final trendingReposProvider =
     FutureProvider.autoDispose<SearchReposResult>((ref) async {
   final period = ref.watch(trendingPeriodProvider);
@@ -23,13 +23,17 @@ final trendingReposProvider =
     TrendingPeriod.monthly => SearchPeriod.thisMonth,
   };
 
+  // Generate random page 1..5 for variety on refresh
+  final randomPage = Random().nextInt(5) + 1;
+
   final result = await api.searchRepositories(
     query: '',
     language: language,
     minStars: 5,
     sort: RepoSort.stars,
     period: searchPeriod,
-    perPage: 20,
+    page: randomPage,
+    perPage: 10,
   );
 
   if (result.items.isNotEmpty && period == TrendingPeriod.weekly) {
@@ -39,15 +43,32 @@ final trendingReposProvider =
   return result;
 });
 
-/// Real top-by-followers user/org search using the GitHub Search Users API.
+/// Top developers search provider.
+/// Uses random query offset so pull-to-refresh fetches fresh developers every time!
 final topUsersProvider =
     FutureProvider.autoDispose<SearchUsersResult>((ref) async {
   final api = ref.watch(githubApiServiceProvider);
-  final searchResult = await api.searchUsers(query: 'followers:>1000', type: 'user', perPage: 10);
+  final randomQueries = [
+    'followers:>2000',
+    'followers:>1500',
+    'followers:>1000',
+    'followers:>800',
+    'followers:>500',
+  ];
+  final randomQuery = randomQueries[Random().nextInt(randomQueries.length)];
+  final randomPage = Random().nextInt(3) + 1;
+
+  final searchResult = await api.searchUsers(
+    query: randomQuery,
+    type: 'user',
+    page: randomPage,
+    perPage: 10,
+  );
   
-  // Fetch detailed profiles to get the actual followers count
+  if (searchResult.items.isEmpty) return searchResult;
+
   final detailedUsers = await Future.wait(
-    searchResult.items.map((user) => api.getUserDetail(user.login))
+    searchResult.items.map((user) => api.getUserDetail(user.login)),
   );
   
   return SearchUsersResult(detailedUsers, searchResult.totalCount);
@@ -59,7 +80,6 @@ final topOrgsProvider =
   return api.searchUsers(query: 'repos:>50', type: 'org');
 });
 
-/// All-time most-starred repos overall (a classic, real "top repos" list).
 final allTimeTopReposProvider =
     FutureProvider.autoDispose<SearchReposResult>((ref) async {
   final language = ref.watch(trendingLanguageProvider);

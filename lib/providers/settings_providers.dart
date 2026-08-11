@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants/api_constants.dart';
 import '../core/network/dio_client.dart';
+import '../core/notifications/background_task_manager.dart';
 import '../data/models/user_and_search_models.dart';
 import '../data/models/repo_model.dart';
 import '../providers/core_providers.dart';
@@ -32,10 +33,12 @@ class GithubPatNotifier extends StateNotifier<String?> {
       await _secureStorage.delete(key: ApiConstants.patStorageKey);
       state = null;
       DioClient.instance.applyPat(null);
+      try { await BackgroundTaskManager.cancelGitHubNotificationSync(); } catch (_) {}
     } else {
       await _secureStorage.write(key: ApiConstants.patStorageKey, value: trimmed);
       state = trimmed;
       DioClient.instance.applyPat(trimmed);
+      try { await BackgroundTaskManager.scheduleGitHubNotificationSync(); } catch (_) {}
     }
   }
 
@@ -152,6 +155,29 @@ class CompactCardsNotifier extends StateNotifier<bool> {
   }
 }
 
+final performanceModeProvider = StateNotifierProvider<PerformanceModeNotifier, bool>(
+  (ref) => PerformanceModeNotifier(),
+);
+
+class PerformanceModeNotifier extends StateNotifier<bool> {
+  PerformanceModeNotifier() : super(false) {
+    _load();
+  }
+
+  static const _key = 'performance_mode_low_end';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool(_key) ?? false;
+  }
+
+  Future<void> setEnabled(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_key, value);
+  }
+}
+
 final demoUsernameProvider = StateProvider<String?>((ref) => null);
 
 // ── Authenticated User ────────────────────────────────────────────────────────
@@ -163,11 +189,9 @@ final authenticatedUserProvider = FutureProvider<GhUser?>((ref) async {
   final api = ref.read(githubApiServiceProvider);
 
   if (pat != null && pat.isNotEmpty) {
-    try {
-      return await api.getAuthenticatedUser();
-    } catch (_) {
-      // Fallback to demo user if authentication fails
-    }
+    // Let errors propagate so the UI can show a specific message (e.g. invalid PAT)
+    // rather than silently falling through to the unauthenticated state.
+    return await api.getAuthenticatedUser();
   }
 
   if (demoUser != null && demoUser.isNotEmpty) {

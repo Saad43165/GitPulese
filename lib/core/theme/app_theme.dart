@@ -8,28 +8,28 @@ import 'app_spacing.dart';
 class AppColors {
   AppColors._();
 
-  // Dark — deep space neon aesthetic
-  static const Color darkBg = Color(0xFF000000); // Pure black
-  static const Color darkSurface = Color(0xFF0B0F19); // Very dark blue tint
-  static const Color darkSurfaceElevated = Color(0xFF120E21); // Dark purple surface
-  static const Color darkBorder = Color(0xFF2D1B4E); // Purple tinted border
+  // Dark — Soothing Obsidian aesthetic
+  static const Color darkBg = Color(0xFF090D16); // Deep midnight obsidian
+  static const Color darkSurface = Color(0xFF0F172A); // Soothing dark slate
+  static const Color darkSurfaceElevated = Color(0xFF161B22); // Sleek dark surface matching profile cards
+  static const Color darkBorder = Color(0xFF1E293B); // Clean border
   static const Color darkTextPrimary = Color(0xFFF8FAFC);
   static const Color darkTextSecondary = Color(0xFF94A3B8);
   static const Color darkTextTertiary = Color(0xFF64748B);
 
-  // Light
+  // Light — Soothing Polar Ice aesthetic
   static const Color lightBg = Color(0xFFF8FAFC);
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightSurfaceElevated = Color(0xFFF1F5F9);
-  static const Color lightBorder = Color(0xFFDDD6FE); // Premium light-purple border tint
+  static const Color lightBorder = Color(0xFFE2E8F0); // Soothing light border
   static const Color lightTextPrimary = Color(0xFF0F172A);
-  static const Color lightTextSecondary = Color(0xFF64748B);
+  static const Color lightTextSecondary = Color(0xFF475569);
   static const Color lightTextTertiary = Color(0xFF94A3B8);
   
-  // Brand - Neon Purple/Blue
-  static const Color accent = Color(0xFF8B5CF6); // Vibrant Purple
-  static const Color accentDeep = Color(0xFF6D28D9); // Deep Purple
-  static const Color accentSoft = Color(0xFFC084FC); // Soft Purple/Pink
+  // Brand - Soothing Indigo & Lavender Accent Palette
+  static const Color accent = Color(0xFF6366F1); // Soothing Indigo
+  static const Color accentDeep = Color(0xFF4F46E5); // Deep Indigo
+  static const Color accentSoft = Color(0xFFA5B4FC); // Soft Lavender
   static const Color success = Color(0xFF10B981);
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFEF4444);

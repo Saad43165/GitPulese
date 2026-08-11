@@ -26,9 +26,9 @@ import '../../widgets/state_views.dart';
 import '../../widgets/glowing_indicator.dart';
 import '../../widgets/shimmer_skeletons.dart';
 import '../../widgets/app_back_button.dart';
-import '../repo_detail/repo_detail_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 import '../auth/auth_dialog.dart';
-import 'developer_wrapped_screen.dart';
 import 'widgets/ai_developer_analyzer_card.dart';
 import '../../core/notifications/widget_manager.dart';
 import '../../widgets/github_analytics_section.dart';
@@ -215,7 +215,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(16),
-                                    onTap: () => Navigator.of(context).push(CardPageRoute(child: DeveloperWrappedScreen(user: user, repos: repos))),
+                                    onTap: () => context.push(AppRoutes.wrapped, extra: {'user': user, 'repos': repos}),
                                     child: const Padding(
                                       padding: EdgeInsets.all(20),
                                       child: Row(
@@ -318,8 +318,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                               child: RepoCard(
                                 repo: repo,
                                 compact: compactCards,
-                                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                                    builder: (_) => RepoDetailScreen(owner: repo.owner.login, repoName: repo.name))),
+                                onTap: () => context.push(AppRoutes.repoPath(repo.owner.login, repo.name)),
                               ),
                             );
                           },
@@ -358,7 +357,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
       expandedHeight: 280.0,
       floating: false,
       pinned: true,
-      backgroundColor: isDark ? const Color(0xFF0D1117) : Colors.white,
+      backgroundColor: isDark ? AppColors.darkBg : Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shadowColor: Colors.black.withValues(alpha: 0.15),
@@ -482,7 +481,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark ? const Color(0xFF0D1117) : Colors.white,
+                          color: isDark ? AppColors.darkBg : Colors.white,
                           width: 4,
                         ),
                         boxShadow: [
@@ -687,8 +686,6 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
 
 
   Widget _buildInfoChips(GhUser user) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     // Build list of info rows to show
     final items = <_InfoRow>[];
 
@@ -1159,10 +1156,7 @@ class _UserDetailScreenState extends ConsumerState<UserDetailScreen> {
                                   error: (_, __) => const SizedBox.shrink(),
                                 ),
                               ),
-                              onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) => UserDetailScreen(
-                                          username: user.login))),
+                              onTap: () => context.push(AppRoutes.userPath(user.login)),
                             );
                           },
                         );
@@ -1295,8 +1289,8 @@ Map<int, int> _computeContributionGraph(List<GhRepo> repos) {
   final Map<int, int> daysActivity = {};
   final now = DateTime.now();
   for (final repo in repos) {
-    if (repo.pushedAt != null) {
-      final diff = now.difference(repo.pushedAt!).inDays;
+    {
+      final diff = now.difference(repo.pushedAt).inDays;
       if (diff >= 0 && diff < 105) {
         daysActivity[diff] = (daysActivity[diff] ?? 0) + 1;
       }

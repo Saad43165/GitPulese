@@ -5,7 +5,6 @@ import '../data/local/tracked_repos_table.dart';
 import '../data/models/repo_model.dart';
 import 'core_providers.dart';
 import 'settings_providers.dart';
-import '../data/remote/github_api_service.dart';
 import '../core/network/dio_client.dart' show GitHubApiException;
 
 final trackedReposProvider =
