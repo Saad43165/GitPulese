@@ -38,9 +38,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ref.invalidate(trendingReposProvider);
             ref.invalidate(topUsersProvider);
           },
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
+          child: AnimationLimiter(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+              slivers: [
               // 1. Clean Modern AppBar / Header Row
               SliverToBoxAdapter(
                 child: Padding(
@@ -502,6 +503,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
+          ),
           ),
         ),
       ),

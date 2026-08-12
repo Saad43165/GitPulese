@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../router/app_router.dart';
 
@@ -23,6 +24,7 @@ class DeepLinkHandler {
   /// {"url": "...", "type": "Issue|PullRequest|...", "repo": "owner/repo", "title": "..."}
   static void handleNotificationPayload(String? payload) {
     if (payload == null || payload.isEmpty) return;
+    HapticFeedback.lightImpact();
     try {
       final data = json.decode(payload) as Map<String, dynamic>;
       final url = data['url'] as String?;

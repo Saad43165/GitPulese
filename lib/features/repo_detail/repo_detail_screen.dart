@@ -244,9 +244,10 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => context.push(
-                                AppRoutes.issuesPath(widget.owner, widget.repoName),
-                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                context.push(AppRoutes.issuesPath(widget.owner, widget.repoName));
+                              },
                               icon: const Icon(Icons.bug_report_rounded, size: 16),
                               label: const Text('Issues'),
                               style: OutlinedButton.styleFrom(
@@ -260,9 +261,10 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => context.push(
-                                AppRoutes.pullsPath(widget.owner, widget.repoName),
-                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                context.push(AppRoutes.pullsPath(widget.owner, widget.repoName));
+                              },
                               icon: const Icon(Icons.call_merge_rounded, size: 16),
                               label: const Text('PRs'),
                               style: OutlinedButton.styleFrom(
@@ -276,9 +278,10 @@ class _RepoDetailScreenState extends ConsumerState<RepoDetailScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () => context.push(
-                                AppRoutes.fileBrowserPath(widget.owner, widget.repoName),
-                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                context.push(AppRoutes.fileBrowserPath(widget.owner, widget.repoName));
+                              },
                               icon: const Icon(Icons.folder_open_rounded, size: 16),
                               label: const Text('Files'),
                               style: OutlinedButton.styleFrom(

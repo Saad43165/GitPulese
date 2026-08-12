@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.gitpulse.app"
+    namespace = "com.gitpulse.companion"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -40,7 +40,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.gitpulse.app"
+        applicationId = "com.gitpulse.companion"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

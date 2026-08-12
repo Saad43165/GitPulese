@@ -33,15 +33,18 @@ class GitHubOAuthService {
 
     try {
       final dio = Dio();
+      // The token exchange must be a POST request to our Cloudflare Worker Proxy
+      // DO NOT call github.com directly, otherwise the client secret must be bundled in the app.
       final response = await dio.post(
-        OAuthConstants.tokenEndpoint,
+        'https://gitpulse-ai.gitpulse-ai.workers.dev/auth/github/token',
         data: {
-          'client_id': OAuthConstants.clientId,
-          'client_secret': OAuthConstants.clientSecret,
           'code': code,
         },
         options: Options(
-          headers: {'Accept': 'application/json'},
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
           validateStatus: (status) => true,
         ),
       );

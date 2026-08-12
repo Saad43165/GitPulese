@@ -12,11 +12,11 @@
 
 # Home Widget / App Widgets
 -keep class es.antonborri.home_widget.** { *; }
--keep class com.gitpulse.app.TrendingWidgetProvider { *; }
--keep class com.gitpulse.app.OverviewWidgetProvider { *; }
--keep class com.gitpulse.app.TopRepoWidgetProvider { *; }
--keep class com.gitpulse.app.ContributionWidgetProvider { *; }
--keep class com.gitpulse.app.LanguageWidgetProvider { *; }
+-keep class com.gitpulse.companion.TrendingWidgetProvider { *; }
+-keep class com.gitpulse.companion.OverviewWidgetProvider { *; }
+-keep class com.gitpulse.companion.TopRepoWidgetProvider { *; }
+-keep class com.gitpulse.companion.ContributionWidgetProvider { *; }
+-keep class com.gitpulse.companion.LanguageWidgetProvider { *; }
 
 # Path Provider & Share Plus
 -keep class dev.fluttercommunity.plus.share.** { *; }

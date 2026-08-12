@@ -5,7 +5,7 @@ import '../../core/utils/formatters.dart';
 import 'home_widgets_ui.dart';
 
 class WidgetManager {
-  static const String appGroupId = 'group.com.gitpulse.app';
+  static const String appGroupId = 'group.com.gitpulse.companion';
   static const String androidWidgetName = 'TrendingWidgetProvider';
 
   static Future<void> updateTrendingWidget(GhRepo repo) async {

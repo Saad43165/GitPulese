@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/router/app_router.dart';
@@ -140,13 +141,24 @@ class _FileBrowserScreenState extends ConsumerState<FileBrowserScreen> {
 
                 return RefreshIndicator(
                   onRefresh: () async => ref.invalidate(_contentsProvider(args)),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) => _FileEntry(
-                      entry: filtered[i],
-                      owner: widget.owner,
-                      repoName: widget.repoName,
+                  child: AnimationLimiter(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) => AnimationConfiguration.staggeredList(
+                        position: i,
+                        duration: const Duration(milliseconds: 300),
+                        child: SlideAnimation(
+                          verticalOffset: 50.0,
+                          child: FadeInAnimation(
+                            child: _FileEntry(
+                              entry: filtered[i],
+                              owner: widget.owner,
+                              repoName: widget.repoName,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../core/router/app_router.dart';
@@ -66,6 +68,7 @@ class _IssuesScreenState extends ConsumerState<IssuesScreen>
           labelColor: AppColors.accent,
           unselectedLabelColor: Colors.white54,
           indicatorColor: AppColors.accent,
+          onTap: (_) => HapticFeedback.selectionClick(),
           tabs: const [
             Tab(text: 'Open'),
             Tab(text: 'Closed'),
@@ -116,14 +119,25 @@ class _IssuesList extends ConsumerWidget {
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(_issuesProvider(args)),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: issues.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) => _IssueCard(
-              issue: issues[i],
-              owner: owner,
-              repoName: repoName,
+          child: AnimationLimiter(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+              itemCount: issues.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) => AnimationConfiguration.staggeredList(
+                position: i,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: _IssueCard(
+                      issue: issues[i],
+                      owner: owner,
+                      repoName: repoName,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         );
@@ -167,12 +181,22 @@ class _PrList extends ConsumerWidget {
         }
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(_prsInIssueTabProvider(args)),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: prs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, i) =>
-                _IssueCard(issue: prs[i], owner: owner, repoName: repoName, isPr: true),
+          child: AnimationLimiter(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+              itemCount: prs.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, i) => AnimationConfiguration.staggeredList(
+                position: i,
+                duration: const Duration(milliseconds: 375),
+                child: SlideAnimation(
+                  verticalOffset: 50.0,
+                  child: FadeInAnimation(
+                    child: _IssueCard(issue: prs[i], owner: owner, repoName: repoName, isPr: true),
+                  ),
+                ),
+              ),
+            ),
           ),
         );
       },

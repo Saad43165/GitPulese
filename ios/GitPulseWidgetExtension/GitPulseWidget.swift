@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Shared constants
 
-private let kAppGroup = "group.com.gitpulse.app"
+private let kAppGroup = "group.com.gitpulse.companion"
 
 // MARK: - Helpers
 

@@ -40,6 +40,35 @@ export default {
       return json({ status: 'ok', service: 'GitPulse AI Worker' });
     }
 
+    // Privacy Policy for Google Play Store compliance
+    if (url.pathname === '/privacy') {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Privacy Policy - GitPulse</title>
+          <style>body { font-family: sans-serif; max-width: 800px; margin: 40px auto; line-height: 1.6; padding: 0 20px; color: #333; }</style>
+        </head>
+        <body>
+          <h1>Privacy Policy for GitPulse</h1>
+          <p><strong>Last Updated: August 2026</strong></p>
+          <p>GitPulse ("we", "our", or "us") respects your privacy. This Privacy Policy explains how we handle your data when you use the GitPulse mobile application.</p>
+          <h2>1. Data We Collect</h2>
+          <p>GitPulse acts as a client for GitHub. When you log in, we authenticate directly with GitHub using OAuth. We receive an access token that is stored <strong>locally and securely</strong> on your device using encrypted storage. We do not transmit this token to any third-party servers, nor do we store it in a central database.</p>
+          <h2>2. How We Use Your Data</h2>
+          <p>Your GitHub data (repositories, profile, pull requests, etc.) is accessed strictly to display it within the app. We do not sell, rent, or share your personal data or GitHub source code with third parties.</p>
+          <h2>3. AI Features</h2>
+          <p>If you use our AI features (like PR Summaries or Code Explanations), snippets of code and metadata you explicitly choose to analyze are sent to our secure AI provider (Groq/Cloudflare). This data is used solely to generate the response and is not used to train models or stored persistently.</p>
+          <h2>4. Your Rights</h2>
+          <p>You can revoke GitPulse's access to your GitHub account at any time by visiting your GitHub Settings (Applications -> Authorized OAuth Apps) and revoking access. You can also delete the app, which instantly removes all locally stored tokens and preferences.</p>
+          <h2>5. Contact Us</h2>
+          <p>If you have any questions about this Privacy Policy, please contact the developer via the app's GitHub repository or Play Store listing.</p>
+        </body>
+        </html>
+      `;
+      return new Response(html, { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+    }
+
     if (request.method !== 'POST') {
       return json({ error: 'Method not allowed' }, 405);
     }
@@ -91,7 +120,7 @@ async function handleGitHubOAuth(body, env) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify({
-      client_id: 'Ov23li8V48NTssNZnJbA',
+      client_id: 'Ov23liSRrNr1PE6Kbd1F',
       client_secret: clientSecret,
       code,
     }),

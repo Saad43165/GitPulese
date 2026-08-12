@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../core/router/app_router.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/constants/api_constants.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -42,11 +39,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _navigateNext();
   }
 
-  Future<void> _navigateNext() async {
+    Future<void> _navigateNext() async {
     await Future.delayed(const Duration(milliseconds: 2800));
     if (!mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
     String? token;
     try {
       const secureStorage = FlutterSecureStorage();

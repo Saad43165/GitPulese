@@ -1,4 +1,4 @@
-package com.gitpulse.app
+package com.gitpulse.companion
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

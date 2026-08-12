@@ -1,17 +1,17 @@
-package com.gitpulse.app
+package com.gitpulse.companion
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.widget.RemoteViews
 
-class ContributionWidgetProvider : AppWidgetProvider() {
+class TopRepoWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         for (appWidgetId in appWidgetIds) {
             val widgetData = es.antonborri.home_widget.HomeWidgetPlugin.getData(context)
-            val views = RemoteViews(context.packageName, R.layout.widget_contribution)
+            val views = RemoteViews(context.packageName, R.layout.widget_top_repo)
             
-            val imagePath = widgetData.getString("contrib_image", null)
+            val imagePath = widgetData.getString("toprepo_image", null)
             if (imagePath != null) {
                 val bitmap = android.graphics.BitmapFactory.decodeFile(imagePath)
                 if (bitmap != null) {

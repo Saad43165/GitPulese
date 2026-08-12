@@ -2,7 +2,7 @@ abstract class OAuthConstants {
   // Register at: github.com/settings/developers → OAuth Apps → New
   // Callback URL: gitpulse://oauth
   static const clientId = 'Ov23liSRrNr1PE6Kbd1F';
-  static const clientSecret = '94650ead1d11166ffbdd173cb2b4135fac742cb3';
+  // NOTE: clientSecret has been moved securely to Cloudflare Worker. Do not add it here.
   
   static const callbackScheme = 'gitpulse';
   static const callbackUrl = 'gitpulse://oauth';
