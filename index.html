@@ -6,46 +6,51 @@
   <title>Saad Ikram | Portfolio</title>
   <style>
             :root {
-          --bg-color: #0F172A;
-          --card-bg: #1E293B;
-          --accent: #8B5CF6;
-          --accent-soft: rgba(139, 92, 246, 0.15);
-          --text-primary: #F8FAFC;
-          --text-secondary: #94A3B8;
-          --border: #334155;
+          --bg-color: #022C22;
+          --card-bg: #064E3B;
+          --accent: #34D399;
+          --accent-soft: rgba(52, 211, 153, 0.15);
+          --text-primary: #ECFDF5;
+          --text-secondary: #A7F3D0;
+          --border: rgba(52, 211, 153, 0.25);
         }
         body {
-          background-color: var(--bg-color);
+          background: linear-gradient(135deg, #022C22 0%, #064E3B 50%, #022C22 100%);
           color: var(--text-primary);
           font-family: 'Inter', system-ui, -apple-system, sans-serif;
           margin: 0;
           padding: 40px 20px;
           display: flex;
           justify-content: center;
+          min-height: 100vh;
         }
         .container {
           max-width: 900px;
           width: 100%;
         }
         header {
+          background: rgba(6, 78, 59, 0.4);
+          border: 1px solid var(--border);
+          border-radius: 20px;
+          padding: 32px;
           display: flex;
           align-items: center;
           gap: 24px;
-          padding-bottom: 32px;
-          border-bottom: 1px solid var(--border);
           margin-bottom: 40px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
         .avatar {
           width: 96px;
           height: 96px;
-          border-radius: 50%;
-          border: 3px solid var(--accent);
+          border-radius: 20px;
+          border: 2px solid var(--accent);
           object-fit: cover;
         }
         .info h1 {
           margin: 0 0 8px 0;
           font-size: 32px;
-          font-weight: 800;
+          font-weight: 900;
+          color: #F0FDF4;
         }
         .info p {
           margin: 0 0 12px 0;
@@ -54,32 +59,30 @@
         }
         .meta-badges {
           display: flex;
-          gap: 12px;
+          gap: 10px;
           flex-wrap: wrap;
-          margin-bottom: 16px;
+          margin-bottom: 12px;
         }
         .badge {
-          background: var(--card-bg);
+          background: rgba(52, 211, 153, 0.1);
           border: 1px solid var(--border);
-          padding: 6px 12px;
+          padding: 4px 12px;
           border-radius: 20px;
-          font-size: 13px;
-          color: var(--text-secondary);
-        }
-        .skills-section {
-          margin-bottom: 32px;
+          font-size: 12px;
+          color: var(--accent);
         }
         .skills-grid {
           display: flex;
-          gap: 10px;
+          gap: 8px;
           flex-wrap: wrap;
+          margin-top: 12px;
         }
         .skill-pill {
-          background: var(--accent-soft);
-          color: #DDD6FE;
-          border: 1px solid rgba(139, 92, 246, 0.3);
+          background: rgba(52, 211, 153, 0.1);
+          border: 1px solid var(--border);
+          color: #6EE7B7;
           padding: 6px 14px;
-          border-radius: 12px;
+          border-radius: 10px;
           font-size: 12px;
           font-weight: 600;
         }
@@ -91,8 +94,8 @@
         .social-link {
           color: var(--accent);
           text-decoration: none;
-          font-weight: 600;
-          font-size: 14px;
+          font-weight: 700;
+          font-size: 13px;
         }
         .social-link:hover {
           text-decoration: underline;
@@ -103,16 +106,13 @@
           gap: 20px;
         }
         .card {
-          background: var(--card-bg);
+          background: rgba(6, 78, 59, 0.5);
           border: 1px solid var(--border);
-          border-radius: 12px;
+          border-radius: 16px;
           padding: 24px;
-          transition: transform 0.2s, border-color 0.2s;
           text-decoration: none;
           color: inherit;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
+          transition: transform 0.2s, border-color 0.2s;
         }
         .card:hover {
           transform: translateY(-4px);
@@ -120,33 +120,19 @@
         }
         .card h3 {
           margin: 0 0 8px 0;
-          font-size: 18px;
-          color: var(--text-primary);
+          color: #ECFDF5;
         }
         .card p {
-          margin: 0 0 20px 0;
-          font-size: 14px;
-          color: var(--text-secondary);
+          color: #A7F3D0;
+          font-size: 13px;
           line-height: 1.5;
-          flex-grow: 1;
         }
         .card-footer {
           display: flex;
           justify-content: space-between;
-          align-items: center;
           font-size: 12px;
-          color: var(--text-secondary);
-        }
-        .lang {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .lang-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: var(--accent);
+          color: #34D399;
+          margin-top: 16px;
         }
       
   </style>
@@ -158,20 +144,43 @@
           <div class="info">
             <h1>Saad Ikram</h1>
             <p>Full Stack Developer & Open Source Contributor</p>
-            <div class="meta-badges">
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom: 12px;">
               <span class="badge">📍 Chakwal</span>
-              <span class="badge">📦 35 Repositories</span>
+              <span class="badge">📦 35 Repos</span>
               <span class="badge">👥 5 Followers</span>
             </div>
             <div class="socials-row"><a href="https://portfolio-saad-mu.vercel.app/" target="_blank" class="social-link">🌐 Website</a></div>
           </div>
         </header>
         <main>
-          <div class="skills-section">
-            <h2 style="margin-bottom: 16px; font-weight: 800; font-size: 20px;">Skills & Technologies</h2>
+          <div class="skills-section" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04); padding:24px; border-radius:16px; margin-bottom:32px;">
+            <h2 style="margin-top:0; margin-bottom: 16px; font-weight: 800; font-size: 20px;">Skills & Technologies</h2>
             <div class="skills-grid"><span class="skill-pill">Flutter</span><span class="skill-pill">Dart</span><span class="skill-pill">React</span><span class="skill-pill">TypeScript</span><span class="skill-pill">Node.js</span><span class="skill-pill">Git</span></div>
           </div>
-          <h2 style="margin-bottom: 24px; font-weight: 800; font-size: 20px;">Featured Projects</h2>
+                <div style="margin-top: 40px;">
+        <h2 style="margin-bottom: 20px; font-weight: 800; font-size: 20px;">💼 Work Experience</h2>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); padding: 18px 22px; border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Senior Full Stack Developer</h3>
+            <span style="font-size: 12px; opacity: 0.7;">2023 - Present</span>
+          </div>
+          <p style="margin: 0 0 8px 0; font-size: 13px; color: #34D399;">Open Source & Independent</p>
+          <p style="margin: 0; font-size: 13px; opacity: 0.8; line-height: 1.5;">Architected high-performance mobile & web applications, optimizing data pipelines and UI response times.</p>
+        </div>
+        </div></div>
+                <div style="margin-top: 40px;">
+        <h2 style="margin-bottom: 20px; font-weight: 800; font-size: 20px;">🎓 Education</h2>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); padding: 16px 20px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700;">B.S. Computer Science & Software Engineering</h3>
+            <p style="margin: 0; font-size: 12px; opacity: 0.7;">Tech University</p>
+          </div>
+          <span style="font-size: 12px; opacity: 0.8; font-weight: 600;">2019 - 2023</span>
+        </div>
+        </div></div>
+          <h2 style="margin-top:40px; margin-bottom: 24px; font-weight: 800; font-size: 20px;">Featured Projects</h2>
           <div class="grid">
                     <a href="https://github.com/Saad43165/GitPulese" target="_blank" class="card">
           <div>
@@ -205,6 +214,7 @@
         </a>
         
           </div>
+          
         </main>
       </div>
       
