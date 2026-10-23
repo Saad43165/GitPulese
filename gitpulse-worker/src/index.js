@@ -17,7 +17,18 @@
  */
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.1-8b-instant';
+// Tried in order; a model that is decommissioned/unavailable falls through to the next.
+// Override the first choice with the GROQ_MODEL env var.
+const MODELS = ['llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'openai/gpt-oss-20b'];
+const MAX_CODE_CHARS = 12000;
+const MAX_REPOS = 30;
+
+class UpstreamError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -85,23 +96,32 @@ export default {
       return await handleGitHubOAuth(body, env);
     }
 
+    if (!body || typeof body !== 'object') {
+      return json({ error: 'Invalid request body' }, 400);
+    }
+
     const groqKey = env.GROQ_API_KEY;
     if (!groqKey) {
-      return json({ error: 'GROQ_API_KEY secret not configured on Worker' }, 500);
+      return json({ error: 'GROQ_API_KEY secret not configured on Worker' }, 503);
     }
+    const groq = { key: groqKey, models: env.GROQ_MODEL ? [env.GROQ_MODEL, ...MODELS] : MODELS };
 
     try {
       if (url.pathname === '/ai/summarize') {
-        return await handleSummarize(body, groqKey);
+        return await handleSummarize(body, groq);
       }
       if (url.pathname === '/ai/explain-code') {
-        return await handleExplainCode(body, groqKey);
+        return await handleExplainCode(body, groq);
       }
       if (url.pathname === '/ai/analyze-user') {
-        return await handleAnalyzeUser(body, groqKey);
+        return await handleAnalyzeUser(body, groq);
       }
       return json({ error: 'Unknown route' }, 404);
     } catch (e) {
+      console.error('AI request failed', url.pathname, e && e.message);
+      if (e instanceof UpstreamError) {
+        return json({ error: e.message }, e.status === 429 ? 429 : 503);
+      }
       return json({ error: e.message || 'Internal error' }, 500);
     }
   },
@@ -135,35 +155,38 @@ async function handleGitHubOAuth(body, env) {
   return json({ access_token: data.access_token, token_type: data.token_type, scope: data.scope });
 }
 
-async function handleSummarize(body, groqKey) {
+async function handleSummarize(body, groq) {
   const { repoFullName, description, readme, primaryLanguage, topics } = body;
   const prompt = `You are an expert developer assistant. Summarize the following GitHub repository in 3–4 concise paragraphs covering its purpose, tech stack, key features, and who would benefit from it.
 
 Repository: ${repoFullName}
 Language: ${primaryLanguage || 'Unknown'}
-Topics: ${(topics || []).join(', ')}
+Topics: ${(Array.isArray(topics) ? topics : []).join(', ')}
 Description: ${description || 'None'}
 README excerpt:
 ${readme ? readme.substring(0, 2000) : 'No README available'}`;
 
-  const summary = await callGroq(groqKey, 'You are a senior software engineer who writes clear, insightful repository summaries.', prompt);
+  const summary = await callGroq(groq, 'You are a senior software engineer who writes clear, insightful repository summaries.', prompt);
   return json({ summary });
 }
 
-async function handleExplainCode(body, groqKey) {
-  const { filename, code } = body;
+async function handleExplainCode(body, groq) {
+  const { filename } = body;
+  const code = String(body.code || '').substring(0, MAX_CODE_CHARS);
+  if (!code.trim()) return json({ error: 'Missing code' }, 400);
   const explanation = await callGroq(
-    groqKey,
+    groq,
     'You are an expert code reviewer. Provide clear, structured, and actionable analysis.',
     `File: ${filename}\n\n${code}`
   );
   return json({ explanation });
 }
 
-async function handleAnalyzeUser(body, groqKey) {
+async function handleAnalyzeUser(body, groq) {
   const { username, bio, repos } = body;
-  const repoList = (repos || [])
-    .map(r => `- ${r.name} (${r.language || 'unknown'}, ⭐${r.stars}): ${r.description || 'No description'}`)
+  const repoList = (Array.isArray(repos) ? repos : [])
+    .slice(0, MAX_REPOS)
+    .map(r => `- ${r.name} (${r.language || 'unknown'}, ⭐${r.stars}): ${String(r.description || 'No description').substring(0, 200)}`)
     .join('\n');
 
   const prompt = `Analyze the GitHub profile of developer "@${username}".
@@ -174,7 +197,7 @@ ${repoList}
 Write a 2–3 paragraph developer profile covering their primary domain, coding style, technology preferences, and standout projects.`;
 
   const analysis = await callGroq(
-    groqKey,
+    groq,
     'You are a senior engineering recruiter who writes insightful developer profiles based on GitHub activity.',
     prompt
   );
@@ -183,36 +206,43 @@ Write a 2–3 paragraph developer profile covering their primary domain, coding 
 
 // ── Groq Client ───────────────────────────────────────────────────────────────
 
-async function callGroq(apiKey, systemPrompt, userContent) {
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
-      ],
-      temperature: 0.4,
-      max_tokens: 2048,
-    }),
-  });
+async function callGroq(groq, systemPrompt, userContent) {
+  let lastError;
+  for (const model of groq.models) {
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groq.key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ],
+        temperature: 0.4,
+        max_tokens: 2048,
+      }),
+    });
 
-  if (!response.ok) {
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      const content = data?.choices?.[0]?.message?.content;
+      if (content && content.trim() !== '') return content.trim();
+      lastError = new UpstreamError('Groq returned an empty response.', 502);
+      continue;
+    }
+
     const err = await response.json().catch(() => ({}));
     const msg = err?.error?.message || `Groq API error ${response.status}`;
-    throw new Error(msg);
+    lastError = new UpstreamError(msg, response.status);
+    // Bad/missing model or transient upstream failure: try the next model.
+    // Anything else (bad key, rate limit, oversized prompt) won't improve by retrying.
+    if (![400, 404, 500, 502, 503].includes(response.status)) break;
+    if (response.status === 400 && !/model/i.test(msg)) break;
   }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content || content.trim() === '') {
-    throw new Error('Groq returned an empty response.');
-  }
-  return content.trim();
+  throw lastError;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

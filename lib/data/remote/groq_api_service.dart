@@ -95,8 +95,14 @@ class GroqApiException implements Exception {
 
   factory GroqApiException.fromDioError(DioException e) {
     final status = e.response?.statusCode;
+    final data = e.response?.data;
+    final serverMsg =
+        (data is Map && data['error'] is String) ? data['error'] as String : null;
 
     if (status == 503) {
+      if (serverMsg != null) {
+        return GroqApiException('AI service unavailable: $serverMsg');
+      }
       return GroqApiException(
           'AI service is temporarily unavailable. Please try again shortly.');
     }
@@ -105,6 +111,9 @@ class GroqApiException implements Exception {
           'Rate limit reached. Please wait a minute and try again.');
     }
     if (status != null && status >= 500) {
+      if (serverMsg != null) {
+        return GroqApiException('AI server error ($status): $serverMsg');
+      }
       return GroqApiException(
           'AI server error ($status). Please try again in a moment.');
     }
@@ -117,9 +126,8 @@ class GroqApiException implements Exception {
       return GroqApiException(
           'Could not connect to the AI service. Check your internet connection.');
     }
-    final data = e.response?.data;
-    if (data is Map && data['error'] != null) {
-      return GroqApiException('AI error: ${data['error']}');
+    if (serverMsg != null) {
+      return GroqApiException('AI error: $serverMsg');
     }
     return GroqApiException(
         'Could not reach the AI service. Please try again.');
