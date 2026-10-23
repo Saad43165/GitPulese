@@ -8,7 +8,12 @@ import 'core_providers.dart';
 import 'settings_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-final groqApiServiceProvider = Provider<GroqApiService>((ref) => GroqApiService());
+/// Builds a [GroqApiService] with the user's stored API key.
+/// Automatically rebuilds when the key changes (e.g. after the user saves one in Settings).
+final groqApiServiceProvider = Provider<GroqApiService>((ref) {
+  final apiKey = ref.watch(groqApiKeyProvider) ?? '';
+  return GroqApiService(apiKey);
+});
 
 // ---------- Compare Mode ----------
 
@@ -164,7 +169,7 @@ class RepoSummaryNotifier extends StateNotifier<AsyncValue<String>?> {
         return;
       }
 
-      final groq = GroqApiService();
+      final groq = ref.read(groqApiServiceProvider);
       final summary = await groq.summarizeRepo(
         repoFullName: repo.fullName,
         description: repo.description,

@@ -1,26 +1,28 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import '../../core/constants/api_constants.dart';
 
-/// Calls the GitPulse AI Worker (Cloudflare) which holds the Groq API key
-/// server-side. Users never need to configure or provide any API key.
+/// Calls the Groq API directly from the app.
+/// Get a free key at https://console.groq.com (no credit card required).
 ///
-/// Worker: gitpulse-worker/src/index.js
-/// Free tier: 100,000 requests/day, zero cold starts, global edge network.
+/// The key is stored securely on-device via flutter_secure_storage and
+/// entered once by the user in Settings → AI Key.
 class GroqApiService {
-  GroqApiService();
+  static const _groqBaseUrl = 'https://api.groq.com/openai/v1';
+  static const _maxCodeChars = 12000;
+  static const _maxRepos = 30;
 
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: ApiConstants.backendBaseUrl,
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 60),
-    sendTimeout: const Duration(seconds: 15),
-    headers: {
-      'Content-Type': 'application/json',
-      if (ApiConstants.appSecret.isNotEmpty)
-        'x-gitpulse-secret': ApiConstants.appSecret,
-    },
-  ));
+  // Models tried in order — falls through on 404/decommissioned model errors.
+  static const _models = [
+    'llama-3.1-8b-instant',
+    'llama-3.3-70b-versatile',
+    'gemma2-9b-it',
+  ];
+
+  final String _apiKey;
+
+  GroqApiService(this._apiKey);
+
+  // ── Public API ─────────────────────────────────────────────────────────────
 
   Future<String> summarizeRepo({
     required String repoFullName,
@@ -29,13 +31,21 @@ class GroqApiService {
     required String? primaryLanguage,
     required List<String> topics,
   }) async {
-    return _post('/ai/summarize', {
-      'repoFullName': repoFullName,
-      'description': description,
-      'readme': readme,
-      'primaryLanguage': primaryLanguage,
-      'topics': topics,
-    }, responseKey: 'summary');
+    final prompt =
+        'You are an expert developer assistant. Summarize the following GitHub '
+        'repository in 3–4 concise paragraphs covering its purpose, tech stack, '
+        'key features, and who would benefit from it.\n\n'
+        'Repository: $repoFullName\n'
+        'Language: ${primaryLanguage ?? 'Unknown'}\n'
+        'Topics: ${topics.join(', ')}\n'
+        'Description: ${description ?? 'None'}\n'
+        'README excerpt:\n'
+        '${readme != null ? readme.substring(0, readme.length.clamp(0, 2000)) : 'No README available'}';
+
+    return _chat(
+      system: 'You are a senior software engineer who writes clear, insightful repository summaries.',
+      user: prompt,
+    );
   }
 
   Future<String> analyzeDeveloper({
@@ -43,94 +53,135 @@ class GroqApiService {
     required String? bio,
     required List<Map<String, dynamic>> repos,
   }) async {
-    return _post('/ai/analyze-user', {
-      'username': username,
-      'bio': bio,
-      'repos': repos,
-    }, responseKey: 'analysis');
+    final repoList = repos
+        .take(_maxRepos)
+        .map((r) =>
+            '- ${r['name']} (${r['language'] ?? 'unknown'}, ⭐${r['stars']}): '
+            '${(r['description'] as String? ?? 'No description').substring(0, (r['description'] as String? ?? '').length.clamp(0, 200))}')
+        .join('\n');
+
+    final prompt = 'Analyze the GitHub profile of developer "@$username".\n'
+        'Bio: ${bio ?? 'None'}\n'
+        'Repositories:\n$repoList\n\n'
+        'Write a 2–3 paragraph developer profile covering their primary domain, '
+        'coding style, technology preferences, and standout projects.';
+
+    return _chat(
+      system: 'You are a senior engineering recruiter who writes insightful developer profiles based on GitHub activity.',
+      user: prompt,
+    );
   }
 
   Future<String> explainCode({
     required String filename,
     required String code,
   }) async {
-    return _post('/ai/explain-code', {
-      'filename': filename,
-      'code': code,
-    }, responseKey: 'explanation');
+    final trimmed = code.length > _maxCodeChars ? code.substring(0, _maxCodeChars) : code;
+    return _chat(
+      system: 'You are an expert code reviewer. Provide clear, structured, and actionable analysis.',
+      user: 'File: $filename\n\n$trimmed',
+    );
   }
 
-  Future<String> _post(
-    String path,
-    Map<String, dynamic> data, {
-    required String responseKey,
+  // ── Core chat call with model fallback ────────────────────────────────────
+
+  Future<String> _chat({
+    required String system,
+    required String user,
   }) async {
-    try {
-      final response = await _dio.post(path, data: data);
+    final dio = Dio(BaseOptions(
+      baseUrl: _groqBaseUrl,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 60),
+      headers: {
+        'Authorization': 'Bearer $_apiKey',
+        'Content-Type': 'application/json',
+      },
+    ));
 
-      final Map<String, dynamic> json;
-      if (response.data is Map) {
-        json = Map<String, dynamic>.from(response.data as Map);
-      } else if (response.data is String) {
-        json = Map<String, dynamic>.from(
-            jsonDecode(response.data as String) as Map);
-      } else {
-        throw GroqApiException('Unexpected response format from AI service.');
-      }
+    GroqApiException? lastError;
 
-      final value = json[responseKey] as String?;
-      if (value == null || value.trim().isEmpty) {
-        throw GroqApiException('AI service returned an empty response.');
+    for (final model in _models) {
+      try {
+        final response = await dio.post(
+          '/chat/completions',
+          data: {
+            'model': model,
+            'messages': [
+              {'role': 'system', 'content': system},
+              {'role': 'user', 'content': user},
+            ],
+            'temperature': 0.4,
+            'max_tokens': 2048,
+          },
+        );
+
+        final content =
+            (response.data as Map?)?['choices']?[0]?['message']?['content'] as String?;
+        if (content != null && content.trim().isNotEmpty) return content.trim();
+
+        lastError = const GroqApiException('Groq returned an empty response.');
+      } on DioException catch (e) {
+        final err = GroqApiException.fromDioError(e);
+        lastError = err;
+
+        // Only try the next model for model-related errors (404, bad_request mentioning model).
+        final status = e.response?.statusCode ?? 0;
+        final msg = err.message.toLowerCase();
+        final isModelError =
+            status == 404 || (status == 400 && msg.contains('model'));
+        if (!isModelError) break;
       }
-      return value.trim();
-    } on DioException catch (e) {
-      throw GroqApiException.fromDioError(e);
     }
+
+    throw lastError ?? const GroqApiException('Could not reach the AI service.');
   }
 }
 
+// ── Exception ─────────────────────────────────────────────────────────────────
+
 class GroqApiException implements Exception {
   final String message;
-  GroqApiException(this.message);
+  const GroqApiException(this.message);
 
   factory GroqApiException.fromDioError(DioException e) {
     final status = e.response?.statusCode;
     final data = e.response?.data;
-    final serverMsg =
-        (data is Map && data['error'] is String) ? data['error'] as String : null;
+    final serverMsg = _extractMsg(data);
 
-    if (status == 503) {
-      if (serverMsg != null) {
-        return GroqApiException('AI service unavailable: $serverMsg');
-      }
-      return GroqApiException(
-          'AI service is temporarily unavailable. Please try again shortly.');
+    if (status == 401) {
+      return const GroqApiException(
+          'Invalid Groq API key. Go to Settings → AI Key and paste a valid key from console.groq.com.');
     }
     if (status == 429) {
-      return GroqApiException(
-          'Rate limit reached. Please wait a minute and try again.');
+      return const GroqApiException('Rate limit reached. Please wait a moment and try again.');
+    }
+    if (status == 413) {
+      return const GroqApiException('Input too large for the AI model. Try with a shorter file.');
     }
     if (status != null && status >= 500) {
-      if (serverMsg != null) {
-        return GroqApiException('AI server error ($status): $serverMsg');
-      }
-      return GroqApiException(
-          'AI server error ($status). Please try again in a moment.');
+      return GroqApiException('Groq server error ($status)${serverMsg != null ? ': $serverMsg' : ''}. Try again in a moment.');
     }
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
-      return GroqApiException(
-          'Request timed out. Please check your internet connection and try again.');
+      return const GroqApiException(
+          'Request timed out. Check your internet connection and try again.');
     }
     if (e.type == DioExceptionType.connectionError) {
-      return GroqApiException(
-          'Could not connect to the AI service. Check your internet connection.');
+      return const GroqApiException(
+          'Could not connect to Groq. Check your internet connection.');
     }
-    if (serverMsg != null) {
-      return GroqApiException('AI error: $serverMsg');
+    if (serverMsg != null) return GroqApiException('AI error: $serverMsg');
+    return const GroqApiException('Could not reach the AI service. Please try again.');
+  }
+
+  static String? _extractMsg(dynamic data) {
+    if (data is Map) {
+      final err = data['error'];
+      if (err is String) return err;
+      if (err is Map) return err['message'] as String?;
     }
-    return GroqApiException(
-        'Could not reach the AI service. Please try again.');
+    return null;
   }
 
   @override
