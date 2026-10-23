@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local build scripts with secrets
+build_release.sh
+.env
+.env.local

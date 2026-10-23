@@ -10,6 +10,12 @@ class ApiConstants {
   /// out of version control — use --dart-define=GITPULSE_APP_SECRET=xxx at build time.
   static const String appSecret = String.fromEnvironment('GITPULSE_APP_SECRET', defaultValue: '');
 
+  /// Default Groq API key — used when the user has not entered their own key.
+  /// Injected at build time: --dart-define=GROQ_DEFAULT_API_KEY=gsk_...
+  /// Never commit the actual key here — pass it via CI/CD or local build script.
+  static const String defaultGroqApiKey =
+      String.fromEnvironment('GROQ_DEFAULT_API_KEY', defaultValue: '');
+
   static const String baseUrl = 'https://api.github.com';
 
   // Search endpoints

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/constants/api_constants.dart';
 import '../data/local/manifest_parser.dart';
 import '../data/models/repo_model.dart';
 import '../data/models/user_and_search_models.dart';
@@ -8,11 +9,13 @@ import 'core_providers.dart';
 import 'settings_providers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Builds a [GroqApiService] with the user's stored API key.
-/// Automatically rebuilds when the key changes (e.g. after the user saves one in Settings).
+/// Builds a [GroqApiService].
+/// Priority: user's own key (Settings → AI Key) → developer's default key.
+/// Automatically rebuilds when the user key changes.
 final groqApiServiceProvider = Provider<GroqApiService>((ref) {
-  final apiKey = ref.watch(groqApiKeyProvider) ?? '';
-  return GroqApiService(apiKey);
+  final userKey = ref.watch(groqApiKeyProvider) ?? '';
+  final effectiveKey = userKey.isNotEmpty ? userKey : ApiConstants.defaultGroqApiKey;
+  return GroqApiService(effectiveKey);
 });
 
 // ---------- Compare Mode ----------
