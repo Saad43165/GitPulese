@@ -11,11 +11,12 @@ class GroqApiService {
   static const _maxCodeChars = 12000;
   static const _maxRepos = 30;
 
-  // Models tried in order — falls through on 404/decommissioned model errors.
+  // Models tried in order — falls through on model errors / decommissioned models.
   static const _models = [
-    'llama-3.1-8b-instant',
     'llama-3.3-70b-versatile',
+    'llama-3.1-70b-versatile',
     'gemma2-9b-it',
+    'llama3-70b-8192',
   ];
 
   final String _apiKey;
@@ -133,11 +134,22 @@ class GroqApiService {
         final err = GroqApiException.fromDioError(e);
         lastError = err;
 
-        // Only try the next model for model-related errors (404, bad_request mentioning model).
+        // Try next model for: 404, decommissioned/unsupported model errors, server errors.
+        // Stop immediately for auth (401), rate limit (429), or bad input (413).
         final status = e.response?.statusCode ?? 0;
         final msg = err.message.toLowerCase();
-        final isModelError =
-            status == 404 || (status == 400 && msg.contains('model'));
+        final stopNow = status == 401 || status == 429 || status == 413;
+        final isModelError = !stopNow && (
+            status == 404 ||
+            status == 0 ||
+            status >= 500 ||
+            msg.contains('model') ||
+            msg.contains('decommission') ||
+            msg.contains('deprecated') ||
+            msg.contains('not found') ||
+            msg.contains('not supported') ||
+            (status == 400 && !msg.contains('token'))
+        );
         if (!isModelError) break;
       }
     }
