@@ -304,7 +304,10 @@ class DeveloperAnalyzerNotifier extends StateNotifier<AsyncValue<String?>> {
     required String username,
     required String? bio,
     required List<GhRepo> topRepos,
+    bool forceRefresh = false,
   }) async {
+    // If we already have a result and forceRefresh isn't requested, skip.
+    if (!forceRefresh && state is AsyncData && (state as AsyncData).value != null) return;
     state = const AsyncValue.loading();
     try {
       final repos = topRepos

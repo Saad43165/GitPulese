@@ -83,6 +83,14 @@ class GroqApiService {
     );
   }
 
+  /// General-purpose prompt — use when none of the typed methods fit.
+  Future<String> queryGroq(String prompt) async {
+    return _chat(
+      system: 'You are a helpful AI assistant for developers.',
+      user: prompt.length > _maxCodeChars ? prompt.substring(0, _maxCodeChars) : prompt,
+    );
+  }
+
   // ── Core chat call with model fallback ────────────────────────────────────
 
   Future<String> _chat({
@@ -142,7 +150,11 @@ class GroqApiService {
 
 class GroqApiException implements Exception {
   final String message;
-  const GroqApiException(this.message);
+  final int? statusCode;
+  const GroqApiException(this.message, {this.statusCode});
+
+  /// True when the error is a rate-limit (429) response from Groq.
+  bool get isQuotaExceeded => statusCode == 429;
 
   factory GroqApiException.fromDioError(DioException e) {
     final status = e.response?.statusCode;
@@ -150,17 +162,18 @@ class GroqApiException implements Exception {
     final serverMsg = _extractMsg(data);
 
     if (status == 401) {
-      return const GroqApiException(
-          'Invalid Groq API key. Go to Settings → AI Key and paste a valid key from console.groq.com.');
+      return GroqApiException(
+          'Invalid Groq API key. Go to Settings → AI Key and paste a valid key from console.groq.com.',
+          statusCode: status);
     }
     if (status == 429) {
-      return const GroqApiException('Rate limit reached. Please wait a moment and try again.');
+      return GroqApiException('Rate limit reached. Please wait a moment and try again.', statusCode: 429);
     }
     if (status == 413) {
-      return const GroqApiException('Input too large for the AI model. Try with a shorter file.');
+      return GroqApiException('Input too large for the AI model. Try with a shorter file.', statusCode: status);
     }
     if (status != null && status >= 500) {
-      return GroqApiException('Groq server error ($status)${serverMsg != null ? ': $serverMsg' : ''}. Try again in a moment.');
+      return GroqApiException('Groq server error ($status)${serverMsg != null ? ': $serverMsg' : ''}. Try again in a moment.', statusCode: status);
     }
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
