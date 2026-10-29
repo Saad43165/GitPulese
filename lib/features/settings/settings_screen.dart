@@ -329,7 +329,7 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.info_outline_rounded,
                   iconColor: Colors.grey,
                   title: 'GitPulse Info',
-                  subtitle: 'Version 1.0.0',
+                  subtitle: 'Version 1.1.0',
                 ),
                 _buildDivider(isDark),
                 _buildListTile(
